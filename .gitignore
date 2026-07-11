@@ -2,3 +2,7 @@
 viewer_config.json
 temp.py
 __pycache__/
+*.spec
+dist/
+build/
+config.py

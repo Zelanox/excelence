@@ -127,8 +127,6 @@ class ExcelViewer:
                 tags=(tag,)
             )
 
-            print(list(row))
-    
     def configure_style(self):
 
         style = ttk.Style()
