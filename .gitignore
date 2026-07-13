@@ -1,4 +1,3 @@
-فهرس.xlsx
 viewer_config.json
 temp.py
 __pycache__/
@@ -6,3 +5,4 @@ __pycache__/
 dist/
 build/
 config.py
+*.xlsx

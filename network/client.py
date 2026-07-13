@@ -3,7 +3,7 @@
 import socket
 import os
 
-import network.protocol as protocol
+from network import protocol
 import config
 
 
@@ -52,28 +52,30 @@ class NetworkClient:
 
         return protocol.read_response(reply)
 
-    def recieve_file(self, path, size):
+    def recieve_file(self, filename, size):
+
         os.makedirs(os.path.dirname(filename), exist_ok=True)
 
-        recieved = 0
+        received = 0
 
         with open(filename, "wb") as file:
-            while recieved < size:
+
+            while received < size:
 
                 chunk = self.socket.recv(
-                    min(4096, size - recieved)
+                    min(config.BUFFER_SIZE, size - received)
                 )
 
                 if not chunk:
                     raise ConnectionError(
-                        "Connection Lost During Download"
+                        "Connection lost during download."
                     )
-                
+
                 file.write(chunk)
 
-                recieved += len(chunk)
-        
-        print(f"Downloaded {recieved} Bytes.")
+                received += len(chunk)
+
+        print(f"Downloaded {received} bytes.")
 
     def send_file(self, path):
         with open(filename, "rb") as file:

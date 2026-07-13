@@ -1,5 +1,5 @@
 import os
-import protocol
+from network import protocol
 
 SERVER_VERSION = 1
 

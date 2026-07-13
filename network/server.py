@@ -1,8 +1,9 @@
 import socket
 import os
 
-import handlers
-import protocol
+from network import handlers
+from network import protocol
+import config
 
 HOST = "0.0.0.0"
 PORT = 5000
