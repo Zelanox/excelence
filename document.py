@@ -2,8 +2,9 @@ import pandas as pd
 
 class Document:
 
-    def __init__(self, storage):
+    def __init__(self, storage, network ):
         self.storage = storage
+        self.network = network
 
         self.df = pd.DataFrame()
 
