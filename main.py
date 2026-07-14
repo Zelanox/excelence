@@ -1,39 +1,105 @@
 import tkinter as tk
 
-from gui import ExcelViewer
-from document import Document
-from storage import Storage
-from network.client import NetworkClient
-from network.sync import SyncManager
 import config
+
+from storage import Storage
+from document import Document
+from gui import ExcelViewer
+
+from network.client import NetworkClient
 
 
 def main():
 
-    root = tk.Tk()
+    # ------------------------------------------
+    # Create core objects
+    # ------------------------------------------
 
     storage = Storage()
 
-    network = NetworkClient(config.SERVER_IP, config.SERVER_PORT)
-    network.connect()
+    network = NetworkClient(
+        config.SERVER_IP,
+        config.SERVER_PORT
+    )
 
-    sync = SyncManager(network)
-    sync.prepare_document()
+    print("Server IP:", config.SERVER_IP)
+    print("Server Port:", config.SERVER_PORT)
 
-    if network.ping():
+    # ------------------------------------------
+    # Detect server
+    # ------------------------------------------
+
+    online = network.connect()
+
+    if online:
+
         print("Server Online")
+
+        network.disconnect()
+
     else:
-        print("Server Offline")
 
-    network.disconnect()
+        print("Offline mode.")
 
-    document = Document(storage, network)
-    document.open(config.CACHE_FILE)
+    # ------------------------------------------
+    # Create document
+    # ------------------------------------------
 
-    viewer = ExcelViewer(root, document)
+    document = Document(
+        storage,
+        network,
+        online
+    )
+
+    # ------------------------------------------
+    # Open last document (if available)
+    # ------------------------------------------
+
+    last_file = storage.load_last_file()
+
+    if last_file:
+
+        try:
+
+            document.open(last_file)
+
+        except Exception as e:
+
+            print(e)
+
+    # ------------------------------------------
+    # Create GUI
+    # ------------------------------------------
+
+    root = tk.Tk()
+
+    app = ExcelViewer(
+        root,
+        document
+    )
+
+    # ------------------------------------------
+    # Handle application closing
+    # ------------------------------------------
+
+    def on_close():
+
+        try:
+
+            document.close()
+
+        finally:
+
+            root.destroy()
+
+    root.protocol(
+        "WM_DELETE_WINDOW",
+        on_close
+    )
 
     root.mainloop()
 
 
 if __name__ == "__main__":
+
     main()

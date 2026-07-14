@@ -1,14 +1,10 @@
-from network.client import NetworkClient
-import config
+import socket
 
-client = NetworkClient(config.SERVER_IP, config.SERVER_PORT)
+s = socket.socket()
+s.settimeout(5)
 
-client.connect()
-
-print("Connected!")
-
-response = client.upload_document()
-
-print(response)
-
-client.disconnect()
+try:
+    s.connect(("192.168.10.232", 5000))
+    print("SUCCESS")
+except Exception as e:
+    print(e)

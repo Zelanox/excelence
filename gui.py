@@ -12,7 +12,7 @@ class ExcelViewer:
         self.document = document
         self.storage = Storage()
 
-        self.root.title("Simple Excel Viewer")
+        self.root.title("التقيل للعرض و التعديل")
         self.root.geometry("900x600")
 
         # Widgets
@@ -183,7 +183,7 @@ class ExcelViewer:
 
             tk.Label(
                 dialog,
-                text=f"Sort Level {i + 1}:"
+                text=f"أولوية {i + 1}:"
             ).grid(
                 row=i,
                 column=0,
@@ -208,7 +208,7 @@ class ExcelViewer:
 
             order_combo = ttk.Combobox(
                 dialog,
-                values=["Ascending", "Descending"],
+                values=["تصاعدي", "تنازلي"],
                 state="readonly",
                 width=12
             )
@@ -238,14 +238,14 @@ class ExcelViewer:
 
                     "column": column,
 
-                    "ascending": order_box.get() == "Ascending"
+                    "تصاعدي": order_box.get() == "تصاعدي"
 
                 })
 
             if not sort_rules:
                 messagebox.showwarning(
-                    "Sort",
-                    "Please choose at least one column."
+                    "ترتيب",
+                    "اختر عمودا واحدا على الأقل"
                 )
                 return
 
@@ -258,7 +258,7 @@ class ExcelViewer:
 
         tk.Button(
             dialog,
-            text="Sort",
+            text="رتب",
             command=apply_sort,
             width=15
         ).grid(
@@ -349,8 +349,8 @@ class ExcelViewer:
         row = int(selected[0])
 
         if not messagebox.askyesno(
-            "Delete",
-            "Delete selected row?"
+            "حذف",
+            "نشيله ؟؟؟"
         ):
             return
 
@@ -391,19 +391,19 @@ class ExcelViewer:
 
         tk.Button(
             top,
-            text="Open Excel",
+            text="افتح ملف",
             command=self.on_open
         ).pack(side="left")
 
         tk.Button(
             top,
-            text="Save",
+            text="احفظ",
             command=self.document.save
         ).pack(side="left", padx=5)
 
         tk.Label(
             top,
-            text="Search:"
+            text="بحث:"
         ).pack(side="left", padx=(20, 5))
 
         tk.Entry(
@@ -414,13 +414,13 @@ class ExcelViewer:
 
         tk.Button(
             top,
-            text="Sort",
+            text="ترتيب",
             command=self.on_sort
         ).pack(side="left")
 
         tk.Button(
             top,
-            text="Add Row",
+            text="اضافة صف",
             command=self.on_add_row
         ).pack(side="left", padx=5)
 
@@ -435,7 +435,7 @@ class ExcelViewer:
 
         tk.Button(
             top,
-            text="Delete Row",
+            text="حذف صف",
             command=self.on_delete_row
         ).pack(side="left")
 

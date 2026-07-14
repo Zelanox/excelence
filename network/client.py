@@ -21,21 +21,19 @@ class NetworkClient:
 
     def connect(self):
 
-        try:
-
-            self.socket = socket.socket(
-                socket.AF_INET,
-                socket.SOCK_STREAM
-            )
-
-            self.socket.connect(
-                (self.host, self.port)
-            )
-
+        if self.socket is not None:
             return True
 
-        except OSError:
+        print(f"Connecting to {self.host}:{self.port}")
 
+        try:
+            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.socket.connect((self.host, self.port))
+            print("Connected!")
+            return True
+
+        except Exception as e:
+            print("Connect failed:", e)
             self.socket = None
             return False
 
@@ -61,6 +59,9 @@ class NetworkClient:
     # ==========================================================
 
     def send_request(self, command, **kwargs):
+
+        if self.socket is None:
+            raise ConnectionError("Not connected to server.")
 
         packet = protocol.make_request(
             command,
@@ -151,9 +152,21 @@ class NetworkClient:
 
     def ping(self):
 
-        return self.send_request(
-            protocol.PING
-        )
+        try:
+
+            self.connect()
+
+            response = self.send_request(protocol.PING)
+
+            self.disconnect()
+
+            return response["status"] == "PONG"
+
+        except Exception:
+
+            self.disconnect()
+
+            return False
 
 
     # ==========================================================

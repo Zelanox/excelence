@@ -1,0 +1,6 @@
+{
+    "server_ip": "127.0.0.1",
+    "server_port": 5000,
+    "buffer_size": 4096,
+    "cache_file": "cache/document.xlsx"
+}

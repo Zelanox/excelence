@@ -32,7 +32,7 @@ COMMANDS = {
 }
 
 
-def handle_client(client, packet, address):
+def handle_client(client, address):
 
     print(f"{address} connected")
 
@@ -45,10 +45,18 @@ def handle_client(client, packet, address):
             if not raw:
                 break
 
-            packet = protocol.read_request(raw)
+            try:
+
+                packet = protocol.read_request(raw)
+
+            except Exception as e:
+
+                print("Invalid packet:", e)
+
+                break
 
             print("\nCLIENT SENT:")
-            print(raw.decode())
+            print(raw.decode(errors="replace"))
 
             command = packet["command"]
 
@@ -99,28 +107,36 @@ def handle_client(client, packet, address):
 
 def main():
 
-    server = socket.socket(
-        socket.AF_INET,
-        socket.SOCK_STREAM
-    )
+    try:
+        server = socket.socket(
+            socket.AF_INET,
+            socket.SOCK_STREAM
+        )
 
-    server.setsockopt(
-        socket.SOL_SOCKET,
-        socket.SO_REUSEADDR,
-        1
-    )
+        server.setsockopt(
+            socket.SOL_SOCKET,
+            socket.SO_REUSEADDR,
+            1
+        )
 
-    server.bind((HOST, PORT))
+        server.bind((HOST, PORT))
 
-    server.listen()
+        server.listen()
 
-    print(f"Server listening on {HOST}:{PORT}")
+        print(f"Server listening on {HOST}:{PORT}")
 
-    while True:
+        while True:
 
-        client, address = server.accept()
+            client, address = server.accept()
+            print("CONNECTED:", address)
 
-        handle_client(client, address)
+            handle_client(client, address)
+    
+    except KeyboardInterrupt:
+        print("Stopping server")
+    
+    finally:
+        server.close()
 
 
 if __name__ == "__main__":

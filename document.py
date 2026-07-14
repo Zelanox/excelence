@@ -1,16 +1,15 @@
 import pandas as pd
 
 import config
-from network import protocol
-from network.clientmetadata import ClientMetadata
 
 
 class Document:
 
-    def __init__(self, storage, network):
+    def __init__(self, storage, network, online=False):
 
         self.storage = storage
         self.network = network
+        self.online = online
 
         self.df = pd.DataFrame()
 
@@ -19,89 +18,82 @@ class Document:
         self.product_column = None
         self.sort_rules = []
 
-    # --------------------------------------------------
-    # Open document
-    # --------------------------------------------------
+
+    # -------------------------------------------------
+    # Open
+    # -------------------------------------------------
+
+    def open(self, filename):
+
+        self.filename = filename
+
+        if self.online:
+
+            try:
+
+                self.network.connect()
+
+                server_version = self.network.get_version()
+
+                local_version = self.storage.get_local_version()
+
+                if server_version > local_version:
+
+                    print("Downloading newer version...")
+
+                    reply = self.network.download_document()
+
+                    if reply["status"] == "OK":
+
+                        filename = reply["path"]
+
+                        self.storage.set_local_version(
+                            server_version
+                        )
+
+                lock = self.network.lock_document()
+
+                if lock["status"] != "OK":
+
+                    raise RuntimeError(
+                        lock.get(
+                            "message",
+                            "Document is already locked."
+                        )
+                    )
+
+            except Exception as e:
+
+                print(f"Network error: {e}")
+                print("Falling back to offline mode.")
+
+                self.online = False
+
+            finally:
+
+                self.network.disconnect()
+
+        self.load(filename)
+
+
+    # -------------------------------------------------
+    # Load
+    # -------------------------------------------------
 
     def load(self, filename):
 
         self.filename = filename
 
-        #
-        # ONLINE MODE
-        #
-        if self.network is not None:
-
-            if not self.network.connect():
-                raise ConnectionError(
-                    "Unable to connect to server."
-                )
-
-            #
-            # Ask server for lock
-            #
-            reply = self.network.open_document()
-
-            if reply["status"] == protocol.LOCKED:
-
-                self.network.disconnect()
-
-                raise PermissionError(
-                    "Document is currently being edited."
-                )
-
-            #
-            # Version check
-            #
-            server_version = self.network.get_version()["version"]
-
-            local_version = ClientMetadata.version()
-
-            if server_version != local_version:
-
-                print("Downloading newer document...")
-
-                response = self.network.download_document()
-
-                if response["status"] != "OK":
-
-                    self.network.disconnect()
-
-                    raise RuntimeError(
-                        response.get(
-                            "message",
-                            "Download failed."
-                        )
-                    )
-
-                ClientMetadata.set_version(server_version)
-
-            #
-            # Open local cache
-            #
-            self.filename = config.CACHE_FILE
-
-        #
-        # OFFLINE MODE
-        #
-        else:
-
-            self.filename = filename
-
-        #
-        # Load dataframe
-        #
-        self.df = self.storage.load_excel(
-            self.filename
-        )
+        self.df = self.storage.load_excel(filename)
 
         self.product_column = self.df.columns[-1]
 
-        self.storage.save_last_file(self.filename)
+        self.storage.save_last_file(filename)
 
-    # --------------------------------------------------
+
+    # -------------------------------------------------
     # Search
-    # --------------------------------------------------
+    # -------------------------------------------------
 
     def search(self, text):
 
@@ -113,21 +105,20 @@ class Document:
         mask = self.df.astype(str).apply(
 
             lambda row:
-
             row.str.lower().str.contains(
                 text,
                 na=False
             ).any(),
 
             axis=1
-
         )
 
         return self.df[mask]
 
-    # --------------------------------------------------
-    # Add row
-    # --------------------------------------------------
+
+    # -------------------------------------------------
+    # Add Row
+    # -------------------------------------------------
 
     def add_row(self, value):
 
@@ -152,9 +143,10 @@ class Document:
 
         return True
 
-    # --------------------------------------------------
+
+    # -------------------------------------------------
     # Sort
-    # --------------------------------------------------
+    # -------------------------------------------------
 
     def sort(self, sort_rules):
 
@@ -169,7 +161,7 @@ class Document:
         ]
 
         ascending = [
-            rule["ascending"]
+            rule["تصاعدي"]
             for rule in sort_rules
         ]
 
@@ -185,9 +177,10 @@ class Document:
 
         )
 
-    # --------------------------------------------------
-    # Edit
-    # --------------------------------------------------
+
+    # -------------------------------------------------
+    # Update Cell
+    # -------------------------------------------------
 
     def update_cell(
         self,
@@ -216,9 +209,10 @@ class Document:
 
         self.df.at[row, column_name] = value
 
-    # --------------------------------------------------
+
+    # -------------------------------------------------
     # Delete
-    # --------------------------------------------------
+    # -------------------------------------------------
 
     def delete_row(self, index):
 
@@ -231,53 +225,44 @@ class Document:
         self.df = (
 
             self.df
+
             .drop(index)
+
             .reset_index(drop=True)
 
         )
 
         return True
 
-    # --------------------------------------------------
+
+    # -------------------------------------------------
     # Save
-    # --------------------------------------------------
+    # -------------------------------------------------
 
     def save(self):
 
-        if not self.filename:
-            return
+        if self.filename:
 
-        #
-        # Save locally
-        #
-        self.storage.save_excel(
-            self.df,
-            self.filename
-        )
+            self.storage.save_excel(
 
-        #
-        # Upload if connected
-        #
-        if self.network is not None:
-            
-            try:
+                self.df,
 
-                response = self.network.upload_document()
+                self.filename
 
-                if response["status"] == "OK":
+            )
 
-                    ClientMetadata.set_version(
-                        response["version"]
-                    )
-            
-            except Exception as e:
-                print(e)
+            if self.online:
 
-                return
+                try:
 
-    # --------------------------------------------------
-    # Save As
-    # --------------------------------------------------
+                    self.network.connect()
+
+                    self.network.upload_document()
+
+                finally:
+
+                    self.network.disconnect()
+
 
     def save_as(self, filename):
 
@@ -287,29 +272,36 @@ class Document:
 
         self.save()
 
-    # --------------------------------------------------
+
+    # -------------------------------------------------
     # Close
-    # --------------------------------------------------
+    # -------------------------------------------------
 
     def close(self):
 
-        if self.network is None:
+        if not self.online:
             return
 
         try:
 
-            self.save()
+            self.network.connect()
 
-            self.network.close_document()
+            self.network.unlock_document()
+
+        except Exception:
+
+            pass
 
         finally:
 
             self.network.disconnect()
 
-    # --------------------------------------------------
+
+    # -------------------------------------------------
 
     def export_excel(self):
         pass
+
 
     def import_excel(self):
         pass
