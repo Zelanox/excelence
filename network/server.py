@@ -1,22 +1,38 @@
 import socket
-import os
+import traceback
 
-from network import handlers
-from network import protocol
 import config
+import network.protocol as protocol
+import network.handlers as handlers
+
 
 HOST = "0.0.0.0"
-PORT = 5000
+PORT = config.SERVER_PORT
+
 
 COMMANDS = {
-    protocol.PING: handlers.ping,
-    protocol.VERSION: handlers.version,
-    protocol.DOWNLOAD_DOCUMENT: handlers.download_document,
-    protocol.UPLOAD_DOCUMENT: handlers.upload_document,
+
+    protocol.PING:
+        handlers.ping,
+
+    protocol.GET_VERSION:
+        handlers.get_version,
+
+    protocol.DOWNLOAD_DOCUMENT:
+        handlers.download_document,
+
+    protocol.UPLOAD_DOCUMENT:
+        handlers.upload_document,
+
+    protocol.OPEN_DOCUMENT:
+        handlers.open_document,
+
+    protocol.CLOSE_DOCUMENT:
+        handlers.close_document
 }
 
 
-def handle_client(client, address):
+def handle_client(client, packet, address):
 
     print(f"{address} connected")
 
@@ -29,21 +45,24 @@ def handle_client(client, address):
             if not raw:
                 break
 
+            packet = protocol.read_request(raw)
+
             print("\nCLIENT SENT:")
             print(raw.decode())
 
-            packet = protocol.read_request(raw)
-
-            command = packet.get("command")
+            command = packet["command"]
 
             handler = COMMANDS.get(command)
 
             if handler is None:
 
                 client.sendall(
+
                     protocol.make_response(
-                        status="ERROR",
-                        message="Unknown command"
+
+                        status=protocol.ERROR,
+
+                        message="Unknown command."
                     )
                 )
 
@@ -51,19 +70,31 @@ def handle_client(client, address):
 
             handler(client, packet)
 
-    except ConnectionResetError:
+    except Exception as error:
 
-        print(f"{address} disconnected unexpectedly")
+        print("Server error:")
+        traceback.print_exc()
 
-    except Exception as e:
+        try:
 
-        print("Server error:", e)
+            client.sendall(
+
+                protocol.make_response(
+
+                    status=protocol.ERROR,
+
+                    message=str(error)
+                )
+            )
+
+        except Exception:
+            pass
 
     finally:
 
-        client.close()
-
         print(f"{address} disconnected")
+
+        client.close()
 
 
 def main():
@@ -71,6 +102,12 @@ def main():
     server = socket.socket(
         socket.AF_INET,
         socket.SOCK_STREAM
+    )
+
+    server.setsockopt(
+        socket.SOL_SOCKET,
+        socket.SO_REUSEADDR,
+        1
     )
 
     server.bind((HOST, PORT))

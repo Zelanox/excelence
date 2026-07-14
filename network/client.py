@@ -1,10 +1,9 @@
-# network/client.py
-
-import socket
 import os
+import socket
 
-from network import protocol
 import config
+import network.protocol as protocol
+from network.client_metadata import ClientMetadata
 
 
 class NetworkClient:
@@ -16,45 +15,87 @@ class NetworkClient:
         self.socket = None
 
 
+    # ==========================================================
+    # Connection
+    # ==========================================================
+
     def connect(self):
 
-        if self.socket is not None:
-            return
+        try:
 
-        self.socket = socket.socket(
-            socket.AF_INET,
-            socket.SOCK_STREAM
-        )
+            self.socket = socket.socket(
+                socket.AF_INET,
+                socket.SOCK_STREAM
+            )
 
-        self.socket.connect((self.host, self.port))
+            self.socket.connect(
+                (self.host, self.port)
+            )
+
+            return True
+
+        except OSError:
+
+            self.socket = None
+            return False
 
 
     def disconnect(self):
 
-        if self.socket:
+        if self.socket is None:
+            return
+
+        try:
             self.socket.close()
+
+        finally:
             self.socket = None
 
+    def is_connected(self):
+
+        return self.socket is not None
+
+
+    # ==========================================================
+    # Generic Request
+    # ==========================================================
 
     def send_request(self, command, **kwargs):
 
-        packet = protocol.make_request(command, **kwargs)
+        packet = protocol.make_request(
+            command,
+            **kwargs
+        )
+
+        self.socket.sendall(packet)
 
         print("\nCLIENT -> SERVER")
         print(packet.decode())
 
-        self.socket.sendall(packet)
-
-        reply = self.socket.recv(4096)
+        reply = self.socket.recv(
+            config.BUFFER_SIZE
+        )
 
         print("SERVER -> CLIENT")
         print(reply.decode())
 
         return protocol.read_response(reply)
 
-    def recieve_file(self, filename, size):
 
-        os.makedirs(os.path.dirname(filename), exist_ok=True)
+    # ==========================================================
+    # File Transfer
+    # ==========================================================
+
+    def receive_file(self, filename, size):
+
+        folder = os.path.dirname(filename)
+
+        if folder:
+
+            os.makedirs(
+                folder,
+                exist_ok=True
+            )
 
         received = 0
 
@@ -63,10 +104,14 @@ class NetworkClient:
             while received < size:
 
                 chunk = self.socket.recv(
-                    min(config.BUFFER_SIZE, size - received)
+                    min(
+                        config.BUFFER_SIZE,
+                        size - received
+                    )
                 )
 
                 if not chunk:
+
                     raise ConnectionError(
                         "Connection lost during download."
                     )
@@ -77,72 +122,170 @@ class NetworkClient:
 
         print(f"Downloaded {received} bytes.")
 
-    def send_file(self, path):
+
+    def send_file(self, filename):
+
+        filesize = os.path.getsize(filename)
+
+        print(f"Uploading {filesize} bytes...")
+
         with open(filename, "rb") as file:
 
             while True:
 
-                chunk = file.read(4096)
+                chunk = file.read(
+                    config.BUFFER_SIZE
+                )
 
                 if not chunk:
                     break
 
                 self.socket.sendall(chunk)
-        
-        print("Upload Finished.")
 
-    # Commands
+        print("Upload complete.")
+
+
+    # ==========================================================
+    # Ping
+    # ==========================================================
 
     def ping(self):
-        return self.send_request(protocol.PING)
 
-    def version(self):
-        return self.send_request(protocol.VERSION)
+        return self.send_request(
+            protocol.PING
+        )
+
+
+    # ==========================================================
+    # Version
+    # ==========================================================
+
+    def get_version(self):
+
+        reply = self.send_request(
+            protocol.GET_VERSION
+        )
+
+        if reply["status"] != protocol.OK:
+            return None
+
+        return reply["version"]
+
+
+    def local_version(self):
+
+        return ClientMetadata.current()
+
+
+    # ==========================================================
+    # Download
+    # ==========================================================
 
     def download_document(self):
 
-        response = self.send_request(protocol.DOWNLOAD_DOCUMENT)
-
-        if response["status"] != protocol.READY:
-            return response
-        
-        print("sending ready ack")  # debug
-
-        self.socket.sendall(
-            protocol.make_request(protocol.READY)
+        response = self.send_request(
+            protocol.DOWNLOAD_DOCUMENT
         )
 
-        print("read ack sent")
+        if response["status"] != protocol.READY:
 
-        self.recieve_file(
+            return response
+
+        self.socket.sendall(
+            protocol.make_request(
+                protocol.READY
+            )
+        )
+
+        self.receive_file(
             config.CACHE_FILE,
             response["size"]
         )
 
-        return {
-            "status": "OK",
-            "path": config.CACHE_FILE
-        }
-
-    def upload_document(self):
-        
-        if not os.path.exists(config.CACHE_FILE):
-
-            return{
-                "status": "ERROR",
-                "message": "Cache file not found."
-            }
-        
-        size = os.path.getsize(config.CACHE_FILE)
-
-        response = self.send_request(
-            protocol.UPLOAD_DOCUMENT,
-            size=size
+        ClientMetadata.set(
+            response["version"]
         )
 
-        if response["state"] != protocol.READY:
-            return response
-        
-        self.send_file(config.CACHE_FILE)
+        return {
+            "status": protocol.OK,
+            "path": config.CACHE_FILE,
+            "version": response["version"]
+        }
 
-        return self.socket.recv(4096)     
+
+    # ==========================================================
+    # Upload
+    # ==========================================================
+
+    def upload_document(self):
+
+        if not os.path.exists(
+            config.CACHE_FILE
+        ):
+
+            return {
+
+                "status": protocol.ERROR,
+
+                "message":
+                "Cache file not found."
+            }
+
+        filesize = os.path.getsize(
+            config.CACHE_FILE
+        )
+
+        response = self.send_request(
+
+            protocol.UPLOAD_DOCUMENT,
+
+            size=filesize
+        )
+
+        if response["status"] != protocol.READY:
+
+            return response
+
+        self.send_file(
+            config.CACHE_FILE
+        )
+
+        reply = self.socket.recv(
+            config.BUFFER_SIZE
+        )
+
+        response = protocol.read_response(
+            reply
+        )
+
+        if response["status"] == protocol.OK:
+
+            ClientMetadata.set(
+                response["version"]
+            )
+
+        return response
+
+
+    # ==========================================================
+    # Document Lock
+    # ==========================================================
+
+    def open_document(self, owner):
+
+        return self.send_request(
+
+            protocol.OPEN_DOCUMENT,
+
+            owner=owner
+        )
+
+
+    def close_document(self, owner):
+
+        return self.send_request(
+
+            protocol.CLOSE_DOCUMENT,
+
+            owner=owner
+        )

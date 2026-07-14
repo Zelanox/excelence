@@ -1,9 +1,11 @@
 import os
-from network import protocol
 
-SERVER_VERSION = 1
+import config
+import network.protocol as protocol
 
-SERVER_DOCUMENT = "C:/Users/W/Desktop/\u0641\u0647\u0631\u0633.xlsx"
+from network.version import VersionManager
+from network.lock import DocumentLock
+
 
 def ping(client, packet):
 
@@ -13,91 +15,94 @@ def ping(client, packet):
         )
     )
 
-def version(client, packet):
+
+def get_version(client, packet):
 
     client.sendall(
         protocol.make_response(
-            status="OK",
-            version=1
+            status=protocol.OK,
+            version=VersionManager.current()
         )
     )
+
 
 def download_document(client, packet):
 
-    print("Looking for:", SERVER_DOCUMENT)      # Debugging
-    print("Absolute path:", os.path.abspath(SERVER_DOCUMENT))   # Debugging
+    filename = config.SERVER_DOCUMENT
 
-    if not os.path.exists(SERVER_DOCUMENT):
+    if not os.path.exists(filename):
+
         client.sendall(
             protocol.make_response(
                 status="ERROR",
-                message="Document not found"
+                message="Document not found."
             )
         )
-    
+
         return
-    
-    size = os.path.getsize(SERVER_DOCUMENT)
+
+    filesize = os.path.getsize(filename)
 
     client.sendall(
         protocol.make_response(
-            status="READY",
-            size=size
+            status=protocol.READY,
+            size=filesize,
+            version=VersionManager.current()
         )
     )
 
-    print("waiting for READY ack ...")  # debug
+    ack = protocol.read_request(client.recv(config.BUFFER_SIZE))
 
-    raw = client.recv(4096)
-
-    print("Raw ACK:", raw)  #debug
-
-    if not raw:
-        print("Client disconnected before ACK.")
+    if ack["command"] != protocol.READY:
         return
 
-    ack = protocol.read_request(raw)
+    print(f"Sending {filesize} bytes...")
 
-    print("ACK:", ack)  #debug0
-    
-    if ack["command"] != "READY":
-        return
-    
-    with open(SERVER_DOCUMENT, "rb") as file:
+    with open(filename, "rb") as file:
+
         while True:
-            chunk = file.read(4096)
+
+            chunk = file.read(config.BUFFER_SIZE)
 
             if not chunk:
                 break
 
             client.sendall(chunk)
 
+    print("Download complete.")
+
+
 def upload_document(client, packet):
 
-    size = packet["size"]
+    filename = config.SERVER_DOCUMENT
 
-    save_path = config.SERVER_DOCUMENT
+    filesize = packet["size"]
 
-    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    print(f"Saving to: {filename}")
 
     client.sendall(
         protocol.make_response(
-            status="READY"
+            status=protocol.READY
         )
+    )
+
+    os.makedirs(
+        os.path.dirname(filename),
+        exist_ok=True
     )
 
     received = 0
 
-    with open(save_path, "wb") as file:
+    with open(filename, "wb") as file:
 
-        while received < size:
+        while received < filesize:
 
             chunk = client.recv(
-                min(config.BUFFER_SIZE, size - received)
+                min(config.BUFFER_SIZE, filesize - received)
             )
 
             if not chunk:
-                break
+                raise ConnectionError("Connection lost.")
 
             file.write(chunk)
 
@@ -105,8 +110,56 @@ def upload_document(client, packet):
 
     print(f"Received {received} bytes.")
 
+    new_version = VersionManager.increment()
+
     client.sendall(
         protocol.make_response(
-            status="OK"
+            status=protocol.OK,
+            version=new_version
         )
     )
+
+
+def open_document(client, packet):
+
+    owner = packet["owner"]
+
+    if DocumentLock.lock(owner):
+
+        client.sendall(
+            protocol.make_response(
+                status=protocol.OK,
+                version=VersionManager.current()
+            )
+        )
+
+    else:
+
+        client.sendall(
+            protocol.make_response(
+                status="LOCKED",
+                owner=DocumentLock.owner()
+            )
+        )
+    
+
+
+def close_document(client, packet):
+
+    owner = packet["owner"]
+
+    if DocumentLock.unlock(owner):
+
+        client.sendall(
+            protocol.make_response(
+                status=protocol.OK
+            )
+        )
+
+    else:
+
+        client.sendall(
+            protocol.make_response(
+                status="DENIED"
+            )
+        )

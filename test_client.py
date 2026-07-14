@@ -7,7 +7,7 @@ client.connect()
 
 print("Connected!")
 
-response = client.download_document()
+response = client.upload_document()
 
 print(response)
 

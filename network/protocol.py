@@ -1,56 +1,152 @@
 import json
 
-# ---------- Commands ----------
+
+# ==========================================================
+# Commands
+# ==========================================================
 
 PING = "PING"
-VERSION = "VERSION"
+
+GET_VERSION = "GET_VERSION"
 
 DOWNLOAD_DOCUMENT = "DOWNLOAD_DOCUMENT"
 UPLOAD_DOCUMENT = "UPLOAD_DOCUMENT"
 
-LOCK = "LOCK"
-UNLOCK = "UNLOCK"
+OPEN_DOCUMENT = "OPEN_DOCUMENT"
+CLOSE_DOCUMENT = "CLOSE_DOCUMENT"
 
 READY = "READY"
-ERROR = "ERROR"
+
 OK = "OK"
-PONG = "PONG"
+ERROR = "ERROR"
 
-# ---------- Packet Helpers ----------
+LOCKED = "LOCKED"
+DENIED = "DENIED"
 
-def make_request(command, **data):
-    """
-    Create a JSON request packet.
-    """
+
+# ==========================================================
+# Packet Builders
+# ==========================================================
+
+def make_request(command, **kwargs):
+
     packet = {
-        "command": command,
-        **data
+        "protocol": 1,
+        "command": command
     }
 
-    return json.dumps(packet).encode("utf-8")
+    packet.update(kwargs)
 
+    return json.dumps(
+        packet,
+        ensure_ascii=False
+    ).encode("utf-8")
+
+
+def make_response(status, **kwargs):
+
+    packet = {
+        "protocol": 1,
+        "status": status
+    }
+
+    packet.update(kwargs)
+
+    return json.dumps(
+        packet,
+        ensure_ascii=False
+    ).encode("utf-8")
+
+# ==========================================================
+# Packet Validators
+# ==========================================================
+
+def validate_request(packet):
+
+    if "command" not in packet:
+        raise ValueError("Missing command.")
+
+    return packet
+
+
+def validate_response(packet):
+
+    if "status" not in packet:
+        raise ValueError("Missing status.")
+
+    return packet
+
+# ==========================================================
+# Packet Readers
+# ==========================================================
 
 def read_request(data):
-    """
-    Decode bytes into a Python dictionary.
-    """
-    return json.loads(data.decode("utf-8"))
 
+    if not data:
 
-def make_response(status="OK", **data):
-    """
-    Create a JSON response packet.
-    """
-    packet = {
-        "status": status,
-        **data
-    }
+        raise ConnectionError(
+            "No request received."
+        )
 
-    return json.dumps(packet).encode("utf-8")
+    try:
+
+        return json.loads(
+            data.decode("utf-8")
+        )
+
+    except json.JSONDecodeError as error:
+
+        raise ValueError(
+            f"Invalid request packet: {error}"
+        )
 
 
 def read_response(data):
-    """
-    Decode a response packet.
-    """
-    return json.loads(data.decode("utf-8"))
+
+    if not data:
+
+        raise ConnectionError(
+            "No response received."
+        )
+
+    try:
+
+        return json.loads(
+            data.decode("utf-8")
+        )
+
+    except json.JSONDecodeError as error:
+
+        raise ValueError(
+            f"Invalid response packet: {error}"
+        )
+
+
+# ==========================================================
+# Debug Helpers
+# ==========================================================
+
+def print_request(packet):
+
+    print("\nCLIENT -> SERVER")
+
+    print(
+        json.dumps(
+            packet,
+            indent=4,
+            ensure_ascii=False
+        )
+    )
+
+
+def print_response(packet):
+
+    print("\nSERVER -> CLIENT")
+
+    print(
+        json.dumps(
+            packet,
+            indent=4,
+            ensure_ascii=False
+        )
+    )

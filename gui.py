@@ -45,18 +45,31 @@ class ExcelViewer:
         if not filename:
             return
 
-        self.document.load(filename)
+        try:
 
-        self.refresh_tree()
+            self.document.load(filename)
 
+            self.refresh_tree()
+
+        except PermissionError as e:
+
+            messagebox.showwarning(
+                "Locked",
+                str(e)
+            )
+
+        except Exception as e:
+
+            messagebox.showerror(
+                "Error",
+                str(e)
+            )
     def refresh_tree(self, dataframe=None):
 
-        # Use the whole document if no filtered DataFrame is supplied
         if dataframe is None:
             dataframe = self.document.df
 
-        # Nothing loaded
-        if dataframe is None:
+        if dataframe is None or dataframe.empty:
             return
 
         # Clear existing rows
@@ -268,6 +281,8 @@ class ExcelViewer:
 
             self.search_var.set(value)
 
+            self.new_product_entry.focus_set()
+
     # ---------------- Edit ----------------
     def edit_cell(self, event):
 
@@ -356,7 +371,16 @@ class ExcelViewer:
 
     def on_close(self):
 
-        self.document.save()
+        try:
+
+            self.document.close()
+
+        except Exception as e:
+
+            messagebox.showerror(
+                "Error",
+                str(e)
+            )
 
         self.root.destroy()
     

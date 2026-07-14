@@ -4,7 +4,7 @@ from gui import ExcelViewer
 from document import Document
 from storage import Storage
 from network.client import NetworkClient
-
+from network.sync import SyncManager
 import config
 
 
@@ -17,6 +17,9 @@ def main():
     network = NetworkClient(config.SERVER_IP, config.SERVER_PORT)
     network.connect()
 
+    sync = SyncManager(network)
+    sync.prepare_document()
+
     if network.ping():
         print("Server Online")
     else:
@@ -25,11 +28,7 @@ def main():
     network.disconnect()
 
     document = Document(storage, network)
-
-    last = storage.load_last()
-
-    if last:
-        document.load(last)
+    document.open(config.CACHE_FILE)
 
     viewer = ExcelViewer(root, document)
 
