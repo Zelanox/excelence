@@ -30,6 +30,15 @@ def download_document(client, packet):
 
     filename = config.SERVER_DOCUMENT
 
+    if not filename:
+        client.sendall(
+            protocol.make_response(
+                status=protocol.ERROR,
+                message="SERVER_DOCUMENT is not configured."
+            )
+        )
+        return
+
     if not os.path.exists(filename):
 
         client.sendall(
@@ -86,10 +95,10 @@ def upload_document(client, packet):
         )
     )
 
-    os.makedirs(
-        os.path.dirname(filename),
-        exist_ok=True
-    )
+    folder = os.path.dirname(filename)
+
+    if folder:
+        os.makedirs(folder, exist_ok=True)
 
     received = 0
 
@@ -129,7 +138,8 @@ def open_document(client, packet):
         client.sendall(
             protocol.make_response(
                 status=protocol.OK,
-                version=VersionManager.current()
+                version=VersionManager.current(),
+                owner=owner
             )
         )
 
@@ -137,7 +147,7 @@ def open_document(client, packet):
 
         client.sendall(
             protocol.make_response(
-                status="LOCKED",
+                status=protocol.LOCKED,
                 owner=DocumentLock.owner()
             )
         )
@@ -160,6 +170,6 @@ def close_document(client, packet):
 
         client.sendall(
             protocol.make_response(
-                status="DENIED"
+                status=protocol.DENIED
             )
         )

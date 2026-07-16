@@ -1,10 +1,10 @@
 import os
 import socket
+import uuid
 
 import config
 import network.protocol as protocol
 from network.client_metadata import ClientMetadata
-
 
 class NetworkClient:
 
@@ -12,8 +12,11 @@ class NetworkClient:
 
         self.host = host
         self.port = port
+
         self.socket = None
 
+        # Unique client id used for document locking
+        self.owner = str(uuid.uuid4())
 
     # ==========================================================
     # Connection
@@ -44,14 +47,26 @@ class NetworkClient:
             return
 
         try:
+
+            try:
+                self.socket.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+
             self.socket.close()
 
         finally:
-            self.socket = None
 
+            self.socket = None
     def is_connected(self):
 
         return self.socket is not None
+
+    def reconnect(self):
+
+        self.disconnect()
+
+        return self.connect()
 
 
     # ==========================================================
@@ -284,21 +299,20 @@ class NetworkClient:
     # Document Lock
     # ==========================================================
 
-    def open_document(self, owner):
+    def open_document(self):
 
         return self.send_request(
 
             protocol.OPEN_DOCUMENT,
 
-            owner=owner
+            owner=self.owner
         )
 
-
-    def close_document(self, owner):
+    def close_document(self):
 
         return self.send_request(
 
             protocol.CLOSE_DOCUMENT,
 
-            owner=owner
+            owner=self.owner
         )

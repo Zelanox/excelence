@@ -4,6 +4,7 @@ import traceback
 import config
 import network.protocol as protocol
 import network.handlers as handlers
+from network.lock import DocumentLock
 
 
 HOST = "0.0.0.0"
@@ -36,6 +37,8 @@ def handle_client(client, address):
 
     print(f"{address} connected")
 
+    owner = None
+
     try:
 
         while True:
@@ -59,6 +62,10 @@ def handle_client(client, address):
             print(raw.decode(errors="replace"))
 
             command = packet["command"]
+
+            if command == protocol.OPEN_DOCUMENT:
+
+                owner = packet["owner"]
 
             handler = COMMANDS.get(command)
 
@@ -100,10 +107,13 @@ def handle_client(client, address):
 
     finally:
 
+        if owner is not None:
+
+            DocumentLock.unlock(owner)
+
         print(f"{address} disconnected")
 
         client.close()
-
 
 def main():
 
@@ -127,8 +137,12 @@ def main():
 
         while True:
 
+            print("Waiting for client")
+            
             client, address = server.accept()
             print("CONNECTED:", address)
+
+            print(f"Accepted :\t{address}")
 
             handle_client(client, address)
     

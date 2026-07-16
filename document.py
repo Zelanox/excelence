@@ -1,7 +1,5 @@
 import pandas as pd
 
-import config
-
 
 class Document:
 
@@ -18,10 +16,12 @@ class Document:
         self.product_column = None
         self.sort_rules = []
 
+        self.modified = False
 
-    # -------------------------------------------------
+
+    # ==========================================================
     # Open
-    # -------------------------------------------------
+    # ==========================================================
 
     def open(self, filename):
 
@@ -31,11 +31,15 @@ class Document:
 
             try:
 
-                self.network.connect()
+                if not self.network.connect():
+
+                    raise ConnectionError(
+                        "Unable to connect."
+                    )
 
                 server_version = self.network.get_version()
 
-                local_version = self.storage.get_local_version()
+                local_version = self.network.local_version()
 
                 if server_version > local_version:
 
@@ -47,38 +51,38 @@ class Document:
 
                         filename = reply["path"]
 
-                        self.storage.set_local_version(
-                            server_version
-                        )
+                reply = self.network.open_document()
 
-                lock = self.network.lock_document()
-
-                if lock["status"] != "OK":
+                if reply["status"] != "OK":
 
                     raise RuntimeError(
-                        lock.get(
+
+                        reply.get(
+
                             "message",
-                            "Document is already locked."
+
+                            "Document is locked."
+
                         )
+
                     )
 
             except Exception as e:
 
-                print(f"Network error: {e}")
+                print("Network error:", e)
+
                 print("Falling back to offline mode.")
 
                 self.online = False
-
-            finally:
 
                 self.network.disconnect()
 
         self.load(filename)
 
 
-    # -------------------------------------------------
+    # ==========================================================
     # Load
-    # -------------------------------------------------
+    # ==========================================================
 
     def load(self, filename):
 
@@ -91,40 +95,47 @@ class Document:
         self.storage.save_last_file(filename)
 
 
-    # -------------------------------------------------
+    # ==========================================================
     # Search
-    # -------------------------------------------------
+    # ==========================================================
 
     def search(self, text):
 
         text = text.strip().lower()
 
         if text == "":
+
             return self.df
 
         mask = self.df.astype(str).apply(
 
             lambda row:
+
             row.str.lower().str.contains(
+
                 text,
+
                 na=False
+
             ).any(),
 
             axis=1
+
         )
 
         return self.df[mask]
 
 
-    # -------------------------------------------------
+    # ==========================================================
     # Add Row
-    # -------------------------------------------------
+    # ==========================================================
 
     def add_row(self, value):
 
         value = value.strip()
 
         if not value:
+
             return False
 
         new_row = {
@@ -139,30 +150,39 @@ class Document:
 
         self.df.loc[len(self.df)] = new_row
 
+        self.modified = True
+
         self.sort(self.sort_rules)
 
         return True
 
 
-    # -------------------------------------------------
+    # ==========================================================
     # Sort
-    # -------------------------------------------------
+    # ==========================================================
 
     def sort(self, sort_rules):
 
         self.sort_rules = sort_rules
 
         if not sort_rules:
+
             return
 
         columns = [
+
             rule["column"]
+
             for rule in sort_rules
+
         ]
 
         ascending = [
+
             rule["تصاعدي"]
+
             for rule in sort_rules
+
         ]
 
         self.df.sort_values(
@@ -178,15 +198,20 @@ class Document:
         )
 
 
-    # -------------------------------------------------
+    # ==========================================================
     # Update Cell
-    # -------------------------------------------------
+    # ==========================================================
 
     def update_cell(
+
         self,
+
         row,
+
         column_name,
+
         value
+
     ):
 
         dtype = self.df[column_name].dtype
@@ -204,22 +229,28 @@ class Document:
         except ValueError:
 
             raise ValueError(
+
                 f"Please enter a valid {dtype}."
+
             )
 
         self.df.at[row, column_name] = value
 
+        self.modified = True
 
-    # -------------------------------------------------
-    # Delete
-    # -------------------------------------------------
+
+    # ==========================================================
+    # Delete Row
+    # ==========================================================
 
     def delete_row(self, index):
 
         if self.df.empty:
+
             return False
 
         if index not in self.df.index:
+
             return False
 
         self.df = (
@@ -232,36 +263,28 @@ class Document:
 
         )
 
+        self.modified = True
+
         return True
 
 
-    # -------------------------------------------------
+    # ==========================================================
     # Save
-    # -------------------------------------------------
+    # ==========================================================
 
     def save(self):
 
-        if self.filename:
+        if not self.filename:
 
-            self.storage.save_excel(
+            return
 
-                self.df,
+        self.storage.save_excel(
 
-                self.filename
+            self.df,
 
-            )
+            self.filename
 
-            if self.online:
-
-                try:
-
-                    self.network.connect()
-
-                    self.network.upload_document()
-
-                finally:
-
-                    self.network.disconnect()
+        )
 
 
     def save_as(self, filename):
@@ -273,35 +296,48 @@ class Document:
         self.save()
 
 
-    # -------------------------------------------------
+    # ==========================================================
     # Close
-    # -------------------------------------------------
+    # ==========================================================
 
     def close(self):
 
+        self.save()
+
         if not self.online:
+
             return
 
         try:
 
-            self.network.connect()
+            if self.modified:
 
-            self.network.unlock_document()
+                reply = self.network.upload_document()
 
-        except Exception:
+                if reply["status"] == "OK":
 
-            pass
+                    self.modified = False
+
+            self.network.close_document()
+
+        except Exception as e:
+
+            print("Shutdown error:", e)
 
         finally:
 
             self.network.disconnect()
 
 
-    # -------------------------------------------------
+    # ==========================================================
+    # Import / Export
+    # ==========================================================
 
     def export_excel(self):
+
         pass
 
 
     def import_excel(self):
+
         pass

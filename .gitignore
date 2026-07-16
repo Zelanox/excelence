@@ -4,5 +4,4 @@ __pycache__/
 *.spec
 dist/
 build/
-config.py
 *.xlsx
