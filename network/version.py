@@ -1,101 +1,165 @@
 import json
 import os
+from datetime import datetime
 
-
-VERSION_FILE = "storage/metadata.json"
+import config
 
 
 class VersionManager:
 
+    FILE = os.path.join(
+        config.BASE_DIR,
+        "versions.json"
+    )
 
-    @staticmethod
-    def load():
+    # =====================================
+    # Internal
+    # =====================================
 
-        if not os.path.exists(VERSION_FILE):
+    @classmethod
+    def _load(cls):
 
-            data = {
-                "version": 1
-            }
+        if not os.path.exists(cls.FILE):
 
-            VersionManager.save(data)
-
-            return data
-
-        try:
-
-            with open(
-                VERSION_FILE,
-                "r",
-                encoding="utf-8"
-            ) as file:
-
-                return json.load(file)
-
-        except (
-            json.JSONDecodeError,
-            OSError
-        ):
-
-            data = {
-                "version": 1
-            }
-
-            VersionManager.save(data)
-
-            return data
-
-
-    @staticmethod
-    def save(data):
-
-        os.makedirs(
-            os.path.dirname(VERSION_FILE),
-            exist_ok=True
-        )
+            return {}
 
         with open(
-            VERSION_FILE,
+            cls.FILE,
+            "r",
+            encoding="utf-8"
+        ) as f:
+
+            return json.load(f)
+
+    @classmethod
+    def _save(cls, versions):
+
+        with open(
+            cls.FILE,
             "w",
             encoding="utf-8"
-        ) as file:
+        ) as f:
 
             json.dump(
-                data,
-                file,
-                indent=4,
-                ensure_ascii=False
+                versions,
+                f,
+                indent=4
             )
 
+    # =====================================
+    # Public
+    # =====================================
 
-    @staticmethod
-    def current():
+    @classmethod
+    def exists(cls, document):
 
-        return VersionManager.load()["version"]
+        versions = cls._load()
 
+        return document in versions
 
-    @staticmethod
-    def increment():
+    @classmethod
+    def current(cls, document):
 
-        data = VersionManager.load()
+        versions = cls._load()
 
-        data["version"] += 1
+        if document not in versions:
 
-        VersionManager.save(data)
+            versions[document] = {
 
-        return data["version"]
+                "version":1,
 
+                "last_modified":
+                    datetime.now().isoformat()
 
-    @staticmethod
-    def set(version):
+            }
 
-        data = {
-            "version": version
+            cls._save(versions)
+
+        return versions[document]["version"]
+
+    @classmethod
+    def increment(cls, document):
+
+        versions = cls._load()
+
+        if document not in versions:
+
+            versions[document] = {
+
+                "version":1,
+
+                "last_modified":
+                    datetime.now().isoformat()
+
+            }
+
+        else:
+
+            versions[document]["version"] += 1
+
+            versions[document]["last_modified"] = \
+                datetime.now().isoformat()
+
+        cls._save(versions)
+
+        return versions[document]["version"]
+
+    @classmethod
+    def set(
+        cls,
+        document,
+        version
+    ):
+
+        versions = cls._load()
+
+        versions[document] = {
+
+            "version": version,
+
+            "last_modified":
+                datetime.now().isoformat()
+
         }
 
-        VersionManager.save(data)
+        cls._save(versions)
 
+    @classmethod
+    def delete(cls, document):
 
-    @staticmethod
-    def reset():
+        versions = cls._load()
 
-        VersionManager.set(1)
+        if document in versions:
+
+            del versions[document]
+
+            cls._save(versions)
+
+    @classmethod
+    def rename(
+        cls,
+        old_name,
+        new_name
+    ):
+
+        versions = cls._load()
+
+        if old_name not in versions:
+
+            return
+
+        versions[new_name] = versions.pop(old_name)
+
+        cls._save(versions)
+
+    @classmethod
+    def info(cls, document):
+
+        versions = cls._load()
+
+        return versions.get(document)
+
+    @classmethod
+    def all(cls):
+
+        return cls._load()

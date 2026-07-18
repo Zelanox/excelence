@@ -1,123 +1,164 @@
 import socket
+import threading
 import traceback
 
 import config
 import network.protocol as protocol
 import network.handlers as handlers
-from network.lock import DocumentLock
-
 
 HOST = "0.0.0.0"
 PORT = config.SERVER_PORT
 
+REQUEST_HANDLERS = {
 
-COMMANDS = {
+    protocol.PING: handlers.ping,
 
-    protocol.PING:
-        handlers.ping,
+    protocol.GET_SERVER_INFO: handlers.get_server_info,
 
-    protocol.GET_VERSION:
-        handlers.get_version,
+    protocol.LIST_DOCUMENTS: handlers.list_documents,
 
-    protocol.DOWNLOAD_DOCUMENT:
-        handlers.download_document,
+    protocol.DOCUMENT_INFO: handlers.document_info,
 
-    protocol.UPLOAD_DOCUMENT:
-        handlers.upload_document,
+    protocol.DOWNLOAD_DOCUMENT: handlers.download_document,
 
-    protocol.OPEN_DOCUMENT:
-        handlers.open_document,
+    protocol.UPLOAD_DOCUMENT: handlers.upload_document,
 
-    protocol.CLOSE_DOCUMENT:
-        handlers.close_document
+    protocol.REQUEST_SAVE: handlers.request_save,
+
+    protocol.SAVE_FINISHED: handlers.save_finished,
+
+    protocol.GET_OPERATIONS: handlers.get_operations,
+
+    protocol.PUSH_OPERATIONS: handlers.push_operations,
+
+    protocol.CREATE_DOCUMENT: handlers.create_document,
+
+    protocol.DELETE_DOCUMENT: handlers.delete_document,
+
+    protocol.RENAME_DOCUMENT: handlers.rename_document,
+
+    protocol.IMPORT_DOCUMENT: handlers.import_document,
+
+    protocol.EXPORT_DOCUMENT: handlers.export_document,
 }
 
+class ClientSession:
 
-def handle_client(client, address):
+    def __init__(self, socket, address):
 
-    print(f"{address} connected")
+        self.socket = socket
+        self.address = address
 
-    owner = None
+        self.client_id = None
 
-    try:
+        self.document = None
 
-        while True:
+        self.saving = False
 
-            raw = client.recv(config.BUFFER_SIZE)
+        self.connected = True
+    
+    def send(self, status, **data):
 
-            if not raw:
-                break
+        self.socket.sendall(
 
-            try:
+            protocol.make_response(
+                status=status,
+                **data
+            )
 
-                packet = protocol.read_request(raw)
+        )
 
-            except Exception as e:
+    def disconnect(self):
 
-                print("Invalid packet:", e)
-
-                break
-
-            print("\nCLIENT SENT:")
-            print(raw.decode(errors="replace"))
-
-            command = packet["command"]
-
-            if command == protocol.OPEN_DOCUMENT:
-
-                owner = packet["owner"]
-
-            handler = COMMANDS.get(command)
-
-            if handler is None:
-
-                client.sendall(
-
-                    protocol.make_response(
-
-                        status=protocol.ERROR,
-
-                        message="Unknown command."
-                    )
-                )
-
-                continue
-
-            handler(client, packet)
-
-    except Exception as error:
-
-        print("Server error:")
-        traceback.print_exc()
+        self.connected = False
 
         try:
-
-            client.sendall(
-
-                protocol.make_response(
-
-                    status=protocol.ERROR,
-
-                    message=str(error)
-                )
-            )
+            self.socket.close()
 
         except Exception:
             pass
+        
+    def packet_loop(session):
 
-    finally:
+        print(f"{session.address} connected")
 
-        if owner is not None:
+        try:
 
-            DocumentLock.unlock(owner)
+            while session.connected:
 
-        print(f"{address} disconnected")
+                raw = session.socket.recv(config.BUFFER_SIZE)
 
-        client.close()
+                if not raw:
+                    break
+
+                try:
+
+                    packet = protocol.read_request(raw)
+
+                except Exception as error:
+
+                    print("Invalid packet:", error)
+
+                    continue
+
+                print()
+
+                print("CLIENT -> SERVER")
+
+                print(raw.decode(errors="replace"))
+
+                command = packet.get("command")
+
+                handler = REQUEST_HANDLERS.get(command)
+
+                if handler is None:
+
+                    session.socket.sendall(
+
+                        protocol.make_response(
+
+                            protocol.ERROR,
+
+                            message="Unknown command."
+
+                        )
+
+                    )
+
+                    continue
+
+                handler(session, packet)
+
+        except Exception:
+
+            traceback.print_exc()
+
+        finally:
+
+            session.connected = False
+
+            try:
+
+                session.socket.close()
+
+            except Exception:
+                pass
+
+            print(f"{session.address} disconnected")
+
+    def client_thread(client, address):
+
+        session = ClientSession(
+            client,
+            address
+        )
+
+        session.run()
 
 def main():
 
     try:
+
         server = socket.socket(
             socket.AF_INET,
             socket.SOCK_STREAM
@@ -129,30 +170,40 @@ def main():
             1
         )
 
-        server.bind((HOST, PORT))
+        server.bind(
+            (HOST, PORT)
+        )
 
         server.listen()
 
-        print(f"Server listening on {HOST}:{PORT}")
+        print("=" * 60)
+        print("Excelence Server Started")
+        print(f"Listening on {HOST}:{PORT}")
+        print("=" * 60)
 
         while True:
 
-            print("Waiting for client")
-            
+            print("\nWaiting for client...")
+
             client, address = server.accept()
-            print("CONNECTED:", address)
 
-            print(f"Accepted :\t{address}")
+            print(f"Accepted: {address}")
 
-            handle_client(client, address)
-    
+            start_client_thread(
+                client,
+                address
+            )
+
     except KeyboardInterrupt:
-        print("Stopping server")
-    
+
+        print("\nStopping server...")
+
     finally:
+
         server.close()
 
+        print("Server closed.")
 
-if __name__ == "__main__":
 
+if __name__== "__main__":
     main()

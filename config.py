@@ -30,9 +30,7 @@ DEFAULT = {
 
     "buffer_size": 4096,
 
-    "cache_file": "cache/document.xlsx",
-
-    "server_document": ""
+    "cache_file": "cache/document.xlsx"
 
 }
 
@@ -83,11 +81,6 @@ BUFFER_SIZE = cfg.get(
 CACHE_FILE = cfg.get(
     "cache_file",
     DEFAULT["cache_file"]
-)
-
-SERVER_DOCUMENT = cfg.get(
-    "server_document",
-    DEFAULT["server_document"]
 )
 
 print(cfg)

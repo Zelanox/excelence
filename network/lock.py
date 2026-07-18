@@ -1,91 +1,241 @@
-import time
+from collections import deque
 
 
-class DocumentLock:
+class SaveManager:
 
-    _locked = False
-    _owner = None
-    _timestamp = None
+    # =====================================================
+    # Structure
+    # =====================================================
 
+    # {
+    #
+    #   "Inventory.xlsx":
+    #
+    #   {
+    #       "saving": "client-id",
+    #       "queue": deque([...])
+    #   }
+    #
+    # }
 
-    @classmethod
-    def lock(cls, owner):
+    _documents = {}
 
-        """
-        Attempt to lock the document.
-
-        Returns:
-            True  -> Lock acquired
-            False -> Already locked
-        """
-
-        if cls._locked:
-            return False
-
-        cls._locked = True
-        cls._owner = owner
-        cls._timestamp = time.time()
-
-        print(f"Document locked by {owner}")
-
-        return True
-
+    # =====================================================
+    # Internal
+    # =====================================================
 
     @classmethod
-    def unlock(cls, owner):
+    def _ensure(cls, document):
 
-        """
-        Release the document lock.
+        if document not in cls._documents:
 
-        Only the owner may unlock it.
-        """
+            cls._documents[document] = {
 
-        if not cls._locked:
-            return True
+                "saving": None,
 
-        if cls._owner != owner:
-            return False
+                "queue": deque()
 
-        cls._locked = False
-        cls._owner = None
-        cls._timestamp = None
+            }
 
-        print(f"Document unlocked by {owner}")
+        return cls._documents[document]
 
-        return True
-
+    # =====================================================
+    # Request Save
+    # =====================================================
 
     @classmethod
-    def is_locked(cls):
+    def request_save(cls, document, owner):
 
-        return cls._locked
+        doc = cls._ensure(document)
 
+        # Nobody saving
+        if doc["saving"] is None:
 
-    @classmethod
-    def owner(cls):
+            doc["saving"] = owner
 
-        return cls._owner
+            print(f"{owner} granted save lock on {document}")
 
+            return {
 
-    @classmethod
-    def info(cls):
+                "status": protocol.SAVE_GRANTED,
+
+                "position": 0
+
+            }
+
+        # Already owns the save lock
+        if doc["saving"] == owner:
+
+            return {
+
+                "status": protocol.SAVE_GRANTED,
+
+                "position": 0
+
+            }
+
+        # Already waiting
+        if owner in doc["queue"]:
+
+            return {
+
+                "status": protocol.SAVE_QUEUED,
+
+                "position": list(doc["queue"]).index(owner) + 1
+
+            }
+
+        # Join queue
+        doc["queue"].append(owner)
+
+        print(f"{owner} queued for {document}")
 
         return {
-            "locked": cls._locked,
-            "owner": cls._owner,
-            "timestamp": cls._timestamp
+
+            "status": protocol.SAVE_QUEUED,
+
+            "position": len(doc["queue"])
+
         }
 
+    # =====================================================
+    # Finish Save
+    # =====================================================
 
     @classmethod
-    def force_unlock(cls):
+    def finish_save(cls, document):
 
-        """
-        Administrator function.
-        """
+        doc = cls._ensure(document)
 
-        cls._locked = False
-        cls._owner = None
-        cls._timestamp = None
+        finished = doc["saving"]
 
-        print("Document force unlocked.")
+        if finished is None:
+
+            return None
+
+        print(f"{finished} finished saving {document}")
+
+        if len(doc["queue"]) == 0:
+
+            doc["saving"] = None
+
+            return None
+
+        next_owner = doc["queue"].popleft()
+
+        doc["saving"] = next_owner
+
+        print(f"{next_owner} granted save lock")
+
+        return next_owner
+
+    # =====================================================
+    # Cancel Waiting
+    # =====================================================
+
+    @classmethod
+    def cancel_request(cls, document, owner):
+
+        doc = cls._ensure(document)
+
+        if owner == doc["saving"]:
+
+            cls.finish_save(document)
+
+            return True
+
+        if owner in doc["queue"]:
+
+            doc["queue"].remove(owner)
+
+            print(f"{owner} removed from queue")
+
+            return True
+
+        return False
+
+    # =====================================================
+    # Current Saver
+    # =====================================================
+
+    @classmethod
+    def current_owner(cls, document):
+
+        doc = cls._ensure(document)
+
+        return doc["saving"]
+
+    # =====================================================
+    # Queue
+    # =====================================================
+
+    @classmethod
+    def queue(cls, document):
+
+        doc = cls._ensure(document)
+
+        return list(doc["queue"])
+
+    # =====================================================
+    # Queue Position
+    # =====================================================
+
+    @classmethod
+    def queue_position(cls, document, owner):
+
+        doc = cls._ensure(document)
+
+        if owner == doc["saving"]:
+
+            return 0
+
+        if owner not in doc["queue"]:
+
+            return -1
+
+        return list(doc["queue"]).index(owner) + 1
+
+    # =====================================================
+    # Is Saving
+    # =====================================================
+
+    @classmethod
+    def is_saving(cls, document):
+
+        doc = cls._ensure(document)
+
+        return doc["saving"] is not None
+
+    # =====================================================
+    # Clear Document
+    # =====================================================
+
+    @classmethod
+    def clear(cls, document):
+
+        if document in cls._documents:
+
+            del cls._documents[document]
+
+    # =====================================================
+    # Debug
+    # =====================================================
+
+    @classmethod
+    def debug(cls):
+
+        print()
+
+        print("========== SAVE MANAGER ==========")
+
+        for document, state in cls._documents.items():
+
+            print(document)
+
+            print("Saving :", state["saving"])
+
+            print("Queue  :", list(state["queue"]))
+
+            print()
+
+        print("==================================")
