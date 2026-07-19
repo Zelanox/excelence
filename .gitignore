@@ -1,7 +1,10 @@
 viewer_config.json
 temp.py
-__pycache__/
 *.spec
 dist/
 build/
 *.xlsx
+.venv/
+__pycache__/
+*.pyc
+.vscode/

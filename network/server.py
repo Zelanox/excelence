@@ -6,8 +6,18 @@ import config
 import network.protocol as protocol
 import network.handlers as handlers
 
+
+# ==========================================================
+# Server Configuration
+# ==========================================================
+
 HOST = "0.0.0.0"
 PORT = config.SERVER_PORT
+
+
+# ==========================================================
+# Request Dispatcher
+# ==========================================================
 
 REQUEST_HANDLERS = {
 
@@ -42,62 +52,92 @@ REQUEST_HANDLERS = {
     protocol.EXPORT_DOCUMENT: handlers.export_document,
 }
 
+
+# ==========================================================
+# Client Session
+# ==========================================================
+
 class ClientSession:
 
-    def __init__(self, socket, address):
+    def __init__(self, client_socket, address):
 
-        self.socket = socket
+        self.socket = client_socket
         self.address = address
 
         self.client_id = None
 
         self.document = None
 
+        self.connected = True
+
         self.saving = False
 
-        self.connected = True
-    
+
+    # ------------------------------------------------------
+
     def send(self, status, **data):
 
         self.socket.sendall(
 
             protocol.make_response(
+
                 status=status,
+
                 **data
+
             )
 
         )
+
+
+    # ------------------------------------------------------
 
     def disconnect(self):
 
         self.connected = False
 
         try:
+
             self.socket.close()
 
         except Exception:
-            pass
-        
-    def packet_loop(session):
 
-        print(f"{session.address} connected")
+            pass
+
+
+    # ------------------------------------------------------
+
+    def packet_loop(self):
+
+        print(f"{self.address} connected")
 
         try:
 
-            while session.connected:
+            while self.connected:
 
-                raw = session.socket.recv(config.BUFFER_SIZE)
+                raw = self.socket.recv(
+
+                    config.BUFFER_SIZE
+
+                )
 
                 if not raw:
+
                     break
 
                 try:
 
                     packet = protocol.read_request(raw)
 
+                    protocol.validate_request(packet)
+
                 except Exception as error:
 
-                    print("Invalid packet:", error)
+                    print()
+
+                    print("Invalid packet:")
+
+                    print(error)
 
                     continue
 
@@ -107,96 +147,144 @@ class ClientSession:
 
                 print(raw.decode(errors="replace"))
 
-                command = packet.get("command")
+                command = packet["command"]
 
                 handler = REQUEST_HANDLERS.get(command)
 
                 if handler is None:
 
-                    session.socket.sendall(
+                    self.send(
 
-                        protocol.make_response(
+                        protocol.ERROR,
 
-                            protocol.ERROR,
-
-                            message="Unknown command."
-
-                        )
+                        message="Unknown command."
 
                     )
 
                     continue
 
-                handler(session, packet)
+                handler(
+
+                    self,
+
+                    packet
+
+                )
 
         except Exception:
+
+            print()
+
+            print(f"Session crashed: {self.address}")
 
             traceback.print_exc()
 
         finally:
 
-            session.connected = False
+            self.disconnect()
 
-            try:
+            print(f"{self.address} disconnected")
 
-                session.socket.close()
 
-            except Exception:
-                pass
+# ==========================================================
+# Thread Helpers
+# ==========================================================
 
-            print(f"{session.address} disconnected")
+def client_thread(client_socket, address):
 
-    def client_thread(client, address):
+    session = ClientSession(
 
-        session = ClientSession(
-            client,
-            address
-        )
+        client_socket,
 
-        session.run()
+        address
+
+    )
+
+    session.packet_loop()
+
+
+def start_client_thread(client_socket, address):
+
+    thread = threading.Thread(
+
+        target=client_thread,
+
+        args=(client_socket, address),
+
+        daemon=True
+
+    )
+
+    thread.start()
+
+    return thread
+
+
+# ==========================================================
+# Main Server
+# ==========================================================
 
 def main():
 
+    server = socket.socket(
+
+        socket.AF_INET,
+
+        socket.SOCK_STREAM
+
+    )
+
+    server.setsockopt(
+
+        socket.SOL_SOCKET,
+
+        socket.SO_REUSEADDR,
+
+        1
+
+    )
+
+    server.bind(
+
+        (HOST, PORT)
+
+    )
+
+    server.listen()
+
+    print("=" * 60)
+
+    print("Excelence Server Started")
+
+    print(f"Listening on {HOST}:{PORT}")
+
+    print("=" * 60)
+
     try:
-
-        server = socket.socket(
-            socket.AF_INET,
-            socket.SOCK_STREAM
-        )
-
-        server.setsockopt(
-            socket.SOL_SOCKET,
-            socket.SO_REUSEADDR,
-            1
-        )
-
-        server.bind(
-            (HOST, PORT)
-        )
-
-        server.listen()
-
-        print("=" * 60)
-        print("Excelence Server Started")
-        print(f"Listening on {HOST}:{PORT}")
-        print("=" * 60)
 
         while True:
 
-            print("\nWaiting for client...")
+            print()
 
-            client, address = server.accept()
+            print("Waiting for client...")
+
+            client_socket, address = server.accept()
 
             print(f"Accepted: {address}")
 
             start_client_thread(
-                client,
+
+                client_socket,
+
                 address
+
             )
 
     except KeyboardInterrupt:
 
-        print("\nStopping server...")
+        print()
+
+        print("Stopping server...")
 
     finally:
 
@@ -205,5 +293,8 @@ def main():
         print("Server closed.")
 
 
-if __name__== "__main__":
+# ==========================================================
+
+if __name__ == "__main__":
+
     main()

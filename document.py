@@ -1,31 +1,125 @@
 import pandas as pd
 
+from typing import Optional
+
+from openpyxl import Workbook
+from openpyxl.worksheet.worksheet import Worksheet
+
+import network.protocol as protocol
 
 class Document:
 
     def __init__(self, storage, network, online=False):
 
+        # ==================================================
+        # Managers
+        # ==================================================
+
         self.storage = storage
+
         self.network = network
+
         self.online = online
 
+        # ==================================================
+        # Workbook
+        # ==================================================
+
+        self.workbook: Optional[Workbook] = None
+
+        self.sheet: Optional[Worksheet] = None
+
+        self.sheet_name = None
+
+        self.sheet_names = []
+
+        self.active_sheet_index = 0
+
+        # ==================================================
+        # Data
+        # ==================================================
+
         self.df = pd.DataFrame()
+        
+        self.filtered_df = pd.DataFrame()
+        
+        self.auto_filter = None
+
+        # ==================================================
+        # Sheet Metadata
+        # ==================================================
+
+        self.merged_cells = []
+
+        self.column_widths = {}
+
+        self.row_heights = {}
+
+        self.hidden_rows = set()
+
+        self.hidden_columns = set()
+
+        self.freeze_panes = None
+
+        # ==================================================
+        # Document State
+        # ==================================================
 
         self.filename = None
 
-        self.product_column = None
-        self.sort_rules = []
+        self.document_name = None
 
         self.modified = False
 
+        self.loaded = False
+
+        # ==================================================
+        # Search / Sort
+        # ==================================================
+
+        self.search_text = ""
+
+        self.sort_rules = []
+
+        self.product_column = None
+
+        # ==================================================
+        # Collaboration
+        # ==================================================
+
+        self.pending_operations = []
+
+        self.operation_history = []
+
+        self.last_server_version = 0
+
+        # ==================================================
+        # Save State
+        # ==================================================
+
+        self.save_requested = False
+
+        self.save_in_progress = False
 
     # ==========================================================
     # Open
     # ==========================================================
 
-    def open(self, filename):
+    def open(
 
-        self.filename = filename
+        self,
+
+        document_name
+
+    ):
+
+        self.document_name = document_name
+
+        self.modified = False
+
+        self.pending_operations.clear()
+
+        self.operation_history.clear()
 
         if self.online:
 
@@ -34,26 +128,14 @@ class Document:
                 if not self.network.connect():
 
                     raise ConnectionError(
-                        "Unable to connect."
+                        "Unable to connect to server."
                     )
 
-                server_version = self.network.get_version()
+                reply = self.network.begin_edit(
+                    document_name
+                )
 
-                local_version = self.network.local_version()
-
-                if server_version > local_version:
-
-                    print("Downloading newer version...")
-
-                    reply = self.network.download_document()
-
-                    if reply["status"] == "OK":
-
-                        filename = reply["path"]
-
-                reply = self.network.open_document()
-
-                if reply["status"] != "OK":
+                if reply["status"] != protocol.OK:
 
                     raise RuntimeError(
 
@@ -61,240 +143,239 @@ class Document:
 
                             "message",
 
-                            "Document is locked."
+                            "Unable to open document."
 
                         )
 
                     )
 
-            except Exception as e:
+                self.last_server_version = reply["version"]
 
-                print("Network error:", e)
+                self.network.download_if_needed(
 
-                print("Falling back to offline mode.")
+                    document_name,
+
+                    self.last_server_version
+
+                )
+
+            except Exception as error:
+
+                print("Network error:", error)
+
+                print("Switching to offline mode.")
 
                 self.online = False
 
                 self.network.disconnect()
 
-        self.load(filename)
+        self.load_local(document_name)
 
-
-    # ==========================================================
-    # Load
-    # ==========================================================
-
-    def load(self, filename):
-
-        self.filename = filename
-
-        self.df = self.storage.load_excel(filename)
-
-        self.product_column = self.df.columns[-1]
-
-        self.storage.save_last_file(filename)
-
-
-    # ==========================================================
-    # Search
-    # ==========================================================
-
-    def search(self, text):
-
-        text = text.strip().lower()
-
-        if text == "":
-
-            return self.df
-
-        mask = self.df.astype(str).apply(
-
-            lambda row:
-
-            row.str.lower().str.contains(
-
-                text,
-
-                na=False
-
-            ).any(),
-
-            axis=1
-
-        )
-
-        return self.df[mask]
-
-
-    # ==========================================================
-    # Add Row
-    # ==========================================================
-
-    def add_row(self, value):
-
-        value = value.strip()
-
-        if not value:
-
-            return False
-
-        new_row = {
-
-            column: ""
-
-            for column in self.df.columns
-
-        }
-
-        new_row[self.product_column] = value
-
-        self.df.loc[len(self.df)] = new_row
-
-        self.modified = True
-
-        self.sort(self.sort_rules)
+        self.loaded = True
 
         return True
 
-
     # ==========================================================
-    # Sort
-    # ==========================================================
-
-    def sort(self, sort_rules):
-
-        self.sort_rules = sort_rules
-
-        if not sort_rules:
-
-            return
-
-        columns = [
-
-            rule["column"]
-
-            for rule in sort_rules
-
-        ]
-
-        ascending = [
-
-            rule["تصاعدي"]
-
-            for rule in sort_rules
-
-        ]
-
-        self.df.sort_values(
-
-            by=columns,
-
-            ascending=ascending,
-
-            inplace=True,
-
-            ignore_index=True
-
-        )
-
-
-    # ==========================================================
-    # Update Cell
+    # Create
     # ==========================================================
 
-    def update_cell(
+    def create(
 
         self,
 
-        row,
-
-        column_name,
-
-        value
+        document_name
 
     ):
 
-        dtype = self.df[column_name].dtype
+        self.document_name = document_name
 
-        try:
+        self.filename = document_name
 
-            if pd.api.types.is_integer_dtype(dtype):
+        self.modified = False
 
-                value = int(value)
+        self.pending_operations.clear()
 
-            elif pd.api.types.is_float_dtype(dtype):
+        self.operation_history.clear()
 
-                value = float(value)
+        # ------------------------------------------
+        # Create Workbook
+        # ------------------------------------------
 
-        except ValueError:
+        self.workbook = Workbook()
 
-            raise ValueError(
+        self.sheet = self.workbook.active
 
-                f"Please enter a valid {dtype}."
+        self.sheet.title = "Sheet1"
 
-            )
+        # ------------------------------------------
+        # Build DataFrame
+        # ------------------------------------------
 
-        self.df.at[row, column_name] = value
+        self.df = pd.DataFrame()
 
-        self.modified = True
+        self.filtered_df = self.df
 
+        # ------------------------------------------
+        # Metadata
+        # ------------------------------------------
 
-    # ==========================================================
-    # Delete Row
-    # ==========================================================
+        self.merged_cells.clear()
 
-    def delete_row(self, index):
+        self.column_widths.clear()
 
-        if self.df.empty:
+        self.row_heights.clear()
 
-            return False
+        self.hidden_rows.clear()
 
-        if index not in self.df.index:
+        self.hidden_columns.clear()
 
-            return False
+        self.freeze_panes = None
 
-        self.df = (
+        # ------------------------------------------
+        # Save locally
+        # ------------------------------------------
 
-            self.df
+        self.save_local()
 
-            .drop(index)
+        # ------------------------------------------
+        # Upload to server (future)
+        # ------------------------------------------
 
-            .reset_index(drop=True)
+        if self.online:
 
-        )
+            try:
 
-        self.modified = True
+                self.network.create_document(
+
+                    document_name
+
+                )
+
+            except Exception as error:
+
+                print(
+
+                    "Unable to create server document:",
+
+                    error
+
+                )
+
+        self.loaded = True
 
         return True
 
+    def save_local(self):
+
+        pass
 
     # ==========================================================
-    # Save
+    # Load Local
     # ==========================================================
 
-    def save(self):
+    def load_local(
+
+        self,
+
+        filename
+
+    ):
+
+        self.filename = filename
+
+        # ------------------------------------------
+        # Load workbook
+        # ------------------------------------------
+
+        self.workbook = self.storage.load_workbook(
+            filename
+        )
+
+        # ------------------------------------------
+        # Select active sheet
+        # ------------------------------------------
+
+        self.sheet = self.workbook.active
+
+        self.sheet_name = self.sheet.title
+
+        self.active_sheet_index = self.workbook.index(
+            self.sheet
+        )
+
+        # ------------------------------------------
+        # Load sheet metadata
+        # ------------------------------------------
+
+        self.load_metadata()
+
+        # ------------------------------------------
+        # Build DataFrame
+        # ------------------------------------------
+
+        self.build_dataframe()
+
+        # ------------------------------------------
+        # Runtime state
+        # ------------------------------------------
+
+        self.modified = False
+
+        self.loaded = True
+
+        if len(self.df.columns):
+
+            self.product_column = self.df.columns[-1]
+
+        else:
+
+            self.product_column = None
+
+    # ==========================================================
+    # Reload
+    # ==========================================================
+
+    def reload(self):
+
+        if not self.loaded:
+
+            return False
 
         if not self.filename:
 
-            return
+            return False
 
-        self.storage.save_excel(
-
-            self.df,
+        self.load_local(
 
             self.filename
 
         )
 
+        return True
 
-    def save_as(self, filename):
+    # ==========================================================
+    # Switch Document
+    # ==========================================================
 
-        self.filename = filename
+    def switch_document(
 
-        self.storage.save_last_file(filename)
+        self,
 
-        self.save()
+        document_name
 
+    ):
+
+        if self.loaded:
+
+            self.close()
+
+        self.open(
+
+            document_name
+
+        )
+
+        return True
 
     # ==========================================================
     # Close
@@ -302,42 +383,371 @@ class Document:
 
     def close(self):
 
-        self.save()
-
-        if not self.online:
+        if not self.loaded:
 
             return
 
         try:
 
-            if self.modified:
+            if self.online:
 
-                reply = self.network.upload_document()
+                self.synchronize()
 
-                if reply["status"] == "OK":
+            else:
 
-                    self.modified = False
-
-            self.network.close_document()
-
-        except Exception as e:
-
-            print("Shutdown error:", e)
+                self.save_local()
 
         finally:
 
             self.network.disconnect()
 
+            self.reset_runtime()
 
-    # ==========================================================
-    # Import / Export
-    # ==========================================================
+            self.loaded = False
 
-    def export_excel(self):
+    def synchronize(self):
+
+        pass
+
+    def reset_runtime(self):
 
         pass
 
+    # ==========================================================
+    # Workbook Metadata
+    # ==========================================================
 
-    def import_excel(self):
+    def load_metadata(self):
 
-        pass
+        sheet = self.sheet
+
+        # ----------------------------
+        # Merged Cells
+        # ----------------------------
+
+        self.merged_cells = [
+
+            str(rng)
+
+            for rng in sheet.merged_cells.ranges
+
+        ]
+
+        # ----------------------------
+        # Column Widths
+        # ----------------------------
+
+        self.column_widths = {}
+
+        for key, dimension in sheet.column_dimensions.items():
+
+            self.column_widths[key] = dimension.width
+
+        # ----------------------------
+        # Row Heights
+        # ----------------------------
+
+        self.row_heights = {}
+
+        for key, dimension in sheet.row_dimensions.items():
+
+            self.row_heights[key] = dimension.height
+
+        # ----------------------------
+        # Hidden Rows
+        # ----------------------------
+
+        self.hidden_rows = {
+
+            row
+
+            for row, dimension
+
+            in sheet.row_dimensions.items()
+
+            if dimension.hidden
+
+        }
+
+        # ----------------------------
+        # Hidden Columns
+        # ----------------------------
+
+        self.hidden_columns = {
+
+            column
+
+            for column, dimension
+
+            in sheet.column_dimensions.items()
+
+            if dimension.hidden
+
+        }
+
+        # ----------------------------
+        # Freeze Panes
+        # ----------------------------
+
+        self.freeze_panes = sheet.freeze_panes
+
+        # ----------------------------
+        # Auto Filter
+        # ----------------------------
+
+        self.auto_filter = sheet.auto_filter.ref
+
+    # ==========================================================
+    # Build DataFrame
+    # ==========================================================
+
+    def build_dataframe(self):
+
+        self.df = self.storage.sheet_to_dataframe(
+
+            self.sheet
+
+        )
+
+        self.filtered_df = self.df.copy()
+
+        return self.df
+
+    # ==========================================================
+    # Refresh Views
+    # ==========================================================
+
+    def refresh_views(self):
+
+        self.build_dataframe()
+
+        # Future
+
+        # self.build_view_model()
+
+        return True
+
+    # ==========================================================
+    # Sheet Management
+    # ==========================================================
+
+    def list_sheets(self):
+
+        self.sheet_names = self.workbook.sheetnames
+
+        return self.sheet_names.copy()
+
+    def get_sheet(self, sheet_name):
+
+        if sheet_name not in self.workbook.sheetnames:
+
+            return None
+
+        return self.workbook[sheet_name]
+
+    # ==========================================================
+    # Set Sheet
+    # ==========================================================
+
+    def set_sheet(self, sheet_name):
+
+        if self.sheet_name == sheet_name:
+
+            return True
+
+        worksheet = self.get_sheet(
+
+            sheet_name
+
+        )
+
+        if worksheet is None:
+
+            return False
+
+        self.sheet = worksheet
+
+        self.sheet_name = sheet_name
+
+        self.active_sheet_index = (
+
+            self.workbook.sheetnames.index(
+
+                sheet_name
+
+            )
+
+        )
+
+        self.load_metadata()
+
+        self.refresh_views()
+
+        return True
+
+    # ==========================================================
+    # Create Sheet
+    # ==========================================================
+
+    def create_sheet(
+
+        self,
+
+        sheet_name,
+
+        activate=True
+
+    ):
+
+        if sheet_name in self.workbook.sheetnames:
+
+            return False
+
+        self.workbook.create_sheet(
+
+            title=sheet_name
+
+        )
+
+        self.list_sheets()
+
+        if activate:
+
+            self.set_sheet(
+
+                sheet_name
+
+            )
+
+        return True
+
+    # ==========================================================
+    # Duplicate Sheet
+    # ==========================================================
+
+    def duplicate_sheet(
+
+        self,
+
+        source_name,
+
+        new_name=None,
+
+        activate=True
+
+    ):
+
+        source = self.get_sheet(
+
+            source_name
+
+        )
+
+        if source is None:
+
+            return False
+
+        copy = self.workbook.copy_worksheet(
+
+            source
+
+        )
+
+        if new_name is None:
+
+            base = source_name + " Copy"
+
+            new_name = base
+
+            counter = 2
+
+            while new_name in self.workbook.sheetnames:
+
+                new_name = f"{base} {counter}"
+
+                counter += 1
+
+        elif new_name in self.workbook.sheetnames:
+
+            return False
+
+        copy.title = new_name
+
+        self.list_sheets()
+
+        if activate:
+
+            self.set_sheet(
+
+                new_name
+
+            )
+
+        return True
+
+    # ==========================================================
+    # Delete Sheet
+    # ==========================================================
+
+    def delete_sheet(
+
+        self,
+
+        sheet_name
+
+    ):
+
+        worksheet = self.get_sheet(
+
+            sheet_name
+
+        )
+
+        if worksheet is None:
+
+            return False
+
+        if len(self.workbook.sheetnames) <= 1:
+
+            return False
+
+        was_active = (
+
+            self.sheet_name == sheet_name
+
+        )
+
+        next_sheet = None
+
+        if was_active:
+
+            names = self.workbook.sheetnames
+
+            index = names.index(sheet_name)
+
+            if index > 0:
+
+                next_sheet = names[index - 1]
+
+            else:
+
+                next_sheet = names[1]
+
+        self.workbook.remove(
+
+            worksheet
+
+        )
+
+        self.list_sheets()
+
+        if was_active:
+
+            self.set_sheet(
+
+                next_sheet
+
+            )
+
+        return True
+
