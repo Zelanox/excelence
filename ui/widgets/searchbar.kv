@@ -1,0 +1,17 @@
+#:import dp kivy.metrics.dp
+
+<SearchBar>
+
+    size_hint_y: None
+    height: dp(42)
+
+    spacing: dp(6)
+    padding: dp(6)
+
+    TextInput:
+        hint_text: "Search..."
+
+    Button:
+        text: "Search"
+        size_hint_x: None
+        width: dp(100)

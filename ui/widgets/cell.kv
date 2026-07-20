@@ -1,0 +1,33 @@
+<Cell>:
+
+    size_hint_x: None
+    width: 120
+
+    size_hint_y: None
+    height: 30
+
+    halign: "left"
+    valign: "middle"
+
+    text_size: self.size
+
+    padding: 6, 0
+
+    canvas.before:
+        Color:
+            rgba: .96, .96, .96, 1
+
+        Rectangle:
+            pos: self.pos
+            size: self.size
+
+    canvas.after:
+        Color:
+            rgba: .8, .8, .8, 1
+
+        Line:
+            rectangle:
+                self.x,
+                self.y,
+                self.width,
+                self.height

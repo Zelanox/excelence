@@ -287,7 +287,7 @@ class Document:
         # Load workbook
         # ------------------------------------------
 
-        self.workbook = self.storage.load_workbook(
+        self.workbook = self.storage.open_workbook(
             filename
         )
 
@@ -503,7 +503,7 @@ class Document:
 
     def build_dataframe(self):
 
-        self.df = self.storage.sheet_to_dataframe(
+        self.df = self.storage.worksheet_to_dataframe(
 
             self.sheet
 

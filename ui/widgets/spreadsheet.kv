@@ -1,0 +1,31 @@
+<Spreadsheet>:
+
+    orientation: "vertical"
+
+    Label:
+        size_hint_y: None
+        height: "35dp"
+        bold: True
+        text: " | ".join(root.headers)
+
+    ScrollView:
+
+        Label:
+
+            text:
+                "\n".join(
+                [
+                " | ".join(row)
+                for row in root.rows
+                ]
+                )
+
+            text_size: self.width, None
+
+            size_hint_y: None
+
+            height: self.texture_size[1]
+
+            valign: "top"
+
+            halign: "left"

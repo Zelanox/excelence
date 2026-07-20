@@ -1,7 +1,8 @@
-from kivy.uix.screenmanager import Screen
 from kivy.app import App
+from kivy.uix.boxlayout import BoxLayout
 
-class MainScreen(Screen):
+
+class BaseWidget(BoxLayout):
 
     @property
     def controller(self):
