@@ -9,6 +9,7 @@ from ui.widgets.statusbar import StatusBar
 
 from app.controller import Controller
 from ui.widgets.cell import Cell
+from ui.widgets.row import Row
 
 from ui.screens.main_screen import MainScreen
 from pathlib import Path
@@ -22,9 +23,11 @@ def load_kv_files():
 
     Builder.load_file(str(kv_root / "widgets" / "searchbar.kv"))
 
-    Builder.load_file(str(kv_root / "widgets" / "spreadsheet.kv"))
-
     Builder.load_file(str(kv_root / "widgets" / "cell.kv"))
+
+    Builder.load_file(str(kv_root / "widgets" / "row.kv"))
+
+    Builder.load_file(str(kv_root / "widgets" / "spreadsheet.kv"))
 
     Builder.load_file(str(kv_root / "widgets" / "statusbar.kv"))
 
@@ -42,6 +45,10 @@ class ExcelenceApp(App):
         sm = ScreenManager()
 
         main_screen = MainScreen(name="main")
+
+        self.main_screen = main_screen
+
+        main_screen.statusbar.refresh()
 
         sm.add_widget(main_screen)
 

@@ -6,6 +6,8 @@
     size_hint_y: None
     height: 30
 
+    color: 0, 0, 0, 1
+
     halign: "left"
     valign: "middle"
 
@@ -26,8 +28,4 @@
             rgba: .8, .8, .8, 1
 
         Line:
-            rectangle:
-                self.x,
-                self.y,
-                self.width,
-                self.height
+            rectangle: [self.x, self.y, self.width, self.height]

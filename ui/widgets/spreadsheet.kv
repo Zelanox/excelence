@@ -2,30 +2,16 @@
 
     orientation: "vertical"
 
-    Label:
-        size_hint_y: None
-        height: "35dp"
-        bold: True
-        text: " | ".join(root.headers)
-
     ScrollView:
 
-        Label:
+        GridLayout:
 
-            text:
-                "\n".join(
-                [
-                " | ".join(row)
-                for row in root.rows
-                ]
-                )
+            id: rows_container
 
-            text_size: self.width, None
+            cols: 1
 
             size_hint_y: None
 
-            height: self.texture_size[1]
+            height: self.minimum_height
 
-            valign: "top"
-
-            halign: "left"
+            spacing: 1

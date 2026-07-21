@@ -9,9 +9,13 @@
     padding: dp(6)
 
     TextInput:
+        id: search_input
         hint_text: "Search..."
+        multiline: False
+        on_text_validate: root.search_clicked()
 
     Button:
         text: "Search"
         size_hint_x: None
         width: dp(100)
+        on_release: root.search_clicked()

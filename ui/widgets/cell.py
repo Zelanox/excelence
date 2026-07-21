@@ -4,11 +4,18 @@ from kivy.properties import (
     NumericProperty,
 )
 
+from kivy.uix.label import Label
+
+from utils.arabic_utils import arabic
 
 
 class Cell(Label):
 
     value = StringProperty("")
+
+    row = NumericProperty(0)
+
+    column = NumericProperty(0)
 
     selected = BooleanProperty(False)
 
@@ -16,10 +23,6 @@ class Cell(Label):
 
     editing = BooleanProperty(False)
 
-    row = NumericProperty(0)
-
-    column = NumericProperty(0)
-
     def on_value(self, instance, value):
 
-        self.text = ar(value)
+        self.text = arabic(value)

@@ -1,6 +1,6 @@
 #:import dp kivy.metrics.dp
 
-<Toolbar>
+<Toolbar>:
 
     size_hint_y: None
     height: dp(46)
@@ -10,12 +10,16 @@
 
     Button:
         text: "Open"
+        on_release: root.open_clicked()
 
     Button:
         text: "Save"
+        on_release: root.save_clicked()
 
     Button:
-        text: "Sort"
+        text: "Reload"
+        on_release: root.reload_clicked()
 
     Button:
-        text: "Settings"
+        text: "Close"
+        on_release: root.close_clicked()

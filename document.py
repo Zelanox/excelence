@@ -528,6 +528,36 @@ class Document:
         return True
 
     # ==========================================================
+    # Search
+    # ==========================================================
+
+    def search(self, text):
+
+        self.search_text = text.strip()
+
+        if not self.search_text:
+
+            self.filtered_df = self.df.copy()
+            return
+
+        search = self.search_text.lower()
+
+        mask = self.df.astype(str).apply(
+            lambda column: column.str.lower().str.contains(
+                search,
+                na=False
+            )
+        ).any(axis=1)
+
+        self.filtered_df = self.df[mask].copy()
+
+    def clear_search(self):
+
+        self.search_text = ""
+
+        self.filtered_df = self.df.copy()
+
+    # ==========================================================
     # Sheet Management
     # ==========================================================
 
