@@ -23,6 +23,7 @@ class Spreadsheet(BaseWidget):
         container.add_widget(
             self.create_row(
                 controller.headers(),
+                row_index=-1,
                 header=True
             )
         )
@@ -42,14 +43,19 @@ class Spreadsheet(BaseWidget):
                 )
 
             container.add_widget(
-                self.create_row(values)
+                self.create_row(
+                    values,
+                    row_index=r
+                )
             )
 
-    def create_row(self, values, header=False):
+    def create_row(self, values, row_index=-1, header=False):
 
         row = Row()
-        row.header = header
+
         row.values = values
+        row.row_index = row_index
+        row.header = header
 
         return row
 

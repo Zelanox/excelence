@@ -24,5 +24,10 @@ class Cell(Label):
     editing = BooleanProperty(False)
 
     def on_value(self, instance, value):
+        if value is None:
+            self.text = ""
+            return
+        
+        converted = arabic(value)
 
-        self.text = arabic(value)
+        self.text = converted

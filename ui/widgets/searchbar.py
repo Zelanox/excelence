@@ -3,16 +3,10 @@ from ui.widgets.base_widget import BaseWidget
 
 class SearchBar(BaseWidget):
 
-    def search_clicked(self):
+    def search_changed(self, text):
 
-        text = self.ids.search_input.text
+        self.controller.search(text)
 
-        controller = self.controller
+        self.app.root.get_screen("main").ids.spreadsheet.reload()
 
-        if text.strip():
-            controller.search(text)
-        else:
-            controller.clear_search()
-
-        self.parent.ids.spreadsheet.refresh()
-        self.parent.ids.statusbar.refresh()
+        self.app.root.get_screen("main").ids.statusbar.refresh()

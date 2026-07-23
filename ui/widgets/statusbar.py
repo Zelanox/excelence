@@ -3,14 +3,8 @@ from ui.widgets.base_widget import BaseWidget
 
 class StatusBar(BaseWidget):
 
-    def set_status(self, text):
-        self.ids.status_label.text = text
-
-    def set_connection(self, text):
-        self.ids.connection_label.text = text
-
-    def set_rows(self, rows):
-        self.ids.rows_label.text = f"{rows} rows"
+    def on_kv_post(self, *args):
+        self.refresh()
 
     def refresh(self):
 
@@ -18,15 +12,16 @@ class StatusBar(BaseWidget):
 
         if controller.is_loaded():
 
-            self.set_status(controller.filename())
-            self.set_rows(controller.row_total())
+            self.ids.file_label.text = controller.filename()
+
+            self.ids.state_label.text = "Loaded"
+
+            self.ids.rows_label.text = f"{controller.row_total()} rows"
 
         else:
 
-            self.set_status("No document loaded")
-            self.set_rows(0)
+            self.ids.file_label.text = "No document"
 
-        if controller.document.online:
-            self.set_connection("Online")
-        else:
-            self.set_connection("Offline")
+            self.ids.state_label.text = "Ready"
+
+            self.ids.rows_label.text = "0 rows"

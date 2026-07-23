@@ -558,6 +558,51 @@ class Document:
         self.filtered_df = self.df.copy()
 
     # ==========================================================
+    # Sort
+    # ==========================================================
+
+    def sort(self, sort_rules):
+
+        if self.df.empty:
+            return
+
+        if not sort_rules:
+            return
+
+        columns = []
+        ascending = []
+
+        for rule in sort_rules:
+
+            column = rule.get("column")
+
+            if column not in self.df.columns:
+                continue
+
+            columns.append(column)
+            ascending.append(
+                rule.get("ascending", True)
+            )
+
+        if not columns:
+            return
+
+        self.df.sort_values(
+            by=columns,
+            ascending=ascending,
+            inplace=True,
+            ignore_index=True
+        )
+
+        # Keep search active after sorting
+        if self.search_text:
+            self.search(self.search_text)
+        else:
+            self.filtered_df = self.df.copy()
+
+        self.sort_rules = sort_rules
+
+    # ==========================================================
     # Sheet Management
     # ==========================================================
 

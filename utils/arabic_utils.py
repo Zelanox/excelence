@@ -1,10 +1,17 @@
 _HAS_SHAPER = False
+_HAS_SHAPER = False
+
 try:
     import arabic_reshaper
+    print("arabic_reshaper OK")
+
     from bidi.algorithm import get_display
+    print("python-bidi OK")
+
     _HAS_SHAPER = True
-except ImportError:
-    pass
+
+except Exception as e:
+    print(e)
 
 def arabic(text: str) -> str:
     """
@@ -31,3 +38,5 @@ def is_available() -> bool:
     Check if the required libraries for Arabic text reshaping and reordering are available.
     """
     return _HAS_SHAPER
+
+print("Arabic shaping available:", _HAS_SHAPER)

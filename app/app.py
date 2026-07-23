@@ -6,6 +6,7 @@ from ui.widgets.toolbar import Toolbar
 from ui.widgets.searchbar import SearchBar
 from ui.widgets.spreadsheet import Spreadsheet
 from ui.widgets.statusbar import StatusBar
+from ui.widgets.arabic_spinner_option import ArabicSpinnerOption
 
 from app.controller import Controller
 from ui.widgets.cell import Cell
@@ -20,6 +21,10 @@ def load_kv_files():
     Builder.load_file(str(kv_root / "screens" / "main_screen.kv"))
 
     Builder.load_file(str(kv_root / "widgets" / "toolbar.kv"))
+
+    Builder.load_file(str(kv_root / "widgets" / "sort_dialog.kv"))
+
+    Builder.load_file(str(kv_root / "widgets" / "arabic_spinner_option.kv"))
 
     Builder.load_file(str(kv_root / "widgets" / "searchbar.kv"))
 
@@ -40,7 +45,6 @@ class ExcelenceApp(App):
         load_kv_files()
 
         self.controller = Controller()
-        self.controller.open_document("فهرس.xlsx")
 
         sm = ScreenManager()
 

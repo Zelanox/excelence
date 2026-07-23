@@ -1,0 +1,9 @@
+kivy
+pandas
+openpyxl
+arabic-reshaper
+python-bidikivy
+pandas
+openpyxl
+arabic-reshaper
+python-bidi

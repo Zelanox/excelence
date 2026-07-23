@@ -86,6 +86,22 @@ class Controller:
 
         return str(value)
 
+    def search(self, text):
+
+        self.document.search(text)
+
+    # ==========================================================
+    # Sorting
+    # ==========================================================
+
+    def sortable_columns(self):
+        return list(self.document.df.columns)
+
+
+    def sort(self, sort_rules):
+
+        self.document.sort(sort_rules)
+        
     # ==========================================================
     # Search
     # ==========================================================
