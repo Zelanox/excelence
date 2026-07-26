@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+
+pandas
+openpyxl
+
+python-multipart
+
+websockets
+
+arabic-reshaper
+python-bidi
+
+pydantic
+
+aiofiles
