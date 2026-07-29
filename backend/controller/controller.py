@@ -3,10 +3,6 @@ from backend.storage.excel_storage import ExcelStorage
 from backend.network.client import NetworkClient
 from backend.utils.config import SERVER_IP, SERVER_PORT
 from backend.models.spreadsheet_status import SpreadsheetStatus
-<<<<<<< HEAD
-
-=======
->>>>>>> 48b5b7e5f20e81cf47af51eff978ce2e3b83027a
 
 class Controller:
     """Coordinate spreadsheet operations for the backend."""
@@ -80,49 +76,40 @@ class Controller:
     # Spreadsheet
     # ==========================================================
 
-<<<<<<< HEAD
+
     def headers(self) -> list[str]:
         """
         Return the visible headers for the active sheet.
-=======
-    def headers(self):
-        return self.document.headers()
->>>>>>> 48b5b7e5f20e81cf47af51eff978ce2e3b83027a
+
 
         Returns:
             A list of column names.
         """
         return self.document.headers()
 
-<<<<<<< HEAD
+
     def row_count(self) -> int:
         """
         Return the number of visible rows.
-=======
-    def row_count(self):
-        return self.document.row_count()
->>>>>>> 48b5b7e5f20e81cf47af51eff978ce2e3b83027a
+
 
         Returns:
             The visible row count.
         """
         return self.document.row_count()
 
-<<<<<<< HEAD
+
     def column_count(self) -> int:
         """
         Return the number of visible columns.
-=======
-    def column_count(self):
-        return self.document.column_count()
->>>>>>> 48b5b7e5f20e81cf47af51eff978ce2e3b83027a
+
 
         Returns:
             The visible column count.
         """
         return self.document.column_count()
 
-<<<<<<< HEAD
+
     def data(self) -> list[dict]:
         """
         Return the visible spreadsheet data as row dictionaries.
@@ -156,23 +143,7 @@ class Controller:
         if value is None:
             return ""
 
-=======
-    def cell_value(self, row, column):
 
-        table = self.document.table()
-
-        if row >= len(table):
-            return ""
-
-        if column >= len(table.columns):
-            return ""
-
-        value = table.iat[row, column]
-
-        if value is None:
-            return ""
-
->>>>>>> 48b5b7e5f20e81cf47af51eff978ce2e3b83027a
         return str(value)
 
     # ==========================================================
@@ -238,13 +209,10 @@ class Controller:
     # Sheets
     # ==========================================================
 
-<<<<<<< HEAD
+
     def sheets(self) -> list[str]:
         """
         Return the available worksheet names.
-=======
-    def sheets(self):
->>>>>>> 48b5b7e5f20e81cf47af51eff978ce2e3b83027a
 
         Returns:
             A list of worksheet names.
@@ -313,7 +281,6 @@ class Controller:
         return len(self.document.filtered_df)
 
     def loaded_document(self):
-<<<<<<< HEAD
         """
         Return the active document instance.
 
@@ -334,29 +301,12 @@ class Controller:
             loaded=self.is_loaded(),
             modified=self.modified(),
             rows=self.row_count(),
-=======
-        return self.document
 
-    
-    def status(self):
-
-        return SpreadsheetStatus(
-
-            filename=self.filename(),
-
-            loaded=self.is_loaded(),
-
-            modified=self.modified(),
-
-            rows=self.row_count(),
-
->>>>>>> 48b5b7e5f20e81cf47af51eff978ce2e3b83027a
             columns=self.column_count()
         )
 
     
     # ==========================================================
-<<<<<<< HEAD
     # Editing preparation
     # ==========================================================
 
@@ -513,40 +463,3 @@ class Controller:
             True if the workbook was renamed successfully, otherwise False.
         """
         return self.document.rename_document(old_name, new_name)
-=======
-    # File Management
-    # ==========================================================
-
-    def list_documents(self, folder):
-
-        return self.document.list_documents(folder)
-
-
-        def data(self):
-
-            return (
-                self.document.filtered_df
-                .fillna("")
-                .to_dict("records")
-            )
-
-    def delete_document(self, filename):
-
-        return self.document.delete_document(filename)
-
-
-    def copy_document(self, source, destination):
-
-        return self.document.copy_document(
-            source,
-            destination
-        )
-
-
-    def rename_document(self, old_name, new_name):
-
-        return self.document.rename_document(
-            old_name,
-            new_name
-        )
->>>>>>> 48b5b7e5f20e81cf47af51eff978ce2e3b83027a
