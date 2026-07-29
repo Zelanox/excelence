@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -30,9 +29,7 @@ class SortRuleRequest(BaseModel):
 class SortRequest(BaseModel):
 
     rules: list[SortRuleRequest] = Field(default_factory=list, description="Sort rules to apply.")
-=======
-from .common import ApiResponse
->>>>>>> 48b5b7e5f20e81cf47af51eff978ce2e3b83027a
+
 
 
 # ==========================================================
@@ -41,18 +38,15 @@ from .common import ApiResponse
 
 class SpreadsheetHeadersResponse(ApiResponse):
 
-<<<<<<< HEAD
+
     headers: list[str] = Field(default_factory=list, description="Visible column headers.")
-=======
-    headers: list[str]
->>>>>>> 48b5b7e5f20e81cf47af51eff978ce2e3b83027a
+
 
 
 # ==========================================================
 # Data
 # ==========================================================
 
-<<<<<<< HEAD
 class SpreadsheetDataResponse(SpreadsheetResponse):
     pass
 
@@ -67,27 +61,16 @@ class SearchResponse(SpreadsheetResponse):
 
 class SortResponse(SpreadsheetResponse):
     pass
-=======
-class SpreadsheetDataResponse(ApiResponse):
 
-    rows: list[dict]
->>>>>>> 48b5b7e5f20e81cf47af51eff978ce2e3b83027a
 
 
 # ==========================================================
 # Sheets
 # ==========================================================
 
-<<<<<<< HEAD
 class SpreadsheetSheetsResponse(SpreadsheetResponse):
     pass
-=======
-class SpreadsheetSheetsResponse(ApiResponse):
 
-    sheets: list[str]
-
-    current_sheet: str
->>>>>>> 48b5b7e5f20e81cf47af51eff978ce2e3b83027a
 
 
 # ==========================================================
@@ -96,7 +79,7 @@ class SpreadsheetSheetsResponse(ApiResponse):
 
 class SpreadsheetStatusResponse(ApiResponse):
 
-<<<<<<< HEAD
+
     filename: str = Field(default="", description="Current workbook filename.")
 
     loaded: bool = Field(default=False, description="Whether a document is currently loaded.")
@@ -106,15 +89,4 @@ class SpreadsheetStatusResponse(ApiResponse):
     rows: int = Field(default=0, description="Number of visible rows.")
 
     columns: int = Field(default=0, description="Number of visible columns.")
-=======
-    filename: str
-
-    loaded: bool
-
-    modified: bool
-
-    rows: int
-
-    columns: int
->>>>>>> 48b5b7e5f20e81cf47af51eff978ce2e3b83027a
 
