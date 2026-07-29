@@ -1,5 +1,9 @@
+<<<<<<< HEAD
 from dataclasses import dataclass, field
 from typing import Any
+=======
+from dataclasses import dataclass
+>>>>>>> 48b5b7e5f20e81cf47af51eff978ce2e3b83027a
 
 
 @dataclass(slots=True)
@@ -13,6 +17,7 @@ class SpreadsheetStatus:
 
     rows: int
 
+<<<<<<< HEAD
     columns: int
 
 
@@ -52,3 +57,6 @@ class DocumentInfo:
     sheets: list[str] = field(default_factory=list)
 
     current_sheet: str = ""
+=======
+    columns: int
+>>>>>>> 48b5b7e5f20e81cf47af51eff978ce2e3b83027a
