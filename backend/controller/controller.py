@@ -2,6 +2,7 @@ from backend.document.document import Document
 from backend.storage.excel_storage import ExcelStorage
 from backend.network.client import NetworkClient
 from backend.utils.config import SERVER_IP, SERVER_PORT
+from backend.models.spreadsheet_status import SpreadsheetStatus
 
 class Controller:
 
@@ -46,38 +47,38 @@ class Controller:
 
         return self.document.reload()
 
-        # ==========================================================
-        # Spreadsheet
-        # ==========================================================
+    # ==========================================================
+    # Spreadsheet
+    # ==========================================================
 
-        def headers(self):
-            return self.document.headers()
-
-
-        def row_count(self):
-            return self.document.row_count()
+    def headers(self):
+        return self.document.headers()
 
 
-        def column_count(self):
-            return self.document.column_count()
+    def row_count(self):
+        return self.document.row_count()
 
 
-        def cell_value(self, row, column):
+    def column_count(self):
+        return self.document.column_count()
 
-            table = self.document.table()
 
-            if row >= len(table):
-                return ""
+    def cell_value(self, row, column):
 
-            if column >= len(table.columns):
-                return ""
+        table = self.document.table()
 
-            value = table.iat[row, column]
+        if row >= len(table):
+            return ""
 
-            if value is None:
-                return ""
+        if column >= len(table.columns):
+            return ""
 
-            return str(value)
+        value = table.iat[row, column]
+
+        if value is None:
+            return ""
+
+        return str(value)
 
     # ==========================================================
     # Sorting
@@ -108,7 +109,7 @@ class Controller:
     # Sheets
     # ==========================================================
 
-    def sheet_names(self):
+    def sheets(self):
 
         return self.document.list_sheets()
 
@@ -141,3 +142,57 @@ class Controller:
 
     def loaded_document(self):
         return self.document
+
+    
+    def status(self):
+
+        return SpreadsheetStatus(
+
+            filename=self.filename(),
+
+            loaded=self.is_loaded(),
+
+            modified=self.modified(),
+
+            rows=self.row_count(),
+
+            columns=self.column_count()
+        )
+
+    
+    # ==========================================================
+    # File Management
+    # ==========================================================
+
+    def list_documents(self, folder):
+
+        return self.document.list_documents(folder)
+
+
+        def data(self):
+
+            return (
+                self.document.filtered_df
+                .fillna("")
+                .to_dict("records")
+            )
+
+    def delete_document(self, filename):
+
+        return self.document.delete_document(filename)
+
+
+    def copy_document(self, source, destination):
+
+        return self.document.copy_document(
+            source,
+            destination
+        )
+
+
+    def rename_document(self, old_name, new_name):
+
+        return self.document.rename_document(
+            old_name,
+            new_name
+        )

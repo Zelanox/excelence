@@ -1,6 +1,7 @@
 import copy
 import os
 import tempfile
+import shutil
 
 import pandas as pd
 
@@ -368,3 +369,117 @@ class ExcelStorage:
                 style["protection"]
             )
 
+
+    # ==========================================================
+    # File Operations
+    # ==========================================================
+
+    def exists(self, filename):
+
+        return os.path.isfile(filename)
+
+    
+    def is_excel_file(self, filename):
+
+        extension = os.path.splitext(filename)[1].lower()
+
+        return extension in (
+            ".xlsx",
+            ".xlsm",
+            ".xltx",
+            ".xltm",
+        )
+
+    
+    def list_documents(self, folder):
+
+        if not os.path.isdir(folder):
+            return []
+
+        documents = []
+
+        for filename in os.listdir(folder):
+
+            path = os.path.join(
+                folder,
+                filename
+            )
+
+            if (
+                os.path.isfile(path)
+                and self.is_excel_file(filename)
+            ):
+                documents.append(filename)
+
+        documents.sort()
+
+        return documents
+
+    
+    def delete(self, filename):
+
+        if not self.exists(filename):
+            return False
+
+        try:
+
+            os.remove(filename)
+
+            return True
+
+        except Exception:
+
+            return False
+
+    
+    def copy(self, source, destination):
+
+        if not self.exists(source):
+            return False
+
+        folder = os.path.dirname(destination)
+
+        if folder:
+            os.makedirs(folder, exist_ok=True)
+
+        try:
+
+            shutil.copy2(
+                source,
+                destination
+            )
+
+            return True
+
+        except Exception:
+
+            return False
+
+
+    def rename(self, old_name, new_name):
+
+        if not self.exists(old_name):
+            return False
+
+        try:
+
+            os.rename(
+                old_name,
+                new_name
+            )
+
+            return True
+
+        except Exception:
+
+            return False
+
+
+    def create_folder(self, folder):
+
+        os.makedirs(
+            folder,
+            exist_ok=True
+        )
+
+        return True

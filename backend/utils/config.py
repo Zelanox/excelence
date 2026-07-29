@@ -15,6 +15,7 @@ else:
 
 
 CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
+DOCUMENTS_FOLDER = "backend/data/documents"
 
 print("CONFIG FILE =", CONFIG_FILE)
 

@@ -2,10 +2,10 @@ import os
 import socket
 import uuid
 
-import config
-import network.protocol as protocol
+from backend.utils import config
+from backend.network import protocol
 
-from network.client_metadata import ClientMetadata
+from backend.network.client_metadata import ClientMetadata
 
 # ==========================================================
 # Network Client

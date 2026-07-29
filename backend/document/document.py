@@ -5,6 +5,8 @@ import pandas as pd
 from openpyxl import load_workbook
 from openpyxl import Workbook
 
+from backend.utils.config import DOCUMENTS_FOLDER
+
 
 class Document:
 
@@ -24,6 +26,8 @@ class Document:
         # File information
         self.filename = ""
         self.sheet_name = ""
+
+        self.documents_folder = DOCUMENTS_FOLDER
 
         # Data
         self.df = pd.DataFrame()
@@ -369,6 +373,28 @@ class Document:
 
         return True
 
+    
+    # ==========================================================
+    # File Management
+    # ==========================================================
+
+    def list_documents(self, folder):
+
+        return self.storage.list_documents(folder)
+
+    def delete_document(self, filename):
+
+        return self.storage.delete(filename)
+
+
+    def copy_document(self, source, destination):
+
+        return self.storage.copy(source, destination)
+
+
+    def rename_document(self, old_name, new_name):
+
+        return self.storage.rename(old_name, new_name)
 
     # ==========================================================
     # Helpers
