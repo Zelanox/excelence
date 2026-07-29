@@ -1,0 +1,43 @@
+2026-07-29 23:47:42,675 - INFO - config - Using config file E:\ZELANOX\Excelence\backend\utils\config.json
+2026-07-29 23:47:52,337 - INFO - config - Using config file E:\ZELANOX\Excelence\backend\utils\config.json
+2026-07-29 23:48:15,534 - INFO - config - Using config file E:\ZELANOX\Excelence\backend\utils\config.json
+2026-07-29 23:48:33,858 - INFO - config - Using config file E:\ZELANOX\Excelence\backend\utils\config.json
+2026-07-29 23:48:55,490 - INFO - config - Using config file E:\ZELANOX\Excelence\backend\utils\config.json
+2026-07-29 23:49:04,091 - INFO - config - Using config file E:\ZELANOX\Excelence\backend\utils\config.json
+2026-07-29 23:49:27,566 - INFO - config - Using config file E:\ZELANOX\Excelence\backend\utils\config.json
+2026-07-29 23:49:35,496 - INFO - config - Using config file E:\ZELANOX\Excelence\backend\utils\config.json
+2026-07-29 23:49:51,507 - INFO - config - Using config file E:\ZELANOX\Excelence\backend\utils\config.json
+2026-07-29 23:50:09,758 - INFO - config - Using config file E:\ZELANOX\Excelence\backend\utils\config.json
+2026-07-29 23:50:26,481 - INFO - config - Using config file E:\ZELANOX\Excelence\backend\utils\config.json
+2026-07-29 23:50:31,281 - INFO - config - Using config file E:\ZELANOX\Excelence\backend\utils\config.json
+2026-07-29 23:50:38,416 - INFO - config - Using config file E:\ZELANOX\Excelence\backend\utils\config.json
+2026-07-29 23:51:04,857 - INFO - config - Using config file E:\ZELANOX\Excelence\backend\utils\config.json
+2026-07-29 23:51:21,969 - INFO - config - Using config file e:\ZELANOX\Excelence\backend\utils\config.json
+2026-07-29 23:51:40,955 - INFO - config - Using config file e:\ZELANOX\Excelence\backend\utils\config.json
+2026-07-29 23:51:59,319 - INFO - config - Using config file E:\ZELANOX\Excelence\backend\utils\config.json
+2026-07-29 23:52:07,385 - INFO - config - Using config file e:\ZELANOX\Excelence\backend\utils\config.json
+2026-07-29 23:52:07,688 - INFO - document - Opened document C:\Users\OS_10\AppData\Local\Temp\tmp1_z7ucr7\sample.xlsx
+2026-07-29 23:52:07,734 - INFO - document - Opened document C:\Users\OS_10\AppData\Local\Temp\tmpjqk2anqx\search.xlsx
+2026-07-29 23:52:07,745 - INFO - document - Opened document C:\Users\OS_10\AppData\Local\Temp\tmpc39am3xw\editing.xlsx
+2026-07-29 23:52:07,765 - INFO - document - Opened document C:\Users\OS_10\AppData\Local\Temp\tmpnm8hoz9z\failures.xlsx
+2026-07-29 23:52:07,778 - WARNING - main - Validation error for /spreadsheet/edit-cell: 1 validation error:
+  {'type': 'greater_than_equal', 'loc': ('body', 'row'), 'msg': 'Input should be greater than or equal to 0', 'input': -1, 'ctx': {'ge': 0}}
+
+  File "e:\ZELANOX\Excelence\backend\api\spreadsheet.py", line 197, in edit_cell
+    POST /spreadsheet/edit-cell
+2026-07-29 23:52:07,790 - INFO - document - Opened document C:\Users\OS_10\AppData\Local\Temp\tmpaqs10maa\api.xlsx
+2026-07-29 23:52:20,208 - INFO - config - Using config file E:\ZELANOX\Excelence\backend\utils\config.json
+2026-07-29 23:52:21,532 - INFO - config - Using config file E:\ZELANOX\Excelence\backend\utils\config.json
+2026-07-29 23:52:47,350 - INFO - config - Using config file E:\ZELANOX\Excelence\backend\utils\config.json
+2026-07-29 23:52:56,896 - INFO - config - Using config file e:\ZELANOX\Excelence\backend\utils\config.json
+2026-07-29 23:52:57,182 - INFO - document - Opened document C:\Users\OS_10\AppData\Local\Temp\tmpivbw9fem\sample.xlsx
+2026-07-29 23:52:57,225 - INFO - document - Opened document C:\Users\OS_10\AppData\Local\Temp\tmphmohak48\search.xlsx
+2026-07-29 23:52:57,235 - INFO - document - Opened document C:\Users\OS_10\AppData\Local\Temp\tmp3mmr28v4\editing.xlsx
+2026-07-29 23:52:57,254 - INFO - document - Opened document C:\Users\OS_10\AppData\Local\Temp\tmp1ep5pn4i\failures.xlsx
+2026-07-29 23:52:57,267 - WARNING - main - Validation error for /spreadsheet/edit-cell: 1 validation error:
+  {'type': 'greater_than_equal', 'loc': ('body', 'row'), 'msg': 'Input should be greater than or equal to 0', 'input': -1, 'ctx': {'ge': 0}}
+
+  File "e:\ZELANOX\Excelence\backend\api\spreadsheet.py", line 197, in edit_cell
+    POST /spreadsheet/edit-cell
+2026-07-29 23:52:57,279 - INFO - document - Opened document C:\Users\OS_10\AppData\Local\Temp\tmptp70eujx\api.xlsx
+2026-07-29 23:53:06,750 - INFO - config - Using config file E:\ZELANOX\Excelence\backend\utils\config.json

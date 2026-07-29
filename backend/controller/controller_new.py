@@ -160,7 +160,7 @@ class Controller:
             sort_rules: A list of sort rule dictionaries.
 
         Returns:
-            True if sorting completed successfully, otherwise False.
+            True if the sort operation completed, otherwise False.
         """
         return self.document.sort(sort_rules)
 
@@ -296,7 +296,6 @@ class Controller:
             columns=self.column_count()
         )
 
-    
     # ==========================================================
     # Editing preparation
     # ==========================================================

@@ -2,6 +2,8 @@ import json
 import os
 import sys
 
+from backend.utils.logger import get_logger
+
 
 # ==========================================================
 # Base folder
@@ -15,8 +17,10 @@ else:
 
 
 CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
+DOCUMENTS_FOLDER = os.path.join(BASE_DIR, "data", "documents")
 
-print("CONFIG FILE =", CONFIG_FILE)
+logger = get_logger("config")
+logger.info("Using config file %s", CONFIG_FILE)
 
 # ==========================================================
 # Default configuration
@@ -83,4 +87,4 @@ CACHE_FILE = cfg.get(
     DEFAULT["cache_file"]
 )
 
-print(cfg)
+logger.debug("Configuration loaded: %s", cfg)

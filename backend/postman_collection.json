@@ -1,0 +1,136 @@
+{
+  "info": {
+    "name": "Excelence Backend Editing API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Spreadsheet - Edit Cell",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"row\": 0,\n  \"column\": 0,\n  \"value\": \"Updated\"\n}"
+        },
+        "url": {
+          "raw": "http://127.0.0.1:8000/spreadsheet/edit-cell",
+          "host": ["http://127.0.0.1:8000"],
+          "path": ["spreadsheet", "edit-cell"]
+        }
+      }
+    },
+    {
+      "name": "Spreadsheet - Insert Row",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"index\": 1\n}"
+        },
+        "url": {
+          "raw": "http://127.0.0.1:8000/spreadsheet/rows/insert",
+          "host": ["http://127.0.0.1:8000"],
+          "path": ["spreadsheet", "rows", "insert"]
+        }
+      }
+    },
+    {
+      "name": "Spreadsheet - Delete Row",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"index\": 1\n}"
+        },
+        "url": {
+          "raw": "http://127.0.0.1:8000/spreadsheet/rows/delete",
+          "host": ["http://127.0.0.1:8000"],
+          "path": ["spreadsheet", "rows", "delete"]
+        }
+      }
+    },
+    {
+      "name": "Spreadsheet - Insert Column",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"age\",\n  \"index\": 1\n}"
+        },
+        "url": {
+          "raw": "http://127.0.0.1:8000/spreadsheet/columns/insert",
+          "host": ["http://127.0.0.1:8000"],
+          "path": ["spreadsheet", "columns", "insert"]
+        }
+      }
+    },
+    {
+      "name": "Spreadsheet - Delete Column",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"age\"\n}"
+        },
+        "url": {
+          "raw": "http://127.0.0.1:8000/spreadsheet/columns/delete",
+          "host": ["http://127.0.0.1:8000"],
+          "path": ["spreadsheet", "columns", "delete"]
+        }
+      }
+    },
+    {
+      "name": "Spreadsheet - Add Sheet",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Sheet2\"\n}"
+        },
+        "url": {
+          "raw": "http://127.0.0.1:8000/spreadsheet/sheets/add",
+          "host": ["http://127.0.0.1:8000"],
+          "path": ["spreadsheet", "sheets", "add"]
+        }
+      }
+    },
+    {
+      "name": "Spreadsheet - Rename Sheet",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"old_name\": \"Sheet2\",\n  \"new_name\": \"Sheet2Renamed\"\n}"
+        },
+        "url": {
+          "raw": "http://127.0.0.1:8000/spreadsheet/sheets/rename",
+          "host": ["http://127.0.0.1:8000"],
+          "path": ["spreadsheet", "sheets", "rename"]
+        }
+      }
+    },
+    {
+      "name": "Spreadsheet - Delete Sheet",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Sheet2Renamed\"\n}"
+        },
+        "url": {
+          "raw": "http://127.0.0.1:8000/spreadsheet/sheets/delete",
+          "host": ["http://127.0.0.1:8000"],
+          "path": ["spreadsheet", "sheets", "delete"]
+        }
+      }
+    }
+  ]
+}
