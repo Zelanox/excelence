@@ -3,6 +3,8 @@ from backend.storage.excel_storage import ExcelStorage
 from backend.network.client import NetworkClient
 from backend.utils.config import SERVER_IP, SERVER_PORT
 from backend.models.spreadsheet_status import SpreadsheetStatus
+from backend.commands.spreadsheet.edit_cell import EditCellCommand
+from backend.commands.manager import CommandManager
 
 class Controller:
     """Coordinate spreadsheet operations for the backend."""
@@ -16,6 +18,7 @@ class Controller:
             self.network,
             online=False
         )
+        self.command_manager = CommandManager()
 
     # ==========================================================
     # Document
@@ -310,19 +313,21 @@ class Controller:
     # Editing preparation
     # ==========================================================
 
-    def edit_cell(self, row: int, column: int, value) -> bool:
-        """
-        Update a cell value in the active document.
+    def edit_cell(
+        self,
+        row,
+        column,
+        value
+    ):
 
-        Args:
-            row: Zero-based row index.
-            column: Zero-based column index.
-            value: New value for the cell.
+        command = EditCellCommand(
+            self.document,
+            row,
+            column,
+            value
+        )
 
-        Returns:
-            True if the update completed successfully, otherwise False.
-        """
-        return self.document.edit_cell(row, column, value)
+        return self.command_manager.execute(command)
 
     def insert_row(self, index: int | None = None) -> bool:
         """
@@ -334,7 +339,12 @@ class Controller:
         Returns:
             True if the row was inserted successfully, otherwise False.
         """
-        return self.document.insert_row(index)
+        command = InsertRowCommand(
+            self.document,
+            index
+        )
+
+        return self.command_manager.execute(command)
 
     def delete_row(self, index: int) -> bool:
         """

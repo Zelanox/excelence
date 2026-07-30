@@ -3,15 +3,12 @@ from typing import Any
 import pandas as pd
 from openpyxl import Workbook
 
-<<<<<<< HEAD
+
 from backend.models.spreadsheet_status import DocumentInfo, SpreadsheetData, SpreadsheetSheet
 from backend.utils.config import DOCUMENTS_FOLDER
 from backend.utils.logger import get_logger
 
 logger = get_logger("document")
-=======
-from backend.utils.config import DOCUMENTS_FOLDER
->>>>>>> 48b5b7e5f20e81cf47af51eff978ce2e3b83027a
 
 
 class Document:
@@ -38,10 +35,6 @@ class Document:
 
         self.documents_folder = DOCUMENTS_FOLDER
 
-<<<<<<< HEAD
-=======
-        # Data
->>>>>>> 48b5b7e5f20e81cf47af51eff978ce2e3b83027a
         self.df = pd.DataFrame()
         self.filtered_df = pd.DataFrame()
 
@@ -592,15 +585,10 @@ class Document:
         self.search(self.search_text)
         return True
 
-<<<<<<< HEAD
-=======
-    
->>>>>>> 48b5b7e5f20e81cf47af51eff978ce2e3b83027a
     # ==========================================================
     # File Management
     # ==========================================================
 
-<<<<<<< HEAD
     def list_documents(self, folder: str) -> list[str]:
         """
         List Excel documents in a folder.
@@ -664,24 +652,7 @@ class Document:
         """
         if not self._is_valid_filename(old_name) or not self._is_valid_filename(new_name):
             return False
-=======
-    def list_documents(self, folder):
 
-        return self.storage.list_documents(folder)
-
-    def delete_document(self, filename):
-
-        return self.storage.delete(filename)
-
-
-    def copy_document(self, source, destination):
-
-        return self.storage.copy(source, destination)
-
-
-    def rename_document(self, old_name, new_name):
-
->>>>>>> 48b5b7e5f20e81cf47af51eff978ce2e3b83027a
         return self.storage.rename(old_name, new_name)
 
     # ==========================================================

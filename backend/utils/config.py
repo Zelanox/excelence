@@ -17,11 +17,8 @@ else:
 
 
 CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
-<<<<<<< HEAD
+
 DOCUMENTS_FOLDER = os.path.join(BASE_DIR, "data", "documents")
-=======
-DOCUMENTS_FOLDER = "backend/data/documents"
->>>>>>> 48b5b7e5f20e81cf47af51eff978ce2e3b83027a
 
 logger = get_logger("config")
 logger.info("Using config file %s", CONFIG_FILE)
