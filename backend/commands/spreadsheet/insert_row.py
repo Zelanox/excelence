@@ -1,10 +1,17 @@
-class InsertRowCommand:
+from backend.commands.command import Command
 
-    def __init__(self, document, index=None):
 
+class InsertRowCommand(Command):
+
+    def __init__(
+        self,
+        document,
+        index=None
+    ):
         self.document = document
         self.index = index
 
     def execute(self):
-
-        return self.document.insert_row(self.index)
+        return self.document.insert_row(
+            self.index
+        )

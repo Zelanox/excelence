@@ -3,6 +3,25 @@ from backend.storage.excel_storage import ExcelStorage
 from backend.network.client import NetworkClient
 from backend.utils.config import SERVER_IP, SERVER_PORT
 from backend.models.spreadsheet_status import SpreadsheetStatus
+from backend.commands.manager import CommandManager
+
+from backend.commands.spreadsheet.edit_cell import EditCellCommand
+
+from backend.commands.spreadsheet.insert_row import InsertRowCommand
+from backend.commands.spreadsheet.delete_row import DeleteRowCommand
+
+from backend.commands.spreadsheet.insert_column import InsertColumnCommand
+from backend.commands.spreadsheet.delete_column import DeleteColumnCommand
+
+from backend.commands.spreadsheet.search import SearchCommand
+from backend.commands.spreadsheet.clear_search import ClearSearchCommand
+
+from backend.commands.spreadsheet.sort import SortCommand
+from backend.commands.spreadsheet.clear_sort import ClearSortCommand
+
+from backend.commands.spreadsheet.add_sheet import AddSheetCommand
+from backend.commands.spreadsheet.rename_sheet import RenameSheetCommand
+from backend.commands.spreadsheet.delete_sheet import DeleteSheetCommand
 
 
 class Controller:
@@ -14,9 +33,9 @@ class Controller:
         self.network = NetworkClient(SERVER_IP, SERVER_PORT)
         self.document = Document(
             self.storage,
-            self.network,
-            online=False
+            self.network
         )
+        self.command_manager = CommandManager()
 
     # ==========================================================
     # Document
@@ -162,7 +181,12 @@ class Controller:
         Returns:
             True if the sort operation completed, otherwise False.
         """
-        return self.document.sort(sort_rules)
+        command = SortCommand(
+            self.document,
+            rules
+        )
+
+        return self.command_manager.execute(command)
 
     def clear_sort(self) -> bool:
         """
@@ -171,7 +195,11 @@ class Controller:
         Returns:
             True if sorting was reset successfully, otherwise False.
         """
-        return self.document.clear_sort()
+        command = ClearSortCommand(
+            self.document
+        )
+
+        return self.command_manager.execute(command)
 
     # ==========================================================
     # Search
@@ -187,7 +215,12 @@ class Controller:
         Returns:
             True if the search completed successfully, otherwise False.
         """
-        return self.document.search(text)
+        command = SearchCommand(
+            self.document,
+            text
+        )
+
+        return self.command_manager.execute(command)
 
     def clear_search(self) -> bool:
         """
@@ -196,7 +229,11 @@ class Controller:
         Returns:
             True if the search filter was cleared successfully, otherwise False.
         """
-        return self.document.clear_search()
+        command = ClearSearchCommand(
+            self.document
+        )
+
+        return self.command_manager.execute(command)
 
     # ==========================================================
     # Sheets
@@ -312,7 +349,18 @@ class Controller:
         Returns:
             True if the update completed successfully, otherwise False.
         """
-        return self.document.edit_cell(row, column, value)
+        command = EditCellCommand(
+
+            self.document,
+
+            row,
+
+            column,
+
+            value
+        )
+
+        return self.command_manager.execute(command)
 
     def insert_row(self, index: int | None = None) -> bool:
         """
@@ -324,7 +372,12 @@ class Controller:
         Returns:
             True if the row was inserted successfully, otherwise False.
         """
-        return self.document.insert_row(index)
+        command = InsertRowCommand(
+            self.document,
+            index
+        )
+
+        return self.command_manager.execute(command)
 
     def delete_row(self, index: int) -> bool:
         """
@@ -336,7 +389,12 @@ class Controller:
         Returns:
             True if the row was deleted successfully, otherwise False.
         """
-        return self.document.delete_row(index)
+        command = DeleteRowCommand(
+            self.document,
+            index
+        )
+
+        return self.command_manager.execute(command)
 
     def insert_column(self, name: str, index: int | None = None) -> bool:
         """
@@ -349,7 +407,13 @@ class Controller:
         Returns:
             True if the column was inserted successfully, otherwise False.
         """
-        return self.document.insert_column(name, index)
+        command = InsertColumnCommand(
+            self.document,
+            name,
+            index
+        )
+
+        return self.command_manager.execute(command)
 
     def delete_column(self, name: str) -> bool:
         """
@@ -361,7 +425,12 @@ class Controller:
         Returns:
             True if the column was deleted successfully, otherwise False.
         """
-        return self.document.delete_column(name)
+        command = DeleteColumnCommand(
+            self.document,
+            name
+        )
+
+        return self.command_manager.execute(command)
 
     def rename_sheet(self, old_name: str, new_name: str) -> bool:
         """
@@ -374,7 +443,13 @@ class Controller:
         Returns:
             True if the worksheet was renamed successfully, otherwise False.
         """
-        return self.document.rename_sheet(old_name, new_name)
+        command = RenameSheetCommand(
+            self.document,
+            old_name,
+            new_name
+        )
+
+        return self.command_manager.execute(command)
 
     def add_sheet(self, name: str) -> bool:
         """
@@ -386,7 +461,12 @@ class Controller:
         Returns:
             True if the worksheet was added successfully, otherwise False.
         """
-        return self.document.add_sheet(name)
+        command = AddSheetCommand(
+            self.document,
+            name
+        )
+
+        return self.command_manager.execute(command)
 
     def delete_sheet(self, name: str) -> bool:
         """
@@ -398,7 +478,12 @@ class Controller:
         Returns:
             True if the worksheet was deleted successfully, otherwise False.
         """
-        return self.document.delete_sheet(name)
+        command = DeleteSheetCommand(
+            self.document,
+            name
+        )
+
+        return self.command_manager.execute(command)
 
     # ==========================================================
     # File Management

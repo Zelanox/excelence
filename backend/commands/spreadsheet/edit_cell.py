@@ -10,10 +10,12 @@ class EditCellCommand(Command):
         column,
         value
     ):
+
         self.document = document
 
         self.row = row
         self.column = column
+
         self.value = value
 
     def execute(self):

@@ -5,9 +5,10 @@ class Command(ABC):
 
     @abstractmethod
     def execute(self):
-        """Execute the command."""
         pass
 
     def undo(self):
-        """Undo the command (future implementation)."""
-        raise NotImplementedError()
+        return False
+
+    def redo(self):
+        return self.execute()

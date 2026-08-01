@@ -8,6 +8,10 @@ from backend.models.spreadsheet_status import DocumentInfo, SpreadsheetData, Spr
 from backend.utils.config import DOCUMENTS_FOLDER
 from backend.utils.logger import get_logger
 
+from backend.models.spreadsheet import Spreadsheet
+from backend.models.sheet import Sheet
+from backend.models.spreadsheet_row import SpreadsheetRow
+
 logger = get_logger("document")
 
 
@@ -37,6 +41,9 @@ class Document:
 
         self.df = pd.DataFrame()
         self.filtered_df = pd.DataFrame()
+
+        # Domain Model
+        self.spreadsheet = Spreadsheet()
 
         self.search_text = ""
         self.sort_rules: list[dict[str, Any]] = []
@@ -126,6 +133,47 @@ class Document:
 
         return self.load_local(self.filename)
 
+
+    # ==========================================================
+    # Domain Model
+    # ==========================================================
+
+    def dataframe_to_spreadsheet(self):
+
+        if self.sheet is None:
+        
+            self.spreadsheet = Spreadsheet()
+
+            return
+
+
+        rows = []
+
+        for _, row in self.df.iterrows():
+
+            values = row.fillna("").to_dict()
+
+            rows.append(
+
+                SpreadsheetRow(values=values)
+
+            )
+
+
+        sheet = Sheet(
+
+            name=self.sheet.title,
+
+            rows=rows
+        )
+
+
+        self.spreadsheet = Spreadsheet(
+
+            sheets=[sheet]
+        )
+
+
     # ==========================================================
     # Loading / Saving
     # ==========================================================
@@ -153,6 +201,7 @@ class Document:
 
         self.df = self.storage.read_sheet(self.sheet)
         self.filtered_df = self.df.copy()
+        self.dataframe_to_spreadsheet()
         self.modified = False
         return True
 
