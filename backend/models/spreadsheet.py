@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 
 from backend.models.sheet import Sheet
+from backend.models.spreadsheet_status import SpreadsheetData
 
 
 @dataclass(slots=True)
@@ -77,6 +78,15 @@ class Spreadsheet:
 
         return sheet.column_count
 
+    def filtered_row_count(self):
+
+        sheet = self.current_sheet()
+
+        if sheet is None:
+            return 0
+
+        return sheet.filtered_row_count()
+
     def headers(self):
 
         sheet = self.current_sheet()
@@ -91,15 +101,45 @@ class Spreadsheet:
         sheet = self.current_sheet()
 
         if sheet is None:
-            return []
+            return SpreadsheetData()
 
-        return [
+        return sheet.data()
 
-            row.values
+    def search(self, text):
 
-            for row in sheet.rows
+        sheet = self.current_sheet()
 
-        ]
+        if sheet is None:
+            return False
+
+        return sheet.search(text)
+
+    def clear_search(self):
+
+        sheet = self.current_sheet()
+
+        if sheet is None:
+            return False
+
+        return sheet.clear_search()
+
+    def sort(self, rules, reapply=False):
+
+        sheet = self.current_sheet()
+
+        if sheet is None:
+            return False
+
+        return sheet.sort(rules, reapply=reapply)
+
+    def clear_sort(self):
+
+        sheet = self.current_sheet()
+
+        if sheet is None:
+            return False
+
+        return sheet.clear_sort()
 
     def edit_cell(
         self,

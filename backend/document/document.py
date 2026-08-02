@@ -112,6 +112,7 @@ class Document:
         self.sheet_name = self.sheet.title
 
         self._clear_view_data()
+        self.dataframe_to_spreadsheet()
 
         self.loaded = True
         self.modified = True
@@ -147,38 +148,40 @@ class Document:
 
     def dataframe_to_spreadsheet(self) -> None:
 
-        if self.sheet is None:
-        
+        if self.workbook is None:
             self.spreadsheet = Spreadsheet()
-
             return
 
+        current_sheet_name = self.sheet_name or (self.sheet.title if self.sheet is not None else "")
+        existing_sheets = {
+            sheet.name: sheet for sheet in getattr(self.spreadsheet, "sheets", [])
+        }
 
-        rows = []
+        rebuilt_sheets: list[Sheet] = []
+        active_index = 0
 
-        for _, row in self.df.iterrows():
+        for index, worksheet_name in enumerate(self.workbook.sheetnames):
+            worksheet = self.workbook[worksheet_name]
+            dataframe = self.storage.read_sheet(worksheet)
 
-            values = row.fillna("").to_dict()
+            sheet_model = existing_sheets.get(worksheet_name)
 
-            rows.append(
+            if sheet_model is None:
+                sheet_model = Sheet(name=worksheet_name)
 
-                SpreadsheetRow(values=values)
+            sheet_model.bind(worksheet, dataframe.copy())
 
-            )
+            if worksheet_name == current_sheet_name:
+                sheet_model.set_dataframe(self.df.copy() if not self.df.empty else dataframe.copy())
+                sheet_model.active_view = self.filtered_df.copy() if not self.filtered_df.empty else dataframe.copy()
+                active_index = index
+            else:
+                sheet_model.set_dataframe(dataframe.copy())
+                sheet_model.active_view = dataframe.copy()
 
+            rebuilt_sheets.append(sheet_model)
 
-        sheet = Sheet(
-
-            name=self.sheet.title,
-
-            rows=rows
-        )
-
-
-        self.spreadsheet = Spreadsheet(
-
-            sheets=[sheet]
-        )
+        self.spreadsheet = Spreadsheet(sheets=rebuilt_sheets, active_sheet=active_index)
 
 
     # ==========================================================
@@ -252,25 +255,12 @@ class Document:
 
         self.search_text = text
 
-        self.filtered_df = self.search_service.search(
+        success = self.spreadsheet.search(text)
 
-            self.df,
+        if success:
+            self._sync_from_active_sheet()
 
-            text
-
-        )
-
-        if self.sort_rules:
-
-            self.sort(
-
-                self.sort_rules,
-
-                reapply=True
-
-            )
-
-        return True
+        return success
 
     def clear_search(self) -> bool:
         """
@@ -283,8 +273,13 @@ class Document:
             return False
 
         self.search_text = ""
-        self.filtered_df = self.df.copy()
-        return self._reapply_sort()
+
+        success = self.spreadsheet.clear_search()
+
+        if success:
+            self._sync_from_active_sheet()
+
+        return success
 
     # ==========================================================
     # Sorting
@@ -304,15 +299,12 @@ class Document:
         if not reapply:
             self.sort_rules = sort_rules
 
-        self.filtered_df = self.sort_service.sort(
+        success = self.spreadsheet.sort(self.sort_rules, reapply=reapply)
 
-            self.filtered_df,
+        if success:
+            self._sync_from_active_sheet()
 
-            self.sort_rules
-
-        )
-
-        return True
+        return success
 
     def clear_sort(self) -> bool:
         """
@@ -325,8 +317,13 @@ class Document:
             return False
 
         self.sort_rules = []
-        self.filtered_df = self.df.copy()
-        return True
+
+        success = self.spreadsheet.clear_sort()
+
+        if success:
+            self._sync_from_active_sheet()
+
+        return success
 
     # ==========================================================
     # Editing
@@ -371,21 +368,12 @@ class Document:
         if column >= len(self.df.columns):
             return False
 
-        success = self.editing_service.edit_cell(
+        success = self.spreadsheet.edit_cell(row, column, value)
 
-            self.spreadsheet,
-
-            row,
-
-            column,
-
-            value
-
-        )
         if not success:
             return False
 
-        self.df.iloc[row, column] = value
+        self._sync_from_active_sheet()
         self._sync_active_sheet()
 
         self.modified = True
@@ -413,14 +401,12 @@ class Document:
         if index < 0 or index > len(self.df):
             return False
 
-        empty = {column: "" for column in self.df.columns}
-        top = self.df.iloc[:index]
-        bottom = self.df.iloc[index:]
+        success = self.spreadsheet.insert_row(index)
 
-        self.df = pd.concat(
-            [top, pd.DataFrame([empty]), bottom],
-            ignore_index=True
-        )
+        if not success:
+            return False
+
+        self._sync_from_active_sheet()
         self._sync_active_sheet()
         self.modified = True
         self.search(self.search_text)
@@ -442,8 +428,12 @@ class Document:
         if index < 0 or index >= len(self.df):
             return False
 
-        self.df = self.df.drop(index)
-        self.df.reset_index(drop=True, inplace=True)
+        success = self.spreadsheet.delete_row(index)
+
+        if not success:
+            return False
+
+        self._sync_from_active_sheet()
         self._sync_active_sheet()
         self.modified = True
         self.search(self.search_text)
@@ -475,7 +465,12 @@ class Document:
         if index < 0 or index > len(self.df.columns):
             return False
 
-        self.df.insert(index, name, "")
+        success = self.spreadsheet.insert_column(name, index)
+
+        if not success:
+            return False
+
+        self._sync_from_active_sheet()
         self._sync_active_sheet()
         self.modified = True
         self.search(self.search_text)
@@ -497,7 +492,12 @@ class Document:
         if name not in self.df.columns:
             return False
 
-        self.df.drop(columns=[name], inplace=True)
+        success = self.spreadsheet.delete_column(name)
+
+        if not success:
+            return False
+
+        self._sync_from_active_sheet()
         self._sync_active_sheet()
         self.modified = True
         self.search(self.search_text)
@@ -618,7 +618,7 @@ class Document:
         if self.workbook is None:
             return []
 
-        return self.workbook.sheetnames
+        return self.spreadsheet.sheet_names()
 
     def set_sheet(self, sheet_name: str) -> bool:
         """
@@ -639,7 +639,13 @@ class Document:
         self.sheet = self.workbook[sheet_name]
         self.sheet_name = sheet_name
 
-        self._set_view_data(self.storage.read_sheet(self.sheet), apply_search=True)
+        if not self.spreadsheet.set_active_sheet(sheet_name):
+            return False
+
+        dataframe = self.storage.read_sheet(self.sheet)
+        self._set_view_data(dataframe, apply_search=False)
+        self.dataframe_to_spreadsheet()
+        self.search(self.search_text)
         return True
 
     # ==========================================================
@@ -723,7 +729,12 @@ class Document:
         Returns:
             The filtered pandas DataFrame.
         """
-        return self.filtered_df
+        active_sheet = self._active_sheet_model()
+
+        if active_sheet is None:
+            return self.filtered_df.copy()
+
+        return active_sheet.active_view.copy() if active_sheet.active_view is not None else active_sheet.dataframe.copy()
 
     def data(self) -> SpreadsheetData:
         """
@@ -732,12 +743,12 @@ class Document:
         Returns:
             A structured representation of the visible rows.
         """
-        return SpreadsheetData(
-            headers=self.headers(),
-            rows=self.filtered_df.fillna("").to_dict("records"),
-            row_count=self.row_count(),
-            column_count=self.column_count()
-        )
+        active_sheet = self._active_sheet_model()
+
+        if active_sheet is None:
+            return SpreadsheetData()
+
+        return active_sheet.data()
 
     def original_table(self) -> pd.DataFrame:
         """
@@ -746,11 +757,16 @@ class Document:
         Returns:
             The full pandas DataFrame.
         """
-        return self.df
+        active_sheet = self._active_sheet_model()
+
+        if active_sheet is None:
+            return self.df.copy()
+
+        return active_sheet.dataframe.copy()
 
     def filtered_row_count(self) -> int:
         """Return the number of rows in the filtered view."""
-        return len(self.filtered_df)
+        return self.spreadsheet.filtered_row_count()
 
     def row_count(self) -> int:
         """
@@ -759,13 +775,7 @@ class Document:
         Returns:
             The filtered row count.
         """
-
-        sheet = self.spreadsheet.current_sheet()
-
-        if sheet is None:
-            return 0
-
-        return sheet.row_count
+        return self.spreadsheet.row_count()
 
     def column_count(self) -> int:
         """
@@ -774,12 +784,7 @@ class Document:
         Returns:
             The filtered column count.
         """
-        sheet = self.spreadsheet.current_sheet()
-
-        if sheet is None:
-            return 0
-
-        return sheet.column_count
+        return self.spreadsheet.column_count()
 
     def headers(self) -> list[str]:
         """
@@ -788,12 +793,7 @@ class Document:
         Returns:
             The visible column names.
         """
-        sheet = self.spreadsheet.current_sheet()
-
-        if sheet is None:
-            return []
-
-        return sheet.headers
+        return self.spreadsheet.headers()
 
     def info(self) -> DocumentInfo:
         """
@@ -853,6 +853,21 @@ class Document:
         """Reset the in-memory DataFrame view state."""
         self.df = pd.DataFrame()
         self.filtered_df = pd.DataFrame()
+
+    def _active_sheet_model(self) -> Sheet | None:
+        """Return the current domain-sheet model for the active workbook sheet."""
+        return self.spreadsheet.current_sheet()
+
+    def _sync_from_active_sheet(self) -> None:
+        """Synchronize the document view state from the active sheet model."""
+        active_sheet = self._active_sheet_model()
+
+        if active_sheet is None:
+            self._clear_view_data()
+            return
+
+        self.df = active_sheet.dataframe
+        self.filtered_df = active_sheet.active_view if active_sheet.active_view is not None else active_sheet.dataframe
 
     def _set_view_data(self, dataframe: pd.DataFrame, apply_search: bool = False) -> None:
         """Populate the active DataFrame view and optionally reapply search state."""
