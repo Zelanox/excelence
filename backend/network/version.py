@@ -2,7 +2,7 @@ import json
 import os
 from datetime import datetime
 
-import config
+from backend.utils import config
 
 
 class VersionManager:

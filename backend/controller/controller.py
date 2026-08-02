@@ -10,10 +10,14 @@ from backend.services.spreadsheet_service import SpreadsheetService
 class Controller:
     """Coordinate spreadsheet operations for the backend."""
 
-    def __init__(self, document, spreadsheet_service):
-        """Initialize the controller with storage, network, and document services."""
-        self.storage = ExcelStorage()
-        self.network = NetworkClient(SERVER_IP, SERVER_PORT)
+    def __init__(self, document: Document | None = None, spreadsheet_service: SpreadsheetService | None = None) -> None:
+        """Initialize the controller with document and spreadsheet services."""
+        if document is None:
+            document = Document(ExcelStorage(), NetworkClient(SERVER_IP, SERVER_PORT))
+
+        if spreadsheet_service is None:
+            spreadsheet_service = SpreadsheetService(document)
+
         self.document = document
         self.spreadsheet_service = spreadsheet_service
 
@@ -103,7 +107,7 @@ class Controller:
         """
         return self.document.column_count()
 
-    def data(self) -> list[dict]:
+    def data(self) -> list[dict[str, str]]:
         """
         Return the visible spreadsheet data as row dictionaries.
 
@@ -144,14 +148,14 @@ class Controller:
 
     def sort_columns(self) -> list[str]:
         """
-        Return the available sort columns.
+        Return the available sort columns for the current sheet.
 
         Returns:
             A list of column names.
         """
-        return list(self.document.df.columns)
+        return self.document.headers()
 
-    def sort(self, sort_rules: list[dict]) -> bool:
+    def sort(self, sort_rules: list[dict[str, object]]) -> bool:
         """
         Apply a list of sort rules to the current view.
 
@@ -269,7 +273,7 @@ class Controller:
         Returns:
             The filtered row count.
         """
-        return len(self.document.filtered_df)
+        return self.document.filtered_row_count()
 
     def loaded_document(self):
         """
@@ -352,7 +356,7 @@ class Controller:
         Returns:
             True if the column was inserted successfully, otherwise False.
         """
-        return self.spreadsheet_service.insert_column(index)
+        return self.spreadsheet_service.insert_column(name, index)
 
     def delete_column(self, name: str) -> bool:
         """
@@ -364,7 +368,7 @@ class Controller:
         Returns:
             True if the column was deleted successfully, otherwise False.
         """
-        return self.spreadsheet_service.delete_column(index)
+        return self.spreadsheet_service.delete_column(name)
 
     def rename_sheet(self, old_name: str, new_name: str) -> bool:
         """

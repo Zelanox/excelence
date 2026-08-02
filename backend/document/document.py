@@ -22,7 +22,7 @@ logger = get_logger("document")
 class Document:
     """Own spreadsheet state and workbook operations for the backend."""
 
-    def __init__(self, storage, network, online: bool = False):
+    def __init__(self, storage: Any, network: Any, online: bool = False) -> None:
         """
         Initialize the document state and its collaborators.
 
@@ -111,8 +111,7 @@ class Document:
         self.filename = filename
         self.sheet_name = self.sheet.title
 
-        self.df = pd.DataFrame()
-        self.filtered_df = pd.DataFrame()
+        self._clear_view_data()
 
         self.loaded = True
         self.modified = True
@@ -146,7 +145,7 @@ class Document:
     # Domain Model
     # ==========================================================
 
-    def dataframe_to_spreadsheet(self):
+    def dataframe_to_spreadsheet(self) -> None:
 
         if self.sheet is None:
         
@@ -207,8 +206,7 @@ class Document:
         self.sheet = self.workbook.active
         self.sheet_name = self.sheet.title
 
-        self.df = self.storage.read_sheet(self.sheet)
-        self.filtered_df = self.df.copy()
+        self._set_view_data(self.storage.read_sheet(self.sheet))
         self.dataframe_to_spreadsheet()
         self.modified = False
         return True
@@ -344,13 +342,10 @@ class Document:
     def _refresh_view(self) -> None:
         """Reload the active worksheet and reapply the current search/sort state."""
         if self.workbook is None or self.sheet is None:
-            self.df = pd.DataFrame()
-            self.filtered_df = pd.DataFrame()
+            self._clear_view_data()
             return
 
-        self.df = self.storage.read_sheet(self.sheet)
-        self.filtered_df = self.df.copy()
-        self.search(self.search_text)
+        self._set_view_data(self.storage.read_sheet(self.sheet), apply_search=True)
 
     def edit_cell(self, row: int, column: int, value: Any) -> bool:
         """
@@ -390,7 +385,8 @@ class Document:
         if not success:
             return False
 
-        self.spreadsheet_to_dataframe()
+        self.df.iloc[row, column] = value
+        self._sync_active_sheet()
 
         self.modified = True
 
@@ -559,8 +555,7 @@ class Document:
         self.workbook.create_sheet(title=name)
         self.sheet = self.workbook[name]
         self.sheet_name = name
-        self.df = pd.DataFrame()
-        self.filtered_df = pd.DataFrame()
+        self._clear_view_data()
         self._sync_active_sheet()
         self.modified = True
         self.search(self.search_text)
@@ -644,9 +639,7 @@ class Document:
         self.sheet = self.workbook[sheet_name]
         self.sheet_name = sheet_name
 
-        self.df = self.storage.read_sheet(self.sheet)
-        self.filtered_df = self.df.copy()
-        self.search(self.search_text)
+        self._set_view_data(self.storage.read_sheet(self.sheet), apply_search=True)
         return True
 
     # ==========================================================
@@ -755,6 +748,10 @@ class Document:
         """
         return self.df
 
+    def filtered_row_count(self) -> int:
+        """Return the number of rows in the filtered view."""
+        return len(self.filtered_df)
+
     def row_count(self) -> int:
         """
         Return the number of rows in the filtered view.
@@ -762,7 +759,7 @@ class Document:
         Returns:
             The filtered row count.
         """
-        
+
         sheet = self.spreadsheet.current_sheet()
 
         if sheet is None:
@@ -836,8 +833,7 @@ class Document:
         self.sheet = None
         self.filename = ""
         self.sheet_name = ""
-        self.df = pd.DataFrame()
-        self.filtered_df = pd.DataFrame()
+        self._clear_view_data()
         self.search_text = ""
         self.sort_rules = []
         self.loaded = False
@@ -853,14 +849,26 @@ class Document:
         """Validate that a filename is a non-empty string."""
         return isinstance(filename, str) and bool(filename.strip())
 
-    def spreadsheet_to_dataframe(self):
+    def _clear_view_data(self) -> None:
+        """Reset the in-memory DataFrame view state."""
+        self.df = pd.DataFrame()
+        self.filtered_df = pd.DataFrame()
+
+    def _set_view_data(self, dataframe: pd.DataFrame, apply_search: bool = False) -> None:
+        """Populate the active DataFrame view and optionally reapply search state."""
+        self.df = dataframe
+        self.filtered_df = dataframe.copy()
+
+        if apply_search:
+            self.search(self.search_text)
+
+    def spreadsheet_to_dataframe(self) -> None:
 
         sheet = self.spreadsheet.current_sheet()
 
         if sheet is None:
 
-            self.df = pd.DataFrame()
-            self.filtered_df = pd.DataFrame()
+            self._clear_view_data()
 
             return
 
@@ -872,8 +880,6 @@ class Document:
 
         ]
 
-        self.df = pd.DataFrame(rows)
-
-        self.filtered_df = self.df.copy()
+        self._set_view_data(pd.DataFrame(rows))
 
     

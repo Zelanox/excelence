@@ -2,7 +2,7 @@ import socket
 import threading
 import traceback
 
-import config
+from backend.utils import config
 import network.protocol as protocol
 import network.handlers as handlers
 

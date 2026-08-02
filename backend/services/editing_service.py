@@ -1,12 +1,15 @@
+from typing import Any
+
+
 class EditingService:
 
     def edit_cell(
         self,
-        spreadsheet,
-        row,
-        column,
-        value
-    ):
+        spreadsheet: Any,
+        row: int,
+        column: int,
+        value: Any
+    ) -> bool:
 
         return spreadsheet.edit_cell(
             row,
@@ -16,16 +19,16 @@ class EditingService:
 
     def insert_row(
         self,
-        spreadsheet,
-        index=None
-    ):
+        spreadsheet: Any,
+        index: int | None = None
+    ) -> bool:
 
         return spreadsheet.insert_row(index)
 
     def delete_row(
         self,
-        spreadsheet,
-        index
-    ):
+        spreadsheet: Any,
+        index: int
+    ) -> bool:
 
         return spreadsheet.delete_row(index)

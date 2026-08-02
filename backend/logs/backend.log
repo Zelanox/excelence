@@ -130,3 +130,25 @@
 2026-08-02 21:01:35,198 - INFO - config - Using config file D:\secel\repo\excelence\backend\utils\config.json
 2026-08-02 21:01:43,960 - INFO - config - Using config file D:\secel\repo\excelence\backend\utils\config.json
 2026-08-02 21:03:06,684 - INFO - config - Using config file D:\secel\repo\excelence\backend\utils\config.json
+2026-08-02 23:46:56,196 - INFO - config - Using config file E:\ZELANOX\Excelence\backend\utils\config.json
+2026-08-02 23:47:35,858 - INFO - config - Using config file E:\ZELANOX\Excelence\backend\utils\config.json
+2026-08-02 23:47:35,959 - INFO - document - Opened document C:\Users\OS_10\AppData\Local\Temp\tmp5_jwks1z\sample.xlsx
+2026-08-02 23:47:35,978 - INFO - document - Opened document C:\Users\OS_10\AppData\Local\Temp\tmpyxcqcv4d\search.xlsx
+2026-08-02 23:47:35,990 - INFO - document - Opened document C:\Users\OS_10\AppData\Local\Temp\tmpvg4gqqmb\editing.xlsx
+2026-08-02 23:47:36,083 - INFO - document - Opened document C:\Users\OS_10\AppData\Local\Temp\tmp60l5mlu8\failures.xlsx
+2026-08-02 23:48:06,213 - INFO - config - Using config file E:\ZELANOX\Excelence\backend\utils\config.json
+2026-08-02 23:48:06,254 - INFO - document - Opened document C:\Users\OS_10\AppData\Local\Temp\tmpamzcl_iv\sample.xlsx
+2026-08-02 23:48:06,271 - INFO - document - Opened document C:\Users\OS_10\AppData\Local\Temp\tmpev712itu\search.xlsx
+2026-08-02 23:48:06,282 - INFO - document - Opened document C:\Users\OS_10\AppData\Local\Temp\tmp9y92wyrv\editing.xlsx
+2026-08-02 23:48:06,303 - INFO - document - Opened document C:\Users\OS_10\AppData\Local\Temp\tmp20stpg6e\failures.xlsx
+2026-08-02 23:48:25,917 - INFO - config - Using config file E:\ZELANOX\Excelence\backend\utils\config.json
+2026-08-02 23:53:00,430 - INFO - config - Using config file E:\ZELANOX\Excelence\backend\utils\config.json
+2026-08-02 23:53:00,467 - INFO - document - Opened document C:\Users\OS_10\AppData\Local\Temp\tmpopgr5_x3\sample.xlsx
+2026-08-02 23:53:00,485 - INFO - document - Opened document C:\Users\OS_10\AppData\Local\Temp\tmp2it2txjt\search.xlsx
+2026-08-02 23:53:00,496 - INFO - document - Opened document C:\Users\OS_10\AppData\Local\Temp\tmpcmpbfnxv\editing.xlsx
+2026-08-02 23:53:00,516 - INFO - document - Opened document C:\Users\OS_10\AppData\Local\Temp\tmp6bioldil\failures.xlsx
+2026-08-02 23:53:42,962 - INFO - config - Using config file E:\ZELANOX\Excelence\backend\utils\config.json
+2026-08-02 23:53:42,999 - INFO - document - Opened document C:\Users\OS_10\AppData\Local\Temp\tmp1yvfq98q\sample.xlsx
+2026-08-02 23:53:43,017 - INFO - document - Opened document C:\Users\OS_10\AppData\Local\Temp\tmplb6e7dwf\search.xlsx
+2026-08-02 23:53:43,028 - INFO - document - Opened document C:\Users\OS_10\AppData\Local\Temp\tmpa5_eiqiv\editing.xlsx
+2026-08-02 23:53:43,047 - INFO - document - Opened document C:\Users\OS_10\AppData\Local\Temp\tmp1octbz52\failures.xlsx

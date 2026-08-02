@@ -1,3 +1,5 @@
+from typing import Any
+
 import pandas as pd
 
 
@@ -6,7 +8,7 @@ class SortService:
     def sort(
         self,
         dataframe: pd.DataFrame,
-        rules: list[dict]
+        rules: list[dict[str, Any]]
     ) -> pd.DataFrame:
 
         if dataframe.empty:

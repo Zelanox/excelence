@@ -1,5 +1,10 @@
 from collections import deque
 
+try:
+    import network.protocol as protocol
+except ImportError:  # pragma: no cover - compatibility for package-based imports
+    from backend.network import protocol
+
 
 class SaveManager:
 

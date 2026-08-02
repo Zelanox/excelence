@@ -1,4 +1,10 @@
 from backend.commands.command import Command
 
-class ClearSortCommand:
-    pass
+
+class ClearSortCommand(Command):
+
+    def __init__(self, document):
+        self.document = document
+
+    def execute(self):
+        return self.document.clear_sort()

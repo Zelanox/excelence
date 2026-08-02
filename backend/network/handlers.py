@@ -1,11 +1,11 @@
 import os
 
-import config
-import network.protocol as protocol
+from backend.utils import config
+from backend.network import protocol
 
-from network.repository import Repository
-from network.version import VersionManager
-from network.lock import SaveManager
+from backend.network.repository import Repository
+from backend.network.version import VersionManager
+from backend.network.lock import SaveManager
 
 
 # ==========================================================

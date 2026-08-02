@@ -1,6 +1,6 @@
 import os
 
-import config
+from backend.utils import config
 
 
 class Repository:
