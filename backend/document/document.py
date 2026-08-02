@@ -12,6 +12,10 @@ from backend.models.spreadsheet import Spreadsheet
 from backend.models.sheet import Sheet
 from backend.models.spreadsheet_row import SpreadsheetRow
 
+from backend.services.search_service import SearchService
+from backend.services.sort_service import SortService
+from backend.services.editing_service import EditingService
+
 logger = get_logger("document")
 
 
@@ -36,6 +40,10 @@ class Document:
 
         self.filename = ""
         self.sheet_name = ""
+
+        self.search_service = SearchService()
+        self.sort_service = SortService()
+        self.editing_service = EditingService()
 
         self.documents_folder = DOCUMENTS_FOLDER
 
@@ -244,20 +252,27 @@ class Document:
         if self.workbook is None:
             return False
 
-        self.search_text = text.strip()
+        self.search_text = text
 
-        if not self.search_text:
-            self.filtered_df = self.df.copy()
-            return self._reapply_sort()
+        self.filtered_df = self.search_service.search(
 
-        search = self.search_text.lower()
+            self.df,
 
-        mask = self.df.astype(str).apply(
-            lambda column: column.str.lower().str.contains(search, na=False)
-        ).any(axis=1)
+            text
 
-        self.filtered_df = self.df[mask].copy()
-        return self._reapply_sort()
+        )
+
+        if self.sort_rules:
+
+            self.sort(
+
+                self.sort_rules,
+
+                reapply=True
+
+            )
+
+        return True
 
     def clear_search(self) -> bool:
         """
@@ -288,33 +303,17 @@ class Document:
         Returns:
             True if sorting completed successfully, otherwise False.
         """
-        if self.workbook is None or self.filtered_df.empty:
-            return False
-
         if not reapply:
             self.sort_rules = sort_rules
 
-        if not self.sort_rules:
-            return True
+        self.filtered_df = self.sort_service.sort(
 
-        columns: list[str] = []
-        ascending: list[bool] = []
+            self.filtered_df,
 
-        for rule in self.sort_rules:
-            column = rule.get("column")
-            if column not in self.filtered_df.columns:
-                continue
-            columns.append(column)
-            ascending.append(rule.get("ascending", True))
+            self.sort_rules
 
-        if not columns:
-            return False
+        )
 
-        self.filtered_df = self.filtered_df.sort_values(
-            by=columns,
-            ascending=ascending,
-            kind="stable"
-        ).reset_index(drop=True)
         return True
 
     def clear_sort(self) -> bool:
@@ -377,10 +376,26 @@ class Document:
         if column >= len(self.df.columns):
             return False
 
-        self.df.iat[row, column] = value
-        self._sync_active_sheet()
+        success = self.editing_service.edit_cell(
+
+            self.spreadsheet,
+
+            row,
+
+            column,
+
+            value
+
+        )
+        if not success:
+            return False
+
+        self.spreadsheet_to_dataframe()
+
         self.modified = True
+
         self.search(self.search_text)
+
         return True
 
     def insert_row(self, index: int | None = None) -> bool:
@@ -747,7 +762,13 @@ class Document:
         Returns:
             The filtered row count.
         """
-        return len(self.filtered_df)
+        
+        sheet = self.spreadsheet.current_sheet()
+
+        if sheet is None:
+            return 0
+
+        return sheet.row_count
 
     def column_count(self) -> int:
         """
@@ -756,7 +777,12 @@ class Document:
         Returns:
             The filtered column count.
         """
-        return len(self.filtered_df.columns)
+        sheet = self.spreadsheet.current_sheet()
+
+        if sheet is None:
+            return 0
+
+        return sheet.column_count
 
     def headers(self) -> list[str]:
         """
@@ -765,7 +791,12 @@ class Document:
         Returns:
             The visible column names.
         """
-        return list(self.filtered_df.columns)
+        sheet = self.spreadsheet.current_sheet()
+
+        if sheet is None:
+            return []
+
+        return sheet.headers
 
     def info(self) -> DocumentInfo:
         """
@@ -822,3 +853,27 @@ class Document:
         """Validate that a filename is a non-empty string."""
         return isinstance(filename, str) and bool(filename.strip())
 
+    def spreadsheet_to_dataframe(self):
+
+        sheet = self.spreadsheet.current_sheet()
+
+        if sheet is None:
+
+            self.df = pd.DataFrame()
+            self.filtered_df = pd.DataFrame()
+
+            return
+
+        rows = [
+
+            row.values
+
+            for row in sheet.rows
+
+        ]
+
+        self.df = pd.DataFrame(rows)
+
+        self.filtered_df = self.df.copy()
+
+    

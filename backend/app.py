@@ -1,59 +1,57 @@
-from kivy.app import App
-from kivy.uix.screenmanager import ScreenManager
-from kivy.lang import Builder
+"""
+Application composition root.
 
-from ui.widgets.toolbar import Toolbar
-from ui.widgets.searchbar import SearchBar
-from ui.widgets.spreadsheet import Spreadsheet
-from ui.widgets.statusbar import StatusBar
-from ui.widgets.arabic_spinner_option import ArabicSpinnerOption
+This module wires together the backend components and exposes
+the application's controller.
+"""
 
-from app.controller import Controller
-from ui.widgets.cell import Cell
-from ui.widgets.row import Row
+from backend.controller.controller import Controller
 
-from ui.screens.main_screen import MainScreen
-from pathlib import Path
+from backend.document.document import Document
 
-def load_kv_files():
-    kv_root = Path(__file__).parent.parent / "ui"
+from backend.network.client import NetworkClient
 
-    Builder.load_file(str(kv_root / "screens" / "main_screen.kv"))
+from backend.services.spreadsheet_service import SpreadsheetService
 
-    Builder.load_file(str(kv_root / "widgets" / "toolbar.kv"))
+from backend.storage.excel_storage import ExcelStorage
 
-    Builder.load_file(str(kv_root / "widgets" / "sort_dialog.kv"))
+from backend.utils.config import SERVER_IP, SERVER_PORT
 
-    Builder.load_file(str(kv_root / "widgets" / "arabic_spinner_option.kv"))
 
-    Builder.load_file(str(kv_root / "widgets" / "searchbar.kv"))
+class Application:
+    """
+    Application bootstrap.
 
-    Builder.load_file(str(kv_root / "widgets" / "cell.kv"))
+    Responsible for creating and connecting all backend components.
+    """
 
-    Builder.load_file(str(kv_root / "widgets" / "row.kv"))
+    def __init__(self):
 
-    Builder.load_file(str(kv_root / "widgets" / "spreadsheet.kv"))
+        # Infrastructure
 
-    Builder.load_file(str(kv_root / "widgets" / "statusbar.kv"))
+        self.storage = ExcelStorage()
 
-class ExcelenceApp(App):
+        self.network = NetworkClient(
+            SERVER_IP,
+            SERVER_PORT,
+        )
 
-    title = "Excelence"
+        # Domain
 
-    def build(self):
+        self.document = Document(
+            self.storage,
+            self.network,
+        )
 
-        load_kv_files()
+        # Services
 
-        self.controller = Controller()
+        self.spreadsheet_service = SpreadsheetService(
+            self.document,
+        )
 
-        sm = ScreenManager()
+        # Controller
 
-        main_screen = MainScreen(name="main")
-
-        self.main_screen = main_screen
-
-        main_screen.statusbar.refresh()
-
-        sm.add_widget(main_screen)
-
-        return sm
+        self.controller = Controller(
+            document=self.document,
+            spreadsheet_service=self.spreadsheet_service,
+        )

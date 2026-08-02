@@ -3,22 +3,19 @@ from backend.storage.excel_storage import ExcelStorage
 from backend.network.client import NetworkClient
 from backend.utils.config import SERVER_IP, SERVER_PORT
 from backend.models.spreadsheet_status import SpreadsheetStatus
-from backend.commands.spreadsheet.edit_cell import EditCellCommand
-from backend.commands.manager import CommandManager
+
+from backend.services.spreadsheet_service import SpreadsheetService
+
 
 class Controller:
     """Coordinate spreadsheet operations for the backend."""
 
-    def __init__(self):
+    def __init__(self, document, spreadsheet_service):
         """Initialize the controller with storage, network, and document services."""
         self.storage = ExcelStorage()
         self.network = NetworkClient(SERVER_IP, SERVER_PORT)
-        self.document = Document(
-            self.storage,
-            self.network,
-            online=False
-        )
-        self.command_manager = CommandManager()
+        self.document = document
+        self.spreadsheet_service = spreadsheet_service
 
     # ==========================================================
     # Document
@@ -79,39 +76,32 @@ class Controller:
     # Spreadsheet
     # ==========================================================
 
-
     def headers(self) -> list[str]:
         """
         Return the visible headers for the active sheet.
-
 
         Returns:
             A list of column names.
         """
         return self.document.headers()
 
-
     def row_count(self) -> int:
         """
         Return the number of visible rows.
-
 
         Returns:
             The visible row count.
         """
         return self.document.row_count()
 
-
     def column_count(self) -> int:
         """
         Return the number of visible columns.
-
 
         Returns:
             The visible column count.
         """
         return self.document.column_count()
-
 
     def data(self) -> list[dict]:
         """
@@ -146,7 +136,6 @@ class Controller:
         if value is None:
             return ""
 
-
         return str(value)
 
     # ==========================================================
@@ -170,9 +159,9 @@ class Controller:
             sort_rules: A list of sort rule dictionaries.
 
         Returns:
-            True if sorting completed successfully, otherwise False.
+            True if the sort operation completed, otherwise False.
         """
-        return self.document.sort(sort_rules)
+        return self.spreadsheet_service.sort(sort_rules)
 
     def clear_sort(self) -> bool:
         """
@@ -181,7 +170,7 @@ class Controller:
         Returns:
             True if sorting was reset successfully, otherwise False.
         """
-        return self.document.clear_sort()
+        return self.spreadsheet_service.clear_sort()
 
     # ==========================================================
     # Search
@@ -197,7 +186,7 @@ class Controller:
         Returns:
             True if the search completed successfully, otherwise False.
         """
-        return self.document.search(text)
+        return self.spreadsheet_service.search(text)
 
     def clear_search(self) -> bool:
         """
@@ -206,12 +195,11 @@ class Controller:
         Returns:
             True if the search filter was cleared successfully, otherwise False.
         """
-        return self.document.clear_search()
+        return self.spreadsheet_service.clear_search()
 
     # ==========================================================
     # Sheets
     # ==========================================================
-
 
     def sheets(self) -> list[str]:
         """
@@ -304,30 +292,30 @@ class Controller:
             loaded=self.is_loaded(),
             modified=self.modified(),
             rows=self.row_count(),
-
             columns=self.column_count()
         )
 
-    
     # ==========================================================
     # Editing preparation
     # ==========================================================
 
-    def edit_cell(
-        self,
-        row,
-        column,
-        value
-    ):
+    def edit_cell(self, row: int, column: int, value) -> bool:
+        """
+        Update a cell value in the active document.
 
-        command = EditCellCommand(
-            self.document,
+        Args:
+            row: Zero-based row index.
+            column: Zero-based column index.
+            value: New value for the cell.
+
+        Returns:
+            True if the update completed successfully, otherwise False.
+        """
+        return self.spreadsheet_service.edit_cell(
             row,
             column,
-            value
+            value,
         )
-
-        return self.command_manager.execute(command)
 
     def insert_row(self, index: int | None = None) -> bool:
         """
@@ -339,12 +327,7 @@ class Controller:
         Returns:
             True if the row was inserted successfully, otherwise False.
         """
-        command = InsertRowCommand(
-            self.document,
-            index
-        )
-
-        return self.command_manager.execute(command)
+        return self.spreadsheet_service.insert_row(index)
 
     def delete_row(self, index: int) -> bool:
         """
@@ -356,7 +339,7 @@ class Controller:
         Returns:
             True if the row was deleted successfully, otherwise False.
         """
-        return self.document.delete_row(index)
+        return self.spreadsheet_service.delete_row(index)
 
     def insert_column(self, name: str, index: int | None = None) -> bool:
         """
@@ -369,7 +352,7 @@ class Controller:
         Returns:
             True if the column was inserted successfully, otherwise False.
         """
-        return self.document.insert_column(name, index)
+        return self.spreadsheet_service.insert_column(index)
 
     def delete_column(self, name: str) -> bool:
         """
@@ -381,7 +364,7 @@ class Controller:
         Returns:
             True if the column was deleted successfully, otherwise False.
         """
-        return self.document.delete_column(name)
+        return self.spreadsheet_service.delete_column(index)
 
     def rename_sheet(self, old_name: str, new_name: str) -> bool:
         """
@@ -394,7 +377,10 @@ class Controller:
         Returns:
             True if the worksheet was renamed successfully, otherwise False.
         """
-        return self.document.rename_sheet(old_name, new_name)
+        return self.spreadsheet_service.rename_sheet(
+            old_name,
+            new_name,
+        )
 
     def add_sheet(self, name: str) -> bool:
         """
@@ -406,7 +392,7 @@ class Controller:
         Returns:
             True if the worksheet was added successfully, otherwise False.
         """
-        return self.document.add_sheet(name)
+        return self.spreadsheet_service.add_sheet(name)
 
     def delete_sheet(self, name: str) -> bool:
         """
@@ -418,7 +404,7 @@ class Controller:
         Returns:
             True if the worksheet was deleted successfully, otherwise False.
         """
-        return self.document.delete_sheet(name)
+        return self.spreadsheet_service.delete_sheet(name)
 
     # ==========================================================
     # File Management
