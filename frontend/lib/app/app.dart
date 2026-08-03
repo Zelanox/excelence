@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../features/home/presentation/home_page.dart';
+import '../features/shell/presentation/shell_page.dart';
 import 'theme.dart';
 
 class ExcelenceApp extends StatelessWidget {
@@ -10,12 +10,9 @@ class ExcelenceApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Excelence',
-
       debugShowCheckedModeBanner: false,
-
       theme: excelenceTheme,
-
-      home: const HomePage(),
+      home: const ShellPage(),
     );
   }
 }
