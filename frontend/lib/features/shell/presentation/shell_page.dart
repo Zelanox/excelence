@@ -18,7 +18,7 @@ class ShellPage extends StatelessWidget {
             AppMenuBar(),
             Toolbar(),
             FormulaBar(),
-            SpreadsheetPlaceholder(),
+            Workspace(),
             StatusBar(),
           ],
         ),
