@@ -8,4 +8,11 @@ class CellMetrics {
   static const double rowHeaderWidth = 48;
 
   static const double columnHeaderHeight = 32;
+
+  static int columnFromPixel(double x) =>
+    (x / columnWidth).floor();
+
+  static int rowFromPixel(double y) =>
+    (y / rowHeight).floor();
+
 }

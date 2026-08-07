@@ -11,4 +11,8 @@ class SelectionModel {
 
   final int endRow;
   final int endColumn;
+
+  int get activeRow => startRow;
+
+  int get activeColumn => startColumn;
 }

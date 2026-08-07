@@ -47,14 +47,19 @@ class SpreadsheetController extends ChangeNotifier {
   }
 
     void selectCell(int row, int column) {
-    _selection = SelectionModel(
-      startRow: row,
-      endRow: row,
-      startColumn: column,
-      endColumn: column,
-    );
+      if (_selection.startRow == row &&
+          _selection.startColumn == column) {
+        return;
+      }
 
-    notifyListeners();
-  }
+      _selection = SelectionModel(
+        startRow: row,
+        endRow: row,
+        startColumn: column,
+        endColumn: column,
+      );
+
+      notifyListeners();
+    }
 
 }
