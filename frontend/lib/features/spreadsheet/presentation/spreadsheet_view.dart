@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:frontend/features/spreadsheet/presentation/widgets/viewport/spreadsheet_viewport.dart';
 
-import 'widgets/spreadsheet_grid.dart';
 import 'widgets/sheet_tabs.dart';
 import '../controllers/spreadsheet_controller.dart';
 
@@ -11,10 +11,10 @@ class SpreadsheetView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Column(
+    return Column(
       children: [
         Expanded(
-          child: SpreadsheetGrid(),
+          child: SpreadsheetViewport(),
         ),
 
         SheetTabs(),

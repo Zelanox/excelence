@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class RowHeader extends StatelessWidget {
-  const RowHeader({super.key});
+  const RowHeader({super.key, required ScrollController controller,});
 
   @override
   Widget build(BuildContext context) {

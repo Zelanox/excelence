@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class ColumnHeader extends StatelessWidget {
-  const ColumnHeader({super.key});
+  const ColumnHeader({super.key, required ScrollController controller,});
 
   @override
   Widget build(BuildContext context) {
