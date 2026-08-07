@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../presentation/widgets/viewport/cell_metrics.dart';
 
 class SheetTabs extends StatelessWidget {
   const SheetTabs({super.key});
@@ -6,7 +7,7 @@ class SheetTabs extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 36,
+      height: CellMetrics.columnHeaderHeight,
       decoration: BoxDecoration(
         border: Border(
           top: BorderSide(

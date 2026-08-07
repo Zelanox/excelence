@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/api/api_client.dart';
 import '../controllers/spreadsheet_controller.dart';
+import '../controllers/viewport_controller.dart';
 import '../services/spreadsheet_service.dart';
 import 'spreadsheet_view.dart';
 
@@ -15,7 +16,8 @@ class SpreadsheetFeature extends StatefulWidget {
 }
 
 class _SpreadsheetFeatureState extends State<SpreadsheetFeature> {
-  late final SpreadsheetController controller;
+  late final SpreadsheetController spreadsheetController;
+  late final ViewportController viewportController;
 
   @override
   void initState() {
@@ -27,21 +29,24 @@ class _SpreadsheetFeatureState extends State<SpreadsheetFeature> {
 
     final service = SpreadsheetService(api);
 
-    controller = SpreadsheetController(service);
+    spreadsheetController = SpreadsheetController(service);
+    viewportController = ViewportController();
 
-    controller.loadMockData();
+    spreadsheetController.loadMockData();
   }
 
   @override
   void dispose() {
-    controller.dispose();
+    spreadsheetController.dispose();
+    viewportController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return SpreadsheetView(
-      controller: controller,
+      controller: spreadsheetController,
+      viewportController: viewportController,
     );
   }
 }

@@ -5,7 +5,6 @@ import '../models/row_model.dart';
 import '../models/sheet_model.dart';
 import '../models/spreadsheet_model.dart';
 import '../models/selection_model.dart';
-import '../models/viewport_model.dart';
 
 import '../services/spreadsheet_service.dart';
 
@@ -16,11 +15,9 @@ class SpreadsheetController extends ChangeNotifier {
 
   SpreadsheetModel? _spreadsheet;
   SelectionModel _selection = const SelectionModel();
-  ViewportModel _viewport = const ViewportModel();
 
   SpreadsheetModel? get spreadsheet => _spreadsheet;
   SelectionModel get selection => _selection;
-  ViewportModel get viewport => _viewport;
 
   void loadMockData() {
     _spreadsheet = SpreadsheetModel(
@@ -49,7 +46,7 @@ class SpreadsheetController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void selectCell(int row, int column) {
+    void selectCell(int row, int column) {
     _selection = SelectionModel(
       startRow: row,
       endRow: row,
@@ -60,26 +57,4 @@ class SpreadsheetController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setScroll({
-    required double x,
-    required double y,
-  }) {
-    _viewport = ViewportModel(
-      scrollX: x,
-      scrollY: y,
-      zoom: _viewport.zoom,
-    );
-
-    notifyListeners();
-  }
-
-  void setZoom(double zoom) {
-    _viewport = ViewportModel(
-      scrollX: _viewport.scrollX,
-      scrollY: _viewport.scrollY,
-      zoom: zoom,
-    );
-
-    notifyListeners();
-  }
 }

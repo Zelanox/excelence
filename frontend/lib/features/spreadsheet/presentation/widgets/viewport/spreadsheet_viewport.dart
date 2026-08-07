@@ -5,11 +5,17 @@ import 'column_header.dart';
 import 'corner_cell.dart';
 import 'row_header.dart';
 import 'scroll_coordinator.dart';
+import 'selection_overlay.dart';
+import '../../../controllers/spreadsheet_controller.dart';
+import '../../../controllers/viewport_controller.dart';
 
 class SpreadsheetViewport extends StatefulWidget {
   const SpreadsheetViewport({
     super.key,
+    required this.viewportController,
   });
+
+  final ViewportController viewportController;
 
   static const double rowHeaderWidth = 48;
   static const double columnHeaderHeight = 32;
@@ -26,7 +32,9 @@ class _SpreadsheetViewportState
   @override
   void initState() {
     super.initState();
-    _scroll = ScrollCoordinator();
+    _scroll = ScrollCoordinator(
+      viewportController: widget.viewportController,
+    );
   }
 
   @override
@@ -68,11 +76,18 @@ class _SpreadsheetViewportState
               ),
 
               Expanded(
-                child: CellCanvas(
-                  horizontalController: _scroll.horizontal,
-                  verticalController: _scroll.vertical,
+                child: Stack(
+                  children: [
+                    CellCanvas(
+                      horizontalController: _scroll.horizontal,
+                      verticalController: _scroll.vertical,
+                      viewportController: widget.viewportController,
+                    ),
+
+                    const SpreadsheetSelectionOverlay(),
+                  ],
                 ),
-              ),
+              )
             ],
           ),
         ),
