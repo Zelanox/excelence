@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 
 import 'cell_metrics.dart';
+import '../../../models/visible_range_model.dart';
 
 class GridPainter extends CustomPainter {
-  const GridPainter();
+  const GridPainter({
+    required this.visibleRange,
+  });
+
+  final VisibleRangeModel visibleRange;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -11,33 +16,45 @@ class GridPainter extends CustomPainter {
       ..color = Colors.grey.shade300
       ..strokeWidth = 1;
 
-    // Vertical lines
+    final firstColumn = visibleRange.firstColumn;
+    final lastColumn = visibleRange.lastColumn;
+
+    final firstRow = visibleRange.firstRow;
+    final lastRow = visibleRange.lastRow;
+
+    // Vertical lines.
     for (
-      double x = 0;
-      x <= size.width;
-      x += CellMetrics.columnWidth
+      int column = firstColumn;
+      column <= lastColumn + 1;
+      column++
     ) {
+      final x = column * CellMetrics.columnWidth;
+
       canvas.drawLine(
-        Offset(x, 0),
-        Offset(x, size.height),
+        Offset(x, firstRow * CellMetrics.rowHeight),
+        Offset(x, (lastRow + 1) * CellMetrics.rowHeight),
         paint,
       );
     }
 
-    // Horizontal lines
+    // Horizontal lines.
     for (
-      double y = 0;
-      y <= size.height;
-      y += CellMetrics.rowHeight
+      int row = firstRow;
+      row <= lastRow + 1;
+      row++
     ) {
+      final y = row * CellMetrics.rowHeight;
+
       canvas.drawLine(
-        Offset(0, y),
-        Offset(size.width, y),
+        Offset(firstColumn * CellMetrics.columnWidth, y),
+        Offset((lastColumn + 1) * CellMetrics.columnWidth, y),
         paint,
       );
     }
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant GridPainter oldDelegate) {
+    return oldDelegate.visibleRange != visibleRange;
+  }
 }

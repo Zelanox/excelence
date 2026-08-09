@@ -4,6 +4,7 @@ import '../models/viewport_model.dart';
 import '../presentation/widgets/viewport/hit_tester.dart';
 import '../models/cell_position.dart';
 import '../models/selection_model.dart';
+import '../models/visible_range_model.dart';
 
 
 class ViewportController extends ChangeNotifier {
@@ -141,6 +142,60 @@ class ViewportController extends ChangeNotifier {
     setScroll(
       x: newScrollX,
       y: newScrollY,
+    );
+  }
+
+  VisibleRangeModel getVisibleRange({
+    required Size viewportSize,
+    required int totalRows,
+    required int totalColumns,
+  }) {
+    const double cellWidth = 80.0;
+    const double cellHeight = 28.0;
+
+    final scrollX = viewport.scrollX;
+    final scrollY = viewport.scrollY;
+
+    final zoom = viewport.zoom;
+
+    final scaledCellWidth = cellWidth * zoom;
+    final scaledCellHeight = cellHeight * zoom;
+
+    final firstColumn =
+        (scrollX / scaledCellWidth).floor().clamp(
+          0,
+          totalColumns - 1,
+        );
+
+    final firstRow =
+        (scrollY / scaledCellHeight).floor().clamp(
+          0,
+          totalRows - 1,
+        );
+
+    final visibleColumns =
+        (viewportSize.width / scaledCellWidth).ceil() + 1;
+
+    final visibleRows =
+        (viewportSize.height / scaledCellHeight).ceil() + 1;
+
+    final lastColumn =
+        (firstColumn + visibleColumns - 1).clamp(
+          0,
+          totalColumns - 1,
+        );
+
+    final lastRow =
+        (firstRow + visibleRows - 1).clamp(
+          0,
+          totalRows - 1,
+        );
+
+    return VisibleRangeModel(
+      firstRow: firstRow,
+      lastRow: lastRow,
+      firstColumn: firstColumn,
+      lastColumn: lastColumn,
     );
   }
 

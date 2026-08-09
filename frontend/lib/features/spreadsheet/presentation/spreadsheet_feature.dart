@@ -5,7 +5,6 @@ import '../controllers/spreadsheet_controller.dart';
 import '../controllers/viewport_controller.dart';
 import '../services/spreadsheet_service.dart';
 import 'spreadsheet_view.dart';
-import '../models/spreadsheet_model.dart';
 
 class SpreadsheetFeature extends StatefulWidget {
   const SpreadsheetFeature({
