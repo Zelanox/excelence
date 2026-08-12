@@ -47,7 +47,6 @@ class _SpreadsheetFeatureState extends State<SpreadsheetFeature> {
     return SpreadsheetView(
       controller: spreadsheetController,
       viewportController: viewportController,
-      spreadsheet: spreadsheetController.spreadsheet!,
     );
   }
 }

@@ -7,9 +7,17 @@ class HitTester {
   CellPosition fromPixel({
     required double x,
     required double y,
+    double scrollX = 0,
+    double scrollY = 0,
   }) {
-    final column = (x / CellMetrics.columnWidth).floor();
-    final row = (y / CellMetrics.rowHeight).floor();
+    final contentX = x + scrollX;
+    final contentY = y + scrollY;
+
+    final column =
+        (contentX / CellMetrics.columnWidth).floor();
+
+    final row =
+        (contentY / CellMetrics.rowHeight).floor();
 
     return CellPosition(
       row: row,

@@ -1,49 +1,131 @@
 import 'package:flutter/material.dart';
 
 import '../../../controllers/viewport_controller.dart';
+import '../../../models/spreadsheet_model.dart';
+import 'cell_editor.dart';
+import '../../../controllers/spreadsheet_controller.dart';
 
-class SpreadsheetSelectionOverlay extends StatelessWidget {
+class SpreadsheetSelectionOverlay extends StatefulWidget {
   const SpreadsheetSelectionOverlay({
     super.key,
     required this.viewportController,
+    required this.spreadsheet,
+    required this.spreadsheetController,
+    required this.focusNode,
   });
 
   final ViewportController viewportController;
+  final SpreadsheetModel spreadsheet;
+  final SpreadsheetController spreadsheetController;
+  final FocusNode focusNode;
+
+  @override
+  State<SpreadsheetSelectionOverlay> createState() =>
+      _SpreadsheetSelectionOverlayState();
+}
+
+class _SpreadsheetSelectionOverlayState
+    extends State<SpreadsheetSelectionOverlay> {
+  void _finishEditing() {
+    widget.viewportController.stopEditing();
+
+    // Give Flutter one frame to remove the CellEditor,
+    // then return keyboard focus to the spreadsheet.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+
+      widget.focusNode.requestFocus();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final selection = viewportController.selection;
+    return AnimatedBuilder(
+      animation: widget.viewportController,
+      builder: (context, _) {
+        final selection = widget.viewportController.selection;
+        final viewport = widget.viewportController.viewport;
 
-    const cellWidth = 80.0;
-    const cellHeight = 28.0;
+        const cellWidth = 80.0;
+        const cellHeight = 28.0;
 
-    final left =
-        selection.startColumn * cellWidth -
-        viewportController.viewport.scrollX;
+        final left =
+            selection.startColumn * cellWidth -
+            viewport.scrollX;
 
-    final top =
-        selection.startRow * cellHeight -
-        viewportController.viewport.scrollY;
+        final top =
+            selection.startRow * cellHeight -
+            viewport.scrollY;
 
-    return IgnorePointer(
-      child: Stack(
-        children: [
-          Positioned(
-            left: left,
-            top: top,
-            width: cellWidth,
-            height: cellHeight,
-            child: Container(
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: Colors.blue,
-                  width: 2,
+        final sheet = widget.spreadsheet.activeSheet;
+
+        // Safety check so a selection outside the currently
+        // available model cannot crash the overlay.
+        if (selection.startRow < 0 ||
+            selection.startRow >= sheet.rows.length) {
+          return const SizedBox.expand();
+        }
+
+        final row = sheet.rows[selection.startRow];
+
+        if (selection.startColumn < 0 ||
+            selection.startColumn >= row.cells.length) {
+          return const SizedBox.expand();
+        }
+
+        final cell = row.cells[selection.startColumn];
+
+        return IgnorePointer(
+          ignoring: !widget.viewportController.isEditing,
+          child: Stack(
+            children: [
+              if (widget.viewportController.isEditing)
+                Positioned(
+                  left: left,
+                  top: top,
+                  width: cellWidth,
+                  height: cellHeight,
+                  child: CellEditor(
+                    key: ValueKey(
+                      'editor_${selection.startRow}_${selection.startColumn}',
+                    ),
+                    initialValue: cell.value,
+                    onCommit: (value) {
+                      widget.spreadsheetController.editCell(
+                        row: selection.startRow,
+                        column: selection.startColumn,
+                        value: value,
+                      );
+
+                      _finishEditing();
+                    },
+                    onCancel: () {
+                      _finishEditing();
+                    },
+                  ),
+                )
+              else
+                Positioned(
+                  left: left,
+                  top: top,
+                  width: cellWidth,
+                  height: cellHeight,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withValues(alpha: 0.08),
+                      border: Border.all(
+                        color: Colors.blue,
+                        width: 2,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-            ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

@@ -12,10 +12,15 @@ class ViewportController extends ChangeNotifier {
 
   ViewportModel _viewport = const ViewportModel();
   SelectionModel _selection = const SelectionModel();
+  
+  bool _isEditing = false;
+  
   final HitTester _hitTester = const HitTester();
 
   ViewportModel get viewport => _viewport;
   SelectionModel get selection => _selection;
+  
+  bool get isEditing => _isEditing;
 
   void updateViewport(ViewportModel newViewport) {
     _viewport = newViewport;
@@ -67,19 +72,63 @@ class ViewportController extends ChangeNotifier {
     notifyListeners();
   }
 
-    void selectFromPixel({
+  void selectFromPixel({
     required double x,
     required double y,
   }) {
     final CellPosition position = _hitTester.fromPixel(
       x: x,
       y: y,
+      scrollX: viewport.scrollX,
+      scrollY: viewport.scrollY,
     );
 
     selectCell(
       position.row,
       position.column,
     );
+  }
+
+  void startSelectionFromPixel({
+    required double x,
+    required double y,
+  }) {
+    final CellPosition position = _hitTester.fromPixel(
+      x: x,
+      y: y,
+      scrollX: viewport.scrollX,
+      scrollY: viewport.scrollY,
+    );
+
+    _selection = SelectionModel(
+      startRow: position.row,
+      endRow: position.row,
+      startColumn: position.column,
+      endColumn: position.column,
+    );
+
+    notifyListeners();
+  }
+
+  void updateSelectionFromPixel({
+    required double x,
+    required double y,
+  }) {
+    final CellPosition position = _hitTester.fromPixel(
+      x: x,
+      y: y,
+      scrollX: viewport.scrollX,
+      scrollY: viewport.scrollY,
+    );
+
+    _selection = SelectionModel(
+      startRow: _selection.startRow,
+      startColumn: _selection.startColumn,
+      endRow: position.row,
+      endColumn: position.column,
+    );
+
+    notifyListeners();
   }
 
   void moveLeft() {
@@ -197,6 +246,16 @@ class ViewportController extends ChangeNotifier {
       firstColumn: firstColumn,
       lastColumn: lastColumn,
     );
+  }
+
+  void startEditing() {
+    _isEditing = true;
+    notifyListeners();
+  }
+
+  void stopEditing() {
+    _isEditing = false;
+    notifyListeners();
   }
 
 }

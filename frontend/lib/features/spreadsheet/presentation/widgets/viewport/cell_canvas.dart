@@ -8,7 +8,7 @@ import 'cell_metrics.dart';
 import 'grid_painter.dart';
 import 'cell_painter.dart';
 
-class CellCanvas extends StatelessWidget {
+class CellCanvas extends StatefulWidget {
   const CellCanvas({
     super.key,
     required this.horizontalController,
@@ -19,26 +19,18 @@ class CellCanvas extends StatelessWidget {
 
   final ScrollController horizontalController;
   final ScrollController verticalController;
-
   final ViewportController viewportController;
   final SpreadsheetModel spreadsheet;
 
   @override
+  State<CellCanvas> createState() => _CellCanvasState();
+}
+
+class _CellCanvasState extends State<CellCanvas> {
+  bool _isDragging = false;
+
+  @override
   Widget build(BuildContext context) {
-    final sheet = spreadsheet.activeSheet;
-
-    final totalRows = sheet.rows.length;
-
-    final totalColumns = totalRows > 0
-        ? sheet.rows.first.cells.length
-        : 0;
-
-    if (totalRows == 0 || totalColumns == 0) {
-      return const ColoredBox(
-        color: Colors.white,
-      );
-    }
-
     return LayoutBuilder(
       builder: (context, constraints) {
         final viewportSize = Size(
@@ -46,8 +38,25 @@ class CellCanvas extends StatelessWidget {
           constraints.maxHeight,
         );
 
+        final sheet = widget.spreadsheet.activeSheet;
+
+        final totalRows = sheet.rows.length;
+
+        final totalColumns = sheet.rows.isEmpty
+            ? 0
+            : sheet.rows
+                .map((row) => row.cells.length)
+                .fold<int>(
+                  0,
+                  (max, length) => length > max ? length : max,
+                );
+
+        if (totalRows == 0 || totalColumns == 0) {
+          return const SizedBox.expand();
+        }
+
         final VisibleRangeModel visibleRange =
-            viewportController.getVisibleRange(
+            widget.viewportController.getVisibleRange(
           viewportSize: viewportSize,
           totalRows: totalRows,
           totalColumns: totalColumns,
@@ -55,17 +64,39 @@ class CellCanvas extends StatelessWidget {
 
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTapDown: (details) {
-            viewportController.selectFromPixel(
+
+          // Mouse button pressed.
+          onPanDown: (details) {
+            _isDragging = true;
+
+            widget.viewportController.startSelectionFromPixel(
               x: details.localPosition.dx,
               y: details.localPosition.dy,
             );
           },
+
+          // Mouse is being dragged.
+          onPanUpdate: (details) {
+            if (!_isDragging) {
+              return;
+            }
+
+            widget.viewportController.updateSelectionFromPixel(
+              x: details.localPosition.dx,
+              y: details.localPosition.dy,
+            );
+          },
+
+          // Mouse button released.
+          onPanEnd: (_) {
+            _isDragging = false;
+          },
+
           child: SingleChildScrollView(
-            controller: verticalController,
+            controller: widget.verticalController,
             scrollDirection: Axis.vertical,
             child: SingleChildScrollView(
-              controller: horizontalController,
+              controller: widget.horizontalController,
               scrollDirection: Axis.horizontal,
               child: SizedBox(
                 width: CellMetrics.columnWidth * totalColumns,
@@ -73,22 +104,16 @@ class CellCanvas extends StatelessWidget {
                 child: Stack(
                   children: [
                     CustomPaint(
-                      size: Size(
-                        CellMetrics.columnWidth * totalColumns,
-                        CellMetrics.rowHeight * totalRows,
-                      ),
+                      size: Size.infinite,
                       painter: GridPainter(
                         visibleRange: visibleRange,
                       ),
                     ),
 
                     CustomPaint(
-                      size: Size(
-                        CellMetrics.columnWidth * totalColumns,
-                        CellMetrics.rowHeight * totalRows,
-                      ),
+                      size: Size.infinite,
                       painter: CellPainter(
-                        spreadsheet: spreadsheet,
+                        spreadsheet: widget.spreadsheet,
                         visibleRange: visibleRange,
                       ),
                     ),
