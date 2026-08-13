@@ -61,44 +61,69 @@ class _SpreadsheetViewportState
       return KeyEventResult.ignored;
     }
 
-    // Start editing
+    // ============================================================
+    // ENTER
+    // ============================================================
+
     if (event.logicalKey == LogicalKeyboardKey.enter) {
-      widget.viewportController.startEditing();
+      if (!widget.viewportController.isEditing) {
+        widget.viewportController.startEditing();
 
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          _focusNode.requestFocus();
-        }
-      });
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _focusNode.requestFocus();
+          }
+        });
+      }
 
       return KeyEventResult.handled;
     }
 
-    // Cancel editing
+    // ============================================================
+    // ESCAPE
+    // ============================================================
+
     if (event.logicalKey == LogicalKeyboardKey.escape) {
-      widget.viewportController.stopEditing();
+      if (widget.viewportController.isEditing) {
+        widget.viewportController.stopEditing();
+
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _focusNode.requestFocus();
+          }
+        });
+      }
+
       return KeyEventResult.handled;
     }
 
-    // Move selection left
+    // ============================================================
+    // DON'T NAVIGATE WHILE EDITING
+    // ============================================================
+
+    if (widget.viewportController.isEditing) {
+      return KeyEventResult.ignored;
+    }
+
+    // ============================================================
+    // ARROW KEYS
+    // ============================================================
+
     if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
       widget.viewportController.moveLeft();
       return KeyEventResult.handled;
     }
 
-    // Move selection right
     if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
       widget.viewportController.moveRight();
       return KeyEventResult.handled;
     }
 
-    // Move selection up
     if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
       widget.viewportController.moveUp();
       return KeyEventResult.handled;
     }
 
-    // Move selection down
     if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
       widget.viewportController.moveDown();
       return KeyEventResult.handled;
@@ -126,7 +151,6 @@ class _SpreadsheetViewportState
                   width: SpreadsheetViewport.rowHeaderWidth,
                   child: CornerCell(),
                 ),
-
                 Expanded(
                   child: ColumnHeader(
                     controller: _scroll.horizontal,
@@ -143,7 +167,6 @@ class _SpreadsheetViewportState
           Expanded(
             child: Row(
               children: [
-                // Row header
                 SizedBox(
                   width: SpreadsheetViewport.rowHeaderWidth,
                   child: RowHeader(
@@ -151,31 +174,27 @@ class _SpreadsheetViewportState
                   ),
                 ),
 
-                // Spreadsheet
                 Expanded(
                   child: Stack(
                     children: [
-                      // ------------------------------------------------
-                      // Cells + grid
-                      // ------------------------------------------------
-
                       CellCanvas(
-                        horizontalController: _scroll.horizontal,
-                        verticalController: _scroll.vertical,
+                        horizontalController:
+                            _scroll.horizontal,
+                        verticalController:
+                            _scroll.vertical,
                         viewportController:
                             widget.viewportController,
-                        spreadsheet: widget.spreadsheet,
+                        spreadsheet:
+                            widget.spreadsheet,
                       ),
-
-                      // ------------------------------------------------
-                      // Selection + cell editor
-                      // ------------------------------------------------
 
                       SpreadsheetSelectionOverlay(
                         viewportController:
                             widget.viewportController,
-                        spreadsheet: widget.spreadsheet,
-                        spreadsheetController: widget.spreadsheetController,
+                        spreadsheet:
+                            widget.spreadsheet,
+                        spreadsheetController:
+                            widget.spreadsheetController,
                         focusNode: _focusNode,
                       ),
                     ],
@@ -188,11 +207,4 @@ class _SpreadsheetViewportState
       ),
     );
   }
-
-  void _restoreFocus() {
-    if (mounted) {
-      _focusNode.requestFocus();
-    }
-  }
-
 }

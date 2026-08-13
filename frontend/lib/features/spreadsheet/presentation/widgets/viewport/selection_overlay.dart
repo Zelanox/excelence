@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../controllers/viewport_controller.dart';
 import '../../../models/spreadsheet_model.dart';
-import 'cell_editor.dart';
 import '../../../controllers/spreadsheet_controller.dart';
+import 'cell_editor.dart';
 
 class SpreadsheetSelectionOverlay extends StatefulWidget {
   const SpreadsheetSelectionOverlay({
@@ -29,8 +29,6 @@ class _SpreadsheetSelectionOverlayState
   void _finishEditing() {
     widget.viewportController.stopEditing();
 
-    // Give Flutter one frame to remove the CellEditor,
-    // then return keyboard focus to the spreadsheet.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;
@@ -45,8 +43,11 @@ class _SpreadsheetSelectionOverlayState
     return AnimatedBuilder(
       animation: widget.viewportController,
       builder: (context, _) {
-        final selection = widget.viewportController.selection;
-        final viewport = widget.viewportController.viewport;
+        final selection =
+            widget.viewportController.selection;
+
+        final viewport =
+            widget.viewportController.viewport;
 
         const cellWidth = 80.0;
         const cellHeight = 28.0;
@@ -59,26 +60,28 @@ class _SpreadsheetSelectionOverlayState
             selection.startRow * cellHeight -
             viewport.scrollY;
 
-        final sheet = widget.spreadsheet.activeSheet;
+        final sheet =
+            widget.spreadsheet.activeSheet;
 
-        // Safety check so a selection outside the currently
-        // available model cannot crash the overlay.
         if (selection.startRow < 0 ||
             selection.startRow >= sheet.rows.length) {
           return const SizedBox.expand();
         }
 
-        final row = sheet.rows[selection.startRow];
+        final row =
+            sheet.rows[selection.startRow];
 
         if (selection.startColumn < 0 ||
             selection.startColumn >= row.cells.length) {
           return const SizedBox.expand();
         }
 
-        final cell = row.cells[selection.startColumn];
+        final cell =
+            row.cells[selection.startColumn];
 
         return IgnorePointer(
-          ignoring: !widget.viewportController.isEditing,
+          ignoring:
+              !widget.viewportController.isEditing,
           child: Stack(
             children: [
               if (widget.viewportController.isEditing)
@@ -114,7 +117,9 @@ class _SpreadsheetSelectionOverlayState
                   height: cellHeight,
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Colors.blue.withValues(alpha: 0.08),
+                      color: Colors.blue.withValues(
+                        alpha: 0.08,
+                      ),
                       border: Border.all(
                         color: Colors.blue,
                         width: 2,

@@ -7,11 +7,13 @@ class CellEditor extends StatefulWidget {
     required this.initialValue,
     required this.onCommit,
     required this.onCancel,
+    this.replaceInitialValue = false,
   });
 
   final String initialValue;
   final ValueChanged<String> onCommit;
   final VoidCallback onCancel;
+  final bool replaceInitialValue;
 
   @override
   State<CellEditor> createState() => _CellEditorState();
@@ -34,16 +36,22 @@ class _CellEditorState extends State<CellEditor> {
     _focusNode = FocusNode();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _finished) {
+      if (!mounted) {
         return;
       }
 
       _focusNode.requestFocus();
 
-      _controller.selection = TextSelection(
-        baseOffset: 0,
-        extentOffset: _controller.text.length,
-      );
+      if (widget.replaceInitialValue) {
+        _controller.selection = TextSelection(
+          baseOffset: 0,
+          extentOffset: _controller.text.length,
+        );
+      } else {
+        _controller.selection = TextSelection.collapsed(
+          offset: _controller.text.length,
+        );
+      }
     });
   }
 
@@ -51,7 +59,6 @@ class _CellEditorState extends State<CellEditor> {
   void dispose() {
     _controller.dispose();
     _focusNode.dispose();
-
     super.dispose();
   }
 
@@ -62,10 +69,6 @@ class _CellEditorState extends State<CellEditor> {
 
     _finished = true;
 
-    // Remove focus from the editor before telling the parent
-    // that editing has finished.
-    _focusNode.unfocus();
-
     widget.onCommit(_controller.text);
   }
 
@@ -75,8 +78,6 @@ class _CellEditorState extends State<CellEditor> {
     }
 
     _finished = true;
-
-    _focusNode.unfocus();
 
     widget.onCancel();
   }
@@ -89,13 +90,19 @@ class _CellEditorState extends State<CellEditor> {
       return KeyEventResult.ignored;
     }
 
-    // Enter = commit
+    // ------------------------------------------------------------
+    // ENTER → COMMIT
+    // ------------------------------------------------------------
+
     if (event.logicalKey == LogicalKeyboardKey.enter) {
       _commit();
       return KeyEventResult.handled;
     }
 
-    // Escape = cancel
+    // ------------------------------------------------------------
+    // ESCAPE → CANCEL
+    // ------------------------------------------------------------
+
     if (event.logicalKey == LogicalKeyboardKey.escape) {
       _cancel();
       return KeyEventResult.handled;

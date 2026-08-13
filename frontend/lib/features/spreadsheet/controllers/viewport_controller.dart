@@ -132,6 +132,8 @@ class ViewportController extends ChangeNotifier {
   }
 
   void moveLeft() {
+    _stopEditingWithoutNotify();
+
     final row = _selection.startRow;
     final column = (_selection.startColumn - 1).clamp(0, 25);
 
@@ -139,6 +141,8 @@ class ViewportController extends ChangeNotifier {
   }
 
   void moveRight() {
+    _stopEditingWithoutNotify();
+
     final row = _selection.startRow;
     final column = (_selection.startColumn + 1).clamp(0, 25);
 
@@ -146,6 +150,8 @@ class ViewportController extends ChangeNotifier {
   }
 
   void moveUp() {
+    _stopEditingWithoutNotify();
+
     final row = (_selection.startRow - 1).clamp(0, 99);
     final column = _selection.startColumn;
 
@@ -153,6 +159,8 @@ class ViewportController extends ChangeNotifier {
   }
 
   void moveDown() {
+    _stopEditingWithoutNotify();
+
     final row = (_selection.startRow + 1).clamp(0, 99);
     final column = _selection.startColumn;
 
@@ -256,6 +264,10 @@ class ViewportController extends ChangeNotifier {
   void stopEditing() {
     _isEditing = false;
     notifyListeners();
+  }
+
+  void _stopEditingWithoutNotify() {
+    _isEditing = false;
   }
 
 }

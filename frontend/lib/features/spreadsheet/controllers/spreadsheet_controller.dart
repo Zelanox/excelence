@@ -110,7 +110,6 @@ class SpreadsheetController extends ChangeNotifier {
     final newCell = oldCell.copyWith(
       value: value,
       isEditing: false,
-      isSelected: true,
     );
 
     // ----------------------------------------------------------
