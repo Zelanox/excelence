@@ -46,7 +46,15 @@ class _SpreadsheetViewportState
       viewportController: widget.viewportController,
     );
 
-    _focusNode = FocusNode();
+    _focusNode = FocusNode(
+      debugLabel: 'SpreadsheetViewportFocus',
+    );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _requestSpreadsheetFocus();
+      }
+    });
   }
 
   @override
@@ -56,154 +64,225 @@ class _SpreadsheetViewportState
     super.dispose();
   }
 
+  // ============================================================
+  // FOCUS
+  // ============================================================
+
+  void _requestSpreadsheetFocus() {
+    if (!mounted) {
+      return;
+    }
+
+    _focusNode.requestFocus();
+  }
+
+  void _restoreSpreadsheetFocus() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+
+      _requestSpreadsheetFocus();
+    });
+  }
+
+  // ============================================================
+  // KEYBOARD
+  // ============================================================
+
   KeyEventResult _handleKey(KeyEvent event) {
     if (event is! KeyDownEvent) {
       return KeyEventResult.ignored;
     }
 
-    // ============================================================
-    // ENTER
-    // ============================================================
+    final viewportController =
+        widget.viewportController;
 
-    if (event.logicalKey == LogicalKeyboardKey.enter) {
-      if (!widget.viewportController.isEditing) {
-        widget.viewportController.startEditing();
+    // ==========================================================
+    // NEVER HANDLE SPREADSHEET KEYS WHILE CELL EDITOR IS ACTIVE
+    // ==========================================================
 
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            _focusNode.requestFocus();
-          }
-        });
-      }
-
-      return KeyEventResult.handled;
-    }
-
-    // ============================================================
-    // ESCAPE
-    // ============================================================
-
-    if (event.logicalKey == LogicalKeyboardKey.escape) {
-      if (widget.viewportController.isEditing) {
-        widget.viewportController.stopEditing();
-
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            _focusNode.requestFocus();
-          }
-        });
-      }
-
-      return KeyEventResult.handled;
-    }
-
-    // ============================================================
-    // DON'T NAVIGATE WHILE EDITING
-    // ============================================================
-
-    if (widget.viewportController.isEditing) {
+    if (viewportController.isEditing) {
       return KeyEventResult.ignored;
     }
 
-    // ============================================================
+    // ==========================================================
+    // ENTER → EDIT CURRENT CELL
+    // ==========================================================
+
+    if (event.logicalKey ==
+        LogicalKeyboardKey.enter) {
+      viewportController.startEditing();
+
+      return KeyEventResult.handled;
+    }
+
+    // ==========================================================
+    // ESCAPE
+    // ==========================================================
+
+    if (event.logicalKey ==
+        LogicalKeyboardKey.escape) {
+      viewportController.stopEditing();
+
+      _restoreSpreadsheetFocus();
+
+      return KeyEventResult.handled;
+    }
+
+    // ==========================================================
     // ARROW KEYS
-    // ============================================================
+    // ==========================================================
 
-    if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
-      widget.viewportController.moveLeft();
+    if (event.logicalKey ==
+        LogicalKeyboardKey.arrowLeft) {
+      viewportController.moveLeft();
       return KeyEventResult.handled;
     }
 
-    if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
-      widget.viewportController.moveRight();
+    if (event.logicalKey ==
+        LogicalKeyboardKey.arrowRight) {
+      viewportController.moveRight();
       return KeyEventResult.handled;
     }
 
-    if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-      widget.viewportController.moveUp();
+    if (event.logicalKey ==
+        LogicalKeyboardKey.arrowUp) {
+      viewportController.moveUp();
       return KeyEventResult.handled;
     }
 
-    if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-      widget.viewportController.moveDown();
+    if (event.logicalKey ==
+        LogicalKeyboardKey.arrowDown) {
+      viewportController.moveDown();
+      return KeyEventResult.handled;
+    }
+
+    // ==========================================================
+    // DIRECT TYPING
+    // ==========================================================
+
+    final character = event.character;
+
+    if (character != null &&
+        character.isNotEmpty &&
+        !_isControlCharacter(character)) {
+      viewportController.startEditing(
+        replaceInitialValue: true,
+        initialValue: character,
+      );
+
       return KeyEventResult.handled;
     }
 
     return KeyEventResult.ignored;
   }
 
+  bool _isControlCharacter(String character) {
+    if (character.isEmpty) {
+      return true;
+    }
+
+    return character.codeUnitAt(0) < 32;
+  }
+
+  // ============================================================
+  // BUILD
+  // ============================================================
+
   @override
   Widget build(BuildContext context) {
     return KeyboardHandler(
       focusNode: _focusNode,
       onKeyEvent: _handleKey,
-      child: Column(
-        children: [
-          // ==========================================================
-          // Column header
-          // ==========================================================
+      child: Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: (_) {
+          _requestSpreadsheetFocus();
+        },
+        child: Column(
+          children: [
+            // ====================================================
+            // COLUMN HEADER
+            // ====================================================
 
-          SizedBox(
-            height: SpreadsheetViewport.columnHeaderHeight,
-            child: Row(
-              children: [
-                const SizedBox(
-                  width: SpreadsheetViewport.rowHeaderWidth,
-                  child: CornerCell(),
-                ),
-                Expanded(
-                  child: ColumnHeader(
-                    controller: _scroll.horizontal,
+            SizedBox(
+              height:
+                  SpreadsheetViewport.columnHeaderHeight,
+              child: Row(
+                children: [
+                  const SizedBox(
+                    width:
+                        SpreadsheetViewport.rowHeaderWidth,
+                    child: CornerCell(),
                   ),
-                ),
-              ],
+
+                  Expanded(
+                    child: ColumnHeader(
+                      controller:
+                          _scroll.horizontal,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
 
-          // ==========================================================
-          // Spreadsheet body
-          // ==========================================================
+            // ====================================================
+            // SPREADSHEET BODY
+            // ====================================================
 
-          Expanded(
-            child: Row(
-              children: [
-                SizedBox(
-                  width: SpreadsheetViewport.rowHeaderWidth,
-                  child: RowHeader(
-                    controller: _scroll.vertical,
+            Expanded(
+              child: Row(
+                children: [
+                  SizedBox(
+                    width:
+                        SpreadsheetViewport.rowHeaderWidth,
+                    child: RowHeader(
+                      controller:
+                          _scroll.vertical,
+                    ),
                   ),
-                ),
 
-                Expanded(
-                  child: Stack(
-                    children: [
-                      CellCanvas(
-                        horizontalController:
-                            _scroll.horizontal,
-                        verticalController:
-                            _scroll.vertical,
-                        viewportController:
-                            widget.viewportController,
-                        spreadsheet:
-                            widget.spreadsheet,
-                      ),
+                  Expanded(
+                    child: Stack(
+                      children: [
+                        // ----------------------------------------
+                        // CELLS
+                        // ----------------------------------------
 
-                      SpreadsheetSelectionOverlay(
-                        viewportController:
-                            widget.viewportController,
-                        spreadsheet:
-                            widget.spreadsheet,
-                        spreadsheetController:
-                            widget.spreadsheetController,
-                        focusNode: _focusNode,
-                      ),
-                    ],
+                        CellCanvas(
+                          horizontalController:
+                              _scroll.horizontal,
+                          verticalController:
+                              _scroll.vertical,
+                          viewportController:
+                              widget.viewportController,
+                          spreadsheet:
+                              widget.spreadsheet,
+                        ),
+
+                        // ----------------------------------------
+                        // SELECTION + EDITOR
+                        // ----------------------------------------
+
+                        SpreadsheetSelectionOverlay(
+                          viewportController:
+                              widget.viewportController,
+                          spreadsheet:
+                              widget.spreadsheet,
+                          spreadsheetController:
+                              widget.spreadsheetController,
+                          focusNode:
+                              _focusNode,
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

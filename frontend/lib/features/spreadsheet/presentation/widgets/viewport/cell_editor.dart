@@ -7,13 +7,11 @@ class CellEditor extends StatefulWidget {
     required this.initialValue,
     required this.onCommit,
     required this.onCancel,
-    this.replaceInitialValue = false,
   });
 
   final String initialValue;
   final ValueChanged<String> onCommit;
   final VoidCallback onCancel;
-  final bool replaceInitialValue;
 
   @override
   State<CellEditor> createState() => _CellEditorState();
@@ -21,7 +19,12 @@ class CellEditor extends StatefulWidget {
 
 class _CellEditorState extends State<CellEditor> {
   late final TextEditingController _controller;
-  late final FocusNode _focusNode;
+
+  // Receives keyboard events that bubble up from the TextField.
+  late final FocusNode _keyboardFocusNode;
+
+  // Owns the actual text input focus.
+  late final FocusNode _textFieldFocusNode;
 
   bool _finished = false;
 
@@ -33,34 +36,39 @@ class _CellEditorState extends State<CellEditor> {
       text: widget.initialValue,
     );
 
-    _focusNode = FocusNode();
+    _keyboardFocusNode = FocusNode(
+      debugLabel: 'CellEditorKeyboardFocus',
+    );
+
+    _textFieldFocusNode = FocusNode(
+      debugLabel: 'CellEditorTextFieldFocus',
+    );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;
       }
 
-      _focusNode.requestFocus();
+      // The TextField must own the actual input focus.
+      _textFieldFocusNode.requestFocus();
 
-      if (widget.replaceInitialValue) {
-        _controller.selection = TextSelection(
-          baseOffset: 0,
-          extentOffset: _controller.text.length,
-        );
-      } else {
-        _controller.selection = TextSelection.collapsed(
-          offset: _controller.text.length,
-        );
-      }
+      _controller.selection = TextSelection.collapsed(
+        offset: _controller.text.length,
+      );
     });
   }
 
   @override
   void dispose() {
     _controller.dispose();
-    _focusNode.dispose();
+    _keyboardFocusNode.dispose();
+    _textFieldFocusNode.dispose();
     super.dispose();
   }
+
+  // ============================================================
+  // EDITING
+  // ============================================================
 
   void _commit() {
     if (_finished) {
@@ -82,6 +90,10 @@ class _CellEditorState extends State<CellEditor> {
     widget.onCancel();
   }
 
+  // ============================================================
+  // KEYBOARD
+  // ============================================================
+
   KeyEventResult _handleKey(
     FocusNode node,
     KeyEvent event,
@@ -90,39 +102,46 @@ class _CellEditorState extends State<CellEditor> {
       return KeyEventResult.ignored;
     }
 
-    // ------------------------------------------------------------
-    // ENTER → COMMIT
-    // ------------------------------------------------------------
-
+    // ENTER → commit
     if (event.logicalKey == LogicalKeyboardKey.enter) {
       _commit();
+
       return KeyEventResult.handled;
     }
 
-    // ------------------------------------------------------------
-    // ESCAPE → CANCEL
-    // ------------------------------------------------------------
-
+    // ESCAPE → cancel
     if (event.logicalKey == LogicalKeyboardKey.escape) {
       _cancel();
+
       return KeyEventResult.handled;
     }
 
+    // Everything else belongs to the TextField.
     return KeyEventResult.ignored;
   }
+
+  // ============================================================
+  // BUILD
+  // ============================================================
 
   @override
   Widget build(BuildContext context) {
     return Material(
       color: Colors.white,
       child: Focus(
+        focusNode: _keyboardFocusNode,
         onKeyEvent: _handleKey,
         child: TextField(
           controller: _controller,
-          focusNode: _focusNode,
+
+          // This is the important change.
+          focusNode: _textFieldFocusNode,
+
           autofocus: false,
           maxLines: 1,
           textInputAction: TextInputAction.done,
+          keyboardType: TextInputType.text,
+
           decoration: const InputDecoration(
             contentPadding: EdgeInsets.symmetric(
               horizontal: 4,
@@ -147,6 +166,7 @@ class _CellEditorState extends State<CellEditor> {
               ),
             ),
           ),
+
           onSubmitted: (_) {
             _commit();
           },

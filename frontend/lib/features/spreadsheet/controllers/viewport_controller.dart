@@ -14,6 +14,8 @@ class ViewportController extends ChangeNotifier {
   SelectionModel _selection = const SelectionModel();
   
   bool _isEditing = false;
+  bool _replaceInitialValue = false;
+  String? _initialEditValue;
   
   final HitTester _hitTester = const HitTester();
 
@@ -21,6 +23,8 @@ class ViewportController extends ChangeNotifier {
   SelectionModel get selection => _selection;
   
   bool get isEditing => _isEditing;
+  bool get replaceInitialValue => _replaceInitialValue;
+  String? get initialEditValue => _initialEditValue;
 
   void updateViewport(ViewportModel newViewport) {
     _viewport = newViewport;
@@ -256,13 +260,22 @@ class ViewportController extends ChangeNotifier {
     );
   }
 
-  void startEditing() {
+  void startEditing({
+    bool replaceInitialValue = false,
+    String? initialValue,
+  }) {
     _isEditing = true;
+    _replaceInitialValue = replaceInitialValue;
+    _initialEditValue = initialValue;
+
     notifyListeners();
   }
 
   void stopEditing() {
     _isEditing = false;
+    _replaceInitialValue = false;
+    _initialEditValue = null;
+
     notifyListeners();
   }
 

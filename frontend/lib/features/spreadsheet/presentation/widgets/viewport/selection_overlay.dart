@@ -29,6 +29,7 @@ class _SpreadsheetSelectionOverlayState
   void _finishEditing() {
     widget.viewportController.stopEditing();
 
+    // Wait until the editor has actually disappeared.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;
@@ -79,42 +80,45 @@ class _SpreadsheetSelectionOverlayState
         final cell =
             row.cells[selection.startColumn];
 
-        return IgnorePointer(
-          ignoring:
-              !widget.viewportController.isEditing,
-          child: Stack(
-            children: [
-              if (widget.viewportController.isEditing)
-                Positioned(
-                  left: left,
-                  top: top,
-                  width: cellWidth,
-                  height: cellHeight,
-                  child: CellEditor(
-                    key: ValueKey(
-                      'editor_${selection.startRow}_${selection.startColumn}',
-                    ),
-                    initialValue: cell.value,
-                    onCommit: (value) {
-                      widget.spreadsheetController.editCell(
-                        row: selection.startRow,
-                        column: selection.startColumn,
-                        value: value,
-                      );
-
-                      _finishEditing();
-                    },
-                    onCancel: () {
-                      _finishEditing();
-                    },
+        return Stack(
+          children: [
+            if (widget.viewportController.isEditing)
+              Positioned(
+                left: left,
+                top: top,
+                width: cellWidth,
+                height: cellHeight,
+                child: CellEditor(
+                  key: ValueKey(
+                    'editor_${selection.startRow}_${selection.startColumn}',
                   ),
-                )
-              else
-                Positioned(
-                  left: left,
-                  top: top,
-                  width: cellWidth,
-                  height: cellHeight,
+
+                  initialValue:
+                      widget.viewportController.initialEditValue ??
+                      cell.value,
+
+                  onCommit: (value) {
+                    widget.spreadsheetController.editCell(
+                      row: selection.startRow,
+                      column: selection.startColumn,
+                      value: value,
+                    );
+
+                    _finishEditing();
+                  },
+
+                  onCancel: () {
+                    _finishEditing();
+                  },
+                ),
+              )
+            else
+              Positioned(
+                left: left,
+                top: top,
+                width: cellWidth,
+                height: cellHeight,
+                child: IgnorePointer(
                   child: Container(
                     decoration: BoxDecoration(
                       color: Colors.blue.withValues(
@@ -127,8 +131,8 @@ class _SpreadsheetSelectionOverlayState
                     ),
                   ),
                 ),
-            ],
-          ),
+              ),
+          ],
         );
       },
     );

@@ -65,6 +65,11 @@ class _CellCanvasState extends State<CellCanvas> {
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
 
+          // Double-click → edit the selected cell.
+          onDoubleTap: () {
+            widget.viewportController.startEditing();
+          },
+
           // Mouse button pressed.
           onPanDown: (details) {
             _isDragging = true;
