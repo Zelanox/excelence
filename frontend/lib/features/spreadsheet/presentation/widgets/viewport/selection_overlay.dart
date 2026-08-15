@@ -53,13 +53,41 @@ class _SpreadsheetSelectionOverlayState
         const cellWidth = 80.0;
         const cellHeight = 28.0;
 
+        final selectionStartRow =
+            selection.startRow < selection.endRow
+                ? selection.startRow
+                : selection.endRow;
+
+        final selectionEndRow =
+            selection.startRow > selection.endRow
+                ? selection.startRow
+                : selection.endRow;
+
+        final selectionStartColumn =
+            selection.startColumn < selection.endColumn
+                ? selection.startColumn
+                : selection.endColumn;
+
+        final selectionEndColumn =
+            selection.startColumn > selection.endColumn
+                ? selection.startColumn
+                : selection.endColumn;
+
         final left =
-            selection.startColumn * cellWidth -
+            selectionStartColumn * cellWidth -
             viewport.scrollX;
 
         final top =
-            selection.startRow * cellHeight -
+            selectionStartRow * cellHeight -
             viewport.scrollY;
+
+        final width =
+            (selectionEndColumn - selectionStartColumn + 1) *
+            cellWidth;
+
+        final height =
+            (selectionEndRow - selectionStartRow + 1) *
+            cellHeight;
 
         final sheet =
             widget.spreadsheet.activeSheet;
@@ -86,8 +114,8 @@ class _SpreadsheetSelectionOverlayState
               Positioned(
                 left: left,
                 top: top,
-                width: cellWidth,
-                height: cellHeight,
+                width: width,
+                height: height,
                 child: CellEditor(
                   key: ValueKey(
                     'editor_${selection.startRow}_${selection.startColumn}',

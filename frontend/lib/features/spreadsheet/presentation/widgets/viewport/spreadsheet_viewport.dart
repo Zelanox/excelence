@@ -38,6 +38,11 @@ class _SpreadsheetViewportState
   late final ScrollCoordinator _scroll;
   late final FocusNode _focusNode;
 
+  int? _lastSelectedRow;
+  int? _lastSelectedColumn;
+
+  Size? _cellViewportSize;
+
   @override
   void initState() {
     super.initState();
@@ -50,6 +55,10 @@ class _SpreadsheetViewportState
       debugLabel: 'SpreadsheetViewportFocus',
     );
 
+    widget.viewportController.addListener(
+      _onViewportControllerChanged,
+    );
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _requestSpreadsheetFocus();
@@ -59,9 +68,62 @@ class _SpreadsheetViewportState
 
   @override
   void dispose() {
+    widget.viewportController.removeListener(
+      _onViewportControllerChanged,
+    );
+
     _scroll.dispose();
     _focusNode.dispose();
+
     super.dispose();
+  }
+
+  // ============================================================
+  // SELECTION / VIEWPORT
+  // ============================================================
+
+  void _onViewportControllerChanged() {
+    if (!mounted) {
+      return;
+    }
+
+    final selection = widget.viewportController.selection;
+
+    final row = selection.startRow;
+    final column = selection.startColumn;
+
+    // Ignore notifications caused only by scrolling.
+    if (_lastSelectedRow == row &&
+        _lastSelectedColumn == column) {
+      return;
+    }
+
+    _lastSelectedRow = row;
+    _lastSelectedColumn = column;
+
+    final viewportSize = _cellViewportSize;
+
+    if (viewportSize == null) {
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+
+      final currentSize = _cellViewportSize;
+
+      if (currentSize == null) {
+        return;
+      }
+
+      widget.viewportController.ensureVisible(
+        row: row,
+        column: column,
+        viewportSize: currentSize,
+      );
+    });
   }
 
   // ============================================================
@@ -126,6 +188,20 @@ class _SpreadsheetViewportState
       viewportController.stopEditing();
 
       _restoreSpreadsheetFocus();
+
+      return KeyEventResult.handled;
+    }
+
+    // ==========================================================
+    // TAB NAVIGATION
+    // ==========================================================
+
+    if (event.logicalKey == LogicalKeyboardKey.tab) {
+      if (HardwareKeyboard.instance.isShiftPressed) {
+        viewportController.movePrevious();
+      } else {
+        viewportController.moveNext();
+      }
 
       return KeyEventResult.handled;
     }
@@ -244,38 +320,47 @@ class _SpreadsheetViewportState
                   ),
 
                   Expanded(
-                    child: Stack(
-                      children: [
-                        // ----------------------------------------
-                        // CELLS
-                        // ----------------------------------------
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        _cellViewportSize = Size(
+                          constraints.maxWidth,
+                          constraints.maxHeight,
+                        );
 
-                        CellCanvas(
-                          horizontalController:
-                              _scroll.horizontal,
-                          verticalController:
-                              _scroll.vertical,
-                          viewportController:
-                              widget.viewportController,
-                          spreadsheet:
-                              widget.spreadsheet,
-                        ),
+                        return Stack(
+                          children: [
+                            // ----------------------------------------
+                            // CELLS
+                            // ----------------------------------------
 
-                        // ----------------------------------------
-                        // SELECTION + EDITOR
-                        // ----------------------------------------
+                            CellCanvas(
+                              horizontalController:
+                                  _scroll.horizontal,
+                              verticalController:
+                                  _scroll.vertical,
+                              viewportController:
+                                  widget.viewportController,
+                              spreadsheet:
+                                  widget.spreadsheet,
+                            ),
 
-                        SpreadsheetSelectionOverlay(
-                          viewportController:
-                              widget.viewportController,
-                          spreadsheet:
-                              widget.spreadsheet,
-                          spreadsheetController:
-                              widget.spreadsheetController,
-                          focusNode:
-                              _focusNode,
-                        ),
-                      ],
+                            // ----------------------------------------
+                            // SELECTION + EDITOR
+                            // ----------------------------------------
+
+                            SpreadsheetSelectionOverlay(
+                              viewportController:
+                                  widget.viewportController,
+                              spreadsheet:
+                                  widget.spreadsheet,
+                              spreadsheetController:
+                                  widget.spreadsheetController,
+                              focusNode:
+                                  _focusNode,
+                            ),
+                          ],
+                        );
+                      },
                     ),
                   ),
                 ],

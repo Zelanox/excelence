@@ -30,6 +30,28 @@ class _CellCanvasState extends State<CellCanvas> {
   bool _isDragging = false;
 
   @override
+  void initState() {
+    super.initState();
+
+    widget.viewportController.addListener(_onViewportChanged);
+  }
+
+  void _onViewportChanged() {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {});
+  }
+
+  @override
+  void dispose() {
+    widget.viewportController.removeListener(_onViewportChanged);
+
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {

@@ -171,6 +171,40 @@ class ViewportController extends ChangeNotifier {
     selectCell(row, column);
   }
 
+  void moveNext() {
+    _stopEditingWithoutNotify();
+
+    final row = _selection.startRow;
+    final column = _selection.startColumn;
+
+    if (column < 25) {
+      selectCell(row, column + 1);
+      return;
+    }
+
+    // Move to the first column of the next row.
+    if (row < 99) {
+      selectCell(row + 1, 0);
+    }
+  }
+
+  void movePrevious() {
+    _stopEditingWithoutNotify();
+
+    final row = _selection.startRow;
+    final column = _selection.startColumn;
+
+    if (column > 0) {
+      selectCell(row, column - 1);
+      return;
+    }
+
+    // Move to the last column of the previous row.
+    if (row > 0) {
+      selectCell(row - 1, 25);
+    }
+  }
+
   void ensureVisible({
     required int row,
     required int column,
@@ -200,10 +234,13 @@ class ViewportController extends ChangeNotifier {
       newScrollY = bottom - viewportSize.height;
     }
 
-    setScroll(
-      x: newScrollX,
-      y: newScrollY,
-    );
+    if (newScrollX != viewport.scrollX ||
+      newScrollY != viewport.scrollY) {
+      setScroll(
+        x: newScrollX,
+        y: newScrollY,
+      );
+    }
   }
 
   VisibleRangeModel getVisibleRange({
