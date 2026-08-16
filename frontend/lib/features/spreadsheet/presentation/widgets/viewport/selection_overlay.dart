@@ -26,10 +26,13 @@ class SpreadsheetSelectionOverlay extends StatefulWidget {
 
 class _SpreadsheetSelectionOverlayState
     extends State<SpreadsheetSelectionOverlay> {
+  // ============================================================
+  // EDITING
+  // ============================================================
+
   void _finishEditing() {
     widget.viewportController.stopEditing();
 
-    // Wait until the editor has actually disappeared.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;
@@ -53,69 +56,128 @@ class _SpreadsheetSelectionOverlayState
         const cellWidth = 80.0;
         const cellHeight = 28.0;
 
-        final selectionStartRow =
-            selection.startRow < selection.endRow
-                ? selection.startRow
-                : selection.endRow;
-
-        final selectionEndRow =
-            selection.startRow > selection.endRow
-                ? selection.startRow
-                : selection.endRow;
-
-        final selectionStartColumn =
-            selection.startColumn < selection.endColumn
-                ? selection.startColumn
-                : selection.endColumn;
-
-        final selectionEndColumn =
-            selection.startColumn > selection.endColumn
-                ? selection.startColumn
-                : selection.endColumn;
-
-        final left =
-            selectionStartColumn * cellWidth -
-            viewport.scrollX;
-
-        final top =
-            selectionStartRow * cellHeight -
-            viewport.scrollY;
-
-        final width =
-            (selectionEndColumn - selectionStartColumn + 1) *
-            cellWidth;
-
-        final height =
-            (selectionEndRow - selectionStartRow + 1) *
-            cellHeight;
-
         final sheet =
             widget.spreadsheet.activeSheet;
+
+        // ========================================================
+        // ACTIVE CELL
+        //
+        // The start position remains the active cell.
+        // This is important for editing.
+        // ========================================================
 
         if (selection.startRow < 0 ||
             selection.startRow >= sheet.rows.length) {
           return const SizedBox.expand();
         }
 
-        final row =
+        final activeRow =
             sheet.rows[selection.startRow];
 
         if (selection.startColumn < 0 ||
-            selection.startColumn >= row.cells.length) {
+            selection.startColumn >= activeRow.cells.length) {
           return const SizedBox.expand();
         }
 
-        final cell =
-            row.cells[selection.startColumn];
+        final activeCell =
+            activeRow.cells[selection.startColumn];
+
+        // ========================================================
+        // SELECTION RANGE
+        // ========================================================
+
+        final firstRow =
+            selection.startRow <= selection.endRow
+                ? selection.startRow
+                : selection.endRow;
+
+        final lastRow =
+            selection.startRow >= selection.endRow
+                ? selection.startRow
+                : selection.endRow;
+
+        final firstColumn =
+            selection.startColumn <= selection.endColumn
+                ? selection.startColumn
+                : selection.endColumn;
+
+        final lastColumn =
+            selection.startColumn >= selection.endColumn
+                ? selection.startColumn
+                : selection.endColumn;
+
+        // ========================================================
+        // SELECTION RECTANGLE
+        // ========================================================
+
+        final selectionLeft =
+            firstColumn * cellWidth -
+            viewport.scrollX;
+
+        final selectionTop =
+            firstRow * cellHeight -
+            viewport.scrollY;
+
+        final selectionWidth =
+            (lastColumn - firstColumn + 1) *
+            cellWidth;
+
+        final selectionHeight =
+            (lastRow - firstRow + 1) *
+            cellHeight;
+
+        // ========================================================
+        // EDITOR POSITION
+        //
+        // The editor always belongs to the active/start cell,
+        // NOT the entire selected range.
+        // ========================================================
+
+        final editorLeft =
+            selection.startColumn * cellWidth -
+            viewport.scrollX;
+
+        final editorTop =
+            selection.startRow * cellHeight -
+            viewport.scrollY;
 
         return Stack(
           children: [
+            // ====================================================
+            // SELECTION
+            // ====================================================
+
+            if (!widget.viewportController.isEditing)
+              Positioned(
+                left: selectionLeft,
+                top: selectionTop,
+                width: selectionWidth,
+                height: selectionHeight,
+                child: IgnorePointer(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withValues(
+                        alpha: 0.08,
+                      ),
+                      border: Border.all(
+                        color: Colors.blue,
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+            // ====================================================
+            // CELL EDITOR
+            // ====================================================
+
             if (widget.viewportController.isEditing)
               Positioned(
-                left: left,
-                top: top,
-                width: width,
-                height: height,
+                left: editorLeft,
+                top: editorTop,
+                width: cellWidth,
+                height: cellHeight,
                 child: CellEditor(
                   key: ValueKey(
                     'editor_${selection.startRow}_${selection.startColumn}',
@@ -123,7 +185,7 @@ class _SpreadsheetSelectionOverlayState
 
                   initialValue:
                       widget.viewportController.initialEditValue ??
-                      cell.value,
+                      activeCell.value,
 
                   onCommit: (value) {
                     widget.spreadsheetController.editCell(
@@ -138,26 +200,6 @@ class _SpreadsheetSelectionOverlayState
                   onCancel: () {
                     _finishEditing();
                   },
-                ),
-              )
-            else
-              Positioned(
-                left: left,
-                top: top,
-                width: cellWidth,
-                height: cellHeight,
-                child: IgnorePointer(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.blue.withValues(
-                        alpha: 0.08,
-                      ),
-                      border: Border.all(
-                        color: Colors.blue,
-                        width: 2,
-                      ),
-                    ),
-                  ),
                 ),
               ),
           ],

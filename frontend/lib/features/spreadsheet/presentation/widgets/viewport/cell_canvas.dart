@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 
 import '../../../controllers/viewport_controller.dart';
 import '../../../models/spreadsheet_model.dart';
@@ -51,6 +52,54 @@ class _CellCanvasState extends State<CellCanvas> {
     super.dispose();
   }
 
+  // ============================================================
+  // MOUSE SELECTION
+  // ============================================================
+
+  void _onPointerDown(PointerDownEvent event) {
+    if (event.kind != PointerDeviceKind.mouse) {
+      return;
+    }
+
+    if ((event.buttons & kPrimaryButton) == 0) {
+      return;
+    }
+
+    _isDragging = true;
+
+    widget.viewportController.startSelectionFromPixel(
+      x: event.localPosition.dx,
+      y: event.localPosition.dy,
+    );
+  }
+
+  void _onPointerMove(PointerMoveEvent event) {
+    if (!_isDragging) {
+      return;
+    }
+
+    if ((event.buttons & kPrimaryButton) == 0) {
+      return;
+    }
+
+    widget.viewportController.updateSelectionFromPixel(
+      x: event.localPosition.dx,
+      y: event.localPosition.dy,
+    );
+  }
+
+  void _onPointerUp(PointerUpEvent event) {
+    if (event.kind != PointerDeviceKind.mouse) {
+      return;
+    }
+
+    _isDragging = false;
+  }
+
+  void _onPointerCancel(PointerCancelEvent event) {
+    _isDragging = false;
+  }
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
@@ -85,66 +134,53 @@ class _CellCanvasState extends State<CellCanvas> {
         );
 
         return GestureDetector(
-          behavior: HitTestBehavior.opaque,
+          behavior: HitTestBehavior.translucent,
 
           // Double-click → edit the selected cell.
           onDoubleTap: () {
             widget.viewportController.startEditing();
           },
 
-          // Mouse button pressed.
-          onPanDown: (details) {
-            _isDragging = true;
+          child: Listener(
+            behavior: HitTestBehavior.opaque,
 
-            widget.viewportController.startSelectionFromPixel(
-              x: details.localPosition.dx,
-              y: details.localPosition.dy,
-            );
-          },
+            onPointerDown: _onPointerDown,
+            onPointerMove: _onPointerMove,
+            onPointerUp: _onPointerUp,
+            onPointerCancel: _onPointerCancel,
 
-          // Mouse is being dragged.
-          onPanUpdate: (details) {
-            if (!_isDragging) {
-              return;
-            }
+            child: ScrollConfiguration(
+              behavior: const _SpreadsheetScrollBehavior(),
+              child: SingleChildScrollView(
+                controller: widget.verticalController,
+                scrollDirection: Axis.vertical,
+                child: SingleChildScrollView(
+                  controller: widget.horizontalController,
+                  scrollDirection: Axis.horizontal,
+                  child: SizedBox(
+                    width:
+                        CellMetrics.columnWidth * totalColumns,
+                    height:
+                        CellMetrics.rowHeight * totalRows,
+                    child: Stack(
+                      children: [
+                        CustomPaint(
+                          size: Size.infinite,
+                          painter: GridPainter(
+                            visibleRange: visibleRange,
+                          ),
+                        ),
 
-            widget.viewportController.updateSelectionFromPixel(
-              x: details.localPosition.dx,
-              y: details.localPosition.dy,
-            );
-          },
-
-          // Mouse button released.
-          onPanEnd: (_) {
-            _isDragging = false;
-          },
-
-          child: SingleChildScrollView(
-            controller: widget.verticalController,
-            scrollDirection: Axis.vertical,
-            child: SingleChildScrollView(
-              controller: widget.horizontalController,
-              scrollDirection: Axis.horizontal,
-              child: SizedBox(
-                width: CellMetrics.columnWidth * totalColumns,
-                height: CellMetrics.rowHeight * totalRows,
-                child: Stack(
-                  children: [
-                    CustomPaint(
-                      size: Size.infinite,
-                      painter: GridPainter(
-                        visibleRange: visibleRange,
-                      ),
+                        CustomPaint(
+                          size: Size.infinite,
+                          painter: CellPainter(
+                            spreadsheet: widget.spreadsheet,
+                            visibleRange: visibleRange,
+                          ),
+                        ),
+                      ],
                     ),
-
-                    CustomPaint(
-                      size: Size.infinite,
-                      painter: CellPainter(
-                        spreadsheet: widget.spreadsheet,
-                        visibleRange: visibleRange,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -153,4 +189,18 @@ class _CellCanvasState extends State<CellCanvas> {
       },
     );
   }
+}
+
+/// Mouse dragging belongs to cell selection.
+///
+/// Touch/stylus dragging may still be used by the
+/// ScrollViews for scrolling.
+class _SpreadsheetScrollBehavior extends MaterialScrollBehavior {
+  const _SpreadsheetScrollBehavior();
+
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+        PointerDeviceKind.touch,
+        PointerDeviceKind.stylus,
+      };
 }
