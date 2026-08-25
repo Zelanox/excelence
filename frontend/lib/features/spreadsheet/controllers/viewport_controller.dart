@@ -138,8 +138,8 @@ class ViewportController extends ChangeNotifier {
   void moveLeft() {
     _stopEditingWithoutNotify();
 
-    final row = _selection.startRow;
-    final column = (_selection.startColumn - 1).clamp(0, 25);
+    final row = _selection.endRow;
+    final column = (_selection.endColumn - 1).clamp(0, 25);
 
     selectCell(row, column);
   }
@@ -147,8 +147,8 @@ class ViewportController extends ChangeNotifier {
   void moveRight() {
     _stopEditingWithoutNotify();
 
-    final row = _selection.startRow;
-    final column = (_selection.startColumn + 1).clamp(0, 25);
+    final row = _selection.endRow;
+    final column = (_selection.endColumn + 1).clamp(0, 25);
 
     selectCell(row, column);
   }
@@ -156,8 +156,8 @@ class ViewportController extends ChangeNotifier {
   void moveUp() {
     _stopEditingWithoutNotify();
 
-    final row = (_selection.startRow - 1).clamp(0, 99);
-    final column = _selection.startColumn;
+    final row = (_selection.endRow - 1).clamp(0, 99);
+    final column = _selection.endColumn;
 
     selectCell(row, column);
   }
@@ -165,17 +165,81 @@ class ViewportController extends ChangeNotifier {
   void moveDown() {
     _stopEditingWithoutNotify();
 
-    final row = (_selection.startRow + 1).clamp(0, 99);
-    final column = _selection.startColumn;
+    final row = (_selection.endRow + 1).clamp(0, 99);
+    final column = _selection.endColumn;
 
     selectCell(row, column);
+  }
+
+  void extendSelectionLeft() {
+    _stopEditingWithoutNotify();
+
+    final row = _selection.endRow;
+    final column = (_selection.endColumn - 1).clamp(0, 25); 
+
+    _selection = SelectionModel(
+      startRow: _selection.startRow,
+      startColumn: _selection.startColumn,
+      endRow: row,
+      endColumn: column,
+    );
+
+    notifyListeners();
+  }
+
+  void extendSelectionRight() {
+    _stopEditingWithoutNotify();
+
+    final row = _selection.endRow;
+    final column = (_selection.endColumn + 1).clamp(0, 25);
+
+    _selection = SelectionModel(
+      startRow: _selection.startRow,
+      startColumn: _selection.startColumn,
+      endRow: row,
+      endColumn: column,
+    );
+
+    notifyListeners();
+  }
+
+  void extendSelectionUp() {
+    _stopEditingWithoutNotify();
+
+    final row = (_selection.endRow - 1).clamp(0, 99);
+    final column = _selection.endColumn;
+
+    _selection = SelectionModel(
+      startRow: _selection.startRow,
+      startColumn: _selection.startColumn,
+      endRow: row,
+      endColumn: column,
+    );
+
+    notifyListeners();
+  }
+
+  void extendSelectionDown() {
+    _stopEditingWithoutNotify();
+
+    final row = (_selection.endRow + 1).clamp(0, 99);
+    final column = _selection.endColumn;
+
+    _selection = SelectionModel(
+      startRow: _selection.startRow,
+      startColumn: _selection.startColumn,
+      endRow: row,
+      endColumn: column,
+    );
+
+    notifyListeners();
   }
 
   void moveNext() {
     _stopEditingWithoutNotify();
 
-    final row = _selection.startRow;
-    final column = _selection.startColumn;
+    final row = _selection.endRow;
+    final column = _selection.endColumn;
 
     if (column < 25) {
       selectCell(row, column + 1);
@@ -191,8 +255,8 @@ class ViewportController extends ChangeNotifier {
   void movePrevious() {
     _stopEditingWithoutNotify();
 
-    final row = _selection.startRow;
-    final column = _selection.startColumn;
+    final row = _selection.endRow;
+    final column = _selection.endColumn;
 
     if (column > 0) {
       selectCell(row, column - 1);

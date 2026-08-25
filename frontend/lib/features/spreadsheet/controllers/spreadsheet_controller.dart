@@ -4,7 +4,6 @@ import '../models/cell_model.dart';
 import '../models/row_model.dart';
 import '../models/sheet_model.dart';
 import '../models/spreadsheet_model.dart';
-import '../models/selection_model.dart';
 
 import '../services/spreadsheet_service.dart';
 
@@ -14,10 +13,8 @@ class SpreadsheetController extends ChangeNotifier {
   final SpreadsheetService _service;
 
   SpreadsheetModel? _spreadsheet;
-  SelectionModel _selection = const SelectionModel();
 
   SpreadsheetModel? get spreadsheet => _spreadsheet;
-  SelectionModel get selection => _selection;
 
   // ============================================================
   // Mock data
@@ -45,26 +42,6 @@ class SpreadsheetController extends ChangeNotifier {
           ),
         ),
       ],
-    );
-
-    notifyListeners();
-  }
-
-  // ============================================================
-  // Selection
-  // ============================================================
-
-  void selectCell(int row, int column) {
-    if (_selection.startRow == row &&
-        _selection.startColumn == column) {
-      return;
-    }
-
-    _selection = SelectionModel(
-      startRow: row,
-      endRow: row,
-      startColumn: column,
-      endColumn: column,
     );
 
     notifyListeners();

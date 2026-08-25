@@ -210,27 +210,50 @@ class _SpreadsheetViewportState
     // ARROW KEYS
     // ==========================================================
 
+    final shiftPressed =
+        HardwareKeyboard.instance.isShiftPressed;
+
     if (event.logicalKey ==
         LogicalKeyboardKey.arrowLeft) {
-      viewportController.moveLeft();
+      if (shiftPressed) {
+        viewportController.extendSelectionLeft();
+      } else {
+        viewportController.moveLeft();
+      }
+
       return KeyEventResult.handled;
     }
 
     if (event.logicalKey ==
         LogicalKeyboardKey.arrowRight) {
-      viewportController.moveRight();
+      if (shiftPressed) {
+        viewportController.extendSelectionRight();
+      } else {
+        viewportController.moveRight();
+      }
+
       return KeyEventResult.handled;
     }
 
     if (event.logicalKey ==
         LogicalKeyboardKey.arrowUp) {
-      viewportController.moveUp();
+      if (shiftPressed) {
+        viewportController.extendSelectionUp();
+      } else {
+        viewportController.moveUp();
+      }
+
       return KeyEventResult.handled;
     }
 
     if (event.logicalKey ==
         LogicalKeyboardKey.arrowDown) {
-      viewportController.moveDown();
+      if (shiftPressed) {
+        viewportController.extendSelectionDown();
+      } else {
+        viewportController.moveDown();
+      }
+
       return KeyEventResult.handled;
     }
 
