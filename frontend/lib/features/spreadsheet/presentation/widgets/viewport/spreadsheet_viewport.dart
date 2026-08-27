@@ -169,6 +169,23 @@ class _SpreadsheetViewportState
     }
 
     // ==========================================================
+    // CTRL/CMD + C → COPY SELECTION
+    // ==========================================================
+
+    final copyModifier =
+        HardwareKeyboard.instance.isControlPressed ||
+        HardwareKeyboard.instance.isMetaPressed;
+
+    if (copyModifier &&
+        event.logicalKey == LogicalKeyboardKey.keyC) {
+      widget.spreadsheetController.copySelection(
+        viewportController.selection,
+      );
+
+      return KeyEventResult.handled;
+    }
+
+    // ==========================================================
     // ENTER → EDIT CURRENT CELL
     // ==========================================================
 

@@ -1,9 +1,11 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 
 import '../models/cell_model.dart';
 import '../models/row_model.dart';
 import '../models/sheet_model.dart';
 import '../models/spreadsheet_model.dart';
+import '../models/selection_model.dart';
 
 import '../services/spreadsheet_service.dart';
 
@@ -132,6 +134,198 @@ class SpreadsheetController extends ChangeNotifier {
     // ----------------------------------------------------------
 
     final newSheets = List<SheetModel>.from(
+      currentSpreadsheet.sheets,
+    );
+
+    newSheets[activeSheetIndex] = newSheet;
+
+    // ----------------------------------------------------------
+    // Replace spreadsheet
+    // ----------------------------------------------------------
+
+    _spreadsheet = SpreadsheetModel(
+      sheets: newSheets,
+      activeSheetIndex: activeSheetIndex,
+    );
+
+    notifyListeners();
+  }
+
+  Future<void> copySelection(SelectionModel selection) async {
+    final currentSpreadsheet = _spreadsheet;
+
+    if (currentSpreadsheet == null) {
+      return;
+    }
+
+    final activeSheetIndex =
+        currentSpreadsheet.activeSheetIndex;
+
+    final currentSheet =
+        currentSpreadsheet.sheets[activeSheetIndex];
+
+    final startRow =
+        selection.startRow <= selection.endRow
+            ? selection.startRow
+            : selection.endRow;
+
+    final endRow =
+        selection.startRow <= selection.endRow
+            ? selection.endRow
+            : selection.startRow;
+
+    final startColumn =
+        selection.startColumn <= selection.endColumn
+            ? selection.startColumn
+            : selection.endColumn;
+
+    final endColumn =
+        selection.startColumn <= selection.endColumn
+            ? selection.endColumn
+            : selection.startColumn;
+
+    final rows = <String>[];
+
+    for (int row = startRow; row <= endRow; row++) {
+      final cells = <String>[];
+
+      for (
+        int column = startColumn;
+        column <= endColumn;
+        column++
+      ) {
+        cells.add(
+          currentSheet.rows[row].cells[column].value,
+        );
+      }
+
+      rows.add(cells.join('\t'));
+    }
+
+    await Clipboard.setData(
+      ClipboardData(
+        text: rows.join('\n'),
+      ),
+    );
+  }
+
+  Future<void> pasteClipboard({
+    required int row,
+    required int column,
+    required String clipboardText,
+  }) async {
+    final currentSpreadsheet = _spreadsheet;
+
+    if (currentSpreadsheet == null) {
+      return;
+    }
+
+    final activeSheetIndex =
+        currentSpreadsheet.activeSheetIndex;
+
+    final currentSheet =
+        currentSpreadsheet.sheets[activeSheetIndex];
+
+    // ----------------------------------------------------------
+    // Parse clipboard text as TSV
+    // ----------------------------------------------------------
+
+    final lines = clipboardText
+        .replaceAll('\r\n', '\n')
+        .replaceAll('\r', '\n')
+        .split('\n');
+
+    // Ignore a trailing newline from the clipboard.
+    if (lines.length > 1 && lines.last.isEmpty) {
+      lines.removeLast();
+    }
+
+    if (lines.isEmpty || lines.first.isEmpty) {
+      return;
+    }
+
+    final pastedRows = lines.map(
+      (line) => line.split('\t'),
+    ).toList();
+
+    // ----------------------------------------------------------
+    // Validate paste origin
+    // ----------------------------------------------------------
+
+    if (row < 0 || row >= currentSheet.rows.length) {
+      return;
+    }
+
+    if (column < 0 ||
+        column >= currentSheet.rows[row].cells.length) {
+      return;
+    }
+
+    // ----------------------------------------------------------
+    // Create new rows
+    // ----------------------------------------------------------
+
+    final newRows =
+        List<RowModel>.from(currentSheet.rows);
+
+    for (int pastedRow = 0;
+        pastedRow < pastedRows.length;
+        pastedRow++) {
+      final targetRow = row + pastedRow;
+
+      if (targetRow >= currentSheet.rows.length) {
+        break;
+      }
+
+      final currentRow = currentSheet.rows[targetRow];
+
+      final newCells =
+          List<CellModel>.from(currentRow.cells);
+
+      final values = pastedRows[pastedRow];
+
+      for (int pastedColumn = 0;
+          pastedColumn < values.length;
+          pastedColumn++) {
+        final targetColumn = column + pastedColumn;
+
+        if (targetColumn >= currentRow.cells.length) {
+          break;
+        }
+
+        final oldCell = currentRow.cells[targetColumn];
+
+        newCells[targetColumn] = CellModel(
+          row: oldCell.row,
+          column: oldCell.column,
+          value: values[pastedColumn],
+          formula: null,
+          isSelected: oldCell.isSelected,
+          isEditing: false,
+        );
+      }
+
+      newRows[targetRow] = RowModel(
+        index: currentRow.index,
+        cells: newCells,
+      );
+    }
+
+    // ----------------------------------------------------------
+    // Create new sheet
+    // ----------------------------------------------------------
+
+    final newSheet = SheetModel(
+      name: currentSheet.name,
+      rows: newRows,
+    );
+
+    // ----------------------------------------------------------
+    // Create new sheet list
+    // ----------------------------------------------------------
+
+    final newSheets =
+        List<SheetModel>.from(
       currentSpreadsheet.sheets,
     );
 
