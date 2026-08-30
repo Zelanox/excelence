@@ -186,6 +186,36 @@ class _SpreadsheetViewportState
     }
 
     // ==========================================================
+    // CTRL/CMD + X → CUT SELECTION
+    // ==========================================================
+
+    if (copyModifier &&
+        event.logicalKey == LogicalKeyboardKey.keyX) {
+      final selection = viewportController.selection;
+
+      widget.spreadsheetController.copySelection(
+        selection,
+      );
+
+      widget.spreadsheetController.clearSelection(
+        selection,
+      );
+
+      return KeyEventResult.handled;
+    }
+
+    // ==========================================================
+    // CTRL/CMD + V → PASTE CLIPBOARD
+    // ==========================================================
+
+    if (copyModifier &&
+        event.logicalKey == LogicalKeyboardKey.keyV) {
+      _pasteClipboard(viewportController);
+
+      return KeyEventResult.handled;
+    }
+
+    // ==========================================================
     // ENTER → EDIT CURRENT CELL
     // ==========================================================
 
@@ -292,6 +322,29 @@ class _SpreadsheetViewportState
     }
 
     return KeyEventResult.ignored;
+  }
+
+  // ============================================================
+  // CLIPBOARD PASTE
+  // ============================================================
+
+  Future<void> _pasteClipboard(
+    ViewportController viewportController,
+  ) async {
+    final clipboardData =
+        await Clipboard.getData(Clipboard.kTextPlain);
+
+    final clipboardText = clipboardData?.text;
+
+    if (clipboardText == null || clipboardText.isEmpty) {
+      return;
+    }
+
+    await widget.spreadsheetController.pasteClipboard(
+      row: viewportController.selection.activeRow,
+      column: viewportController.selection.activeColumn,
+      clipboardText: clipboardText,
+    );
   }
 
   bool _isControlCharacter(String character) {

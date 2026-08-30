@@ -226,6 +226,129 @@ class SpreadsheetController extends ChangeNotifier {
     final currentSheet =
         currentSpreadsheet.sheets[activeSheetIndex];
 
+  void clearSelection(SelectionModel selection) {
+    final currentSpreadsheet = _spreadsheet;
+
+    if (currentSpreadsheet == null) {
+      return;
+    }
+
+    final activeSheetIndex =
+        currentSpreadsheet.activeSheetIndex;
+
+    final currentSheet =
+        currentSpreadsheet.sheets[activeSheetIndex];
+
+    // ----------------------------------------------------------
+    // Normalize selection bounds
+    // ----------------------------------------------------------
+
+    final startRow =
+        selection.startRow <= selection.endRow
+            ? selection.startRow
+            : selection.endRow;
+
+    final endRow =
+        selection.startRow <= selection.endRow
+            ? selection.endRow
+            : selection.startRow;
+
+    final startColumn =
+        selection.startColumn <= selection.endColumn
+            ? selection.startColumn
+            : selection.endColumn;
+
+    final endColumn =
+        selection.startColumn <= selection.endColumn
+            ? selection.endColumn
+            : selection.startColumn;
+
+    // ----------------------------------------------------------
+    // Validate selection
+    // ----------------------------------------------------------
+
+    if (startRow < 0 ||
+        startRow >= currentSheet.rows.length) {
+      return;
+    }
+
+    // ----------------------------------------------------------
+    // Create new rows
+    // ----------------------------------------------------------
+
+    final newRows =
+        List<RowModel>.from(currentSheet.rows);
+
+    for (int row = startRow; row <= endRow; row++) {
+      if (row >= currentSheet.rows.length) {
+        break;
+      }
+
+      final currentRow = currentSheet.rows[row];
+
+      final newCells =
+          List<CellModel>.from(currentRow.cells);
+
+      for (
+        int column = startColumn;
+        column <= endColumn;
+        column++
+      ) {
+        if (column < 0 ||
+            column >= currentRow.cells.length) {
+          continue;
+        }
+
+        final oldCell = currentRow.cells[column];
+
+        newCells[column] = CellModel(
+          row: oldCell.row,
+          column: oldCell.column,
+          value: "",
+          formula: null,
+          isSelected: oldCell.isSelected,
+          isEditing: false,
+        );
+      }
+
+      newRows[row] = RowModel(
+        index: currentRow.index,
+        cells: newCells,
+      );
+    }
+
+    // ----------------------------------------------------------
+    // Create new sheet
+    // ----------------------------------------------------------
+
+    final newSheet = SheetModel(
+      name: currentSheet.name,
+      rows: newRows,
+    );
+
+    // ----------------------------------------------------------
+    // Create new sheet list
+    // ----------------------------------------------------------
+
+    final newSheets =
+        List<SheetModel>.from(
+      currentSpreadsheet.sheets,
+    );
+
+    newSheets[activeSheetIndex] = newSheet;
+
+    // ----------------------------------------------------------
+    // Replace spreadsheet
+    // ----------------------------------------------------------
+
+    _spreadsheet = SpreadsheetModel(
+      sheets: newSheets,
+      activeSheetIndex: activeSheetIndex,
+    );
+
+    notifyListeners();
+  }
+
     // ----------------------------------------------------------
     // Parse clipboard text as TSV
     // ----------------------------------------------------------
