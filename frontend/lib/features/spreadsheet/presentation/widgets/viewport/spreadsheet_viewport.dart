@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -11,6 +13,7 @@ import 'selection_overlay.dart';
 
 import '../../../controllers/viewport_controller.dart';
 import '../../../models/spreadsheet_model.dart';
+import '../../../models/selection_model.dart';
 import '../../../controllers/spreadsheet_controller.dart';
 
 class SpreadsheetViewport extends StatefulWidget {
@@ -193,13 +196,7 @@ class _SpreadsheetViewportState
         event.logicalKey == LogicalKeyboardKey.keyX) {
       final selection = viewportController.selection;
 
-      widget.spreadsheetController.copySelection(
-        selection,
-      );
-
-      widget.spreadsheetController.clearSelection(
-        selection,
-      );
+      unawaited(_cutSelection(selection));
 
       return KeyEventResult.handled;
     }
@@ -211,6 +208,30 @@ class _SpreadsheetViewportState
     if (copyModifier &&
         event.logicalKey == LogicalKeyboardKey.keyV) {
       _pasteClipboard(viewportController);
+
+      return KeyEventResult.handled;
+    }
+
+    // ==========================================================
+    // CTRL/CMD + Z → UNDO
+    // ==========================================================
+
+    if (copyModifier &&
+        event.logicalKey == LogicalKeyboardKey.keyZ) {
+      widget.spreadsheetController.undo();
+
+      return KeyEventResult.handled;
+    }
+
+    // ==========================================================
+    // CTRL/CMD + Y or CTRL/CMD + SHIFT + Z → REDO
+    // ==========================================================
+
+    if (copyModifier &&
+        (event.logicalKey == LogicalKeyboardKey.keyY ||
+            (event.logicalKey == LogicalKeyboardKey.keyZ &&
+                HardwareKeyboard.instance.isShiftPressed))) {
+      widget.spreadsheetController.redo();
 
       return KeyEventResult.handled;
     }
@@ -305,6 +326,19 @@ class _SpreadsheetViewportState
     }
 
     // ==========================================================
+    // DELETE / BACKSPACE → CLEAR SELECTION
+    // ==========================================================
+
+    if (event.logicalKey == LogicalKeyboardKey.delete ||
+        event.logicalKey == LogicalKeyboardKey.backspace) {
+      widget.spreadsheetController.clearSelection(
+        viewportController.selection,
+      );
+
+      return KeyEventResult.handled;
+    }
+
+    // ==========================================================
     // DIRECT TYPING
     // ==========================================================
 
@@ -325,8 +359,16 @@ class _SpreadsheetViewportState
   }
 
   // ============================================================
-  // CLIPBOARD PASTE
+  // CLIPBOARD OPERATIONS
   // ============================================================
+
+  Future<void> _cutSelection(SelectionModel selection) async {
+    // Copy to clipboard first
+    await widget.spreadsheetController.copySelection(selection);
+    
+    // Then clear the source cells
+    widget.spreadsheetController.clearSelection(selection);
+  }
 
   Future<void> _pasteClipboard(
     ViewportController viewportController,
