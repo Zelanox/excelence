@@ -10,10 +10,12 @@ class SpreadsheetView extends StatelessWidget {
     super.key,
     required this.controller,
     required this.viewportController,
+    required this.focusNode,
   });
 
   final SpreadsheetController controller;
   final ViewportController viewportController;
+  final FocusNode focusNode;
 
   @override
   Widget build(BuildContext context) {
@@ -34,6 +36,7 @@ class SpreadsheetView extends StatelessWidget {
             Expanded(
               child: SpreadsheetViewport(
                 viewportController: viewportController,
+                focusNode: focusNode,
                 spreadsheetController: controller,
                 spreadsheet: spreadsheet,
               ),

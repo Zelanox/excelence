@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../controllers/viewport_controller.dart';
 import '../../../models/spreadsheet_model.dart';
+import '../../../models/cell_position.dart';
 import '../../../controllers/spreadsheet_controller.dart';
 import 'cell_editor.dart';
 
@@ -12,12 +13,18 @@ class SpreadsheetSelectionOverlay extends StatefulWidget {
     required this.spreadsheet,
     required this.spreadsheetController,
     required this.focusNode,
+    this.referenceInsertion,
+    this.formulaReferenceStart,
+    this.formulaReferenceEnd,
   });
 
   final ViewportController viewportController;
   final SpreadsheetModel spreadsheet;
   final SpreadsheetController spreadsheetController;
   final FocusNode focusNode;
+  final ValueNotifier<String?>? referenceInsertion;
+  final CellPosition? formulaReferenceStart;
+  final CellPosition? formulaReferenceEnd;
 
   @override
   State<SpreadsheetSelectionOverlay> createState() =>
@@ -168,6 +175,55 @@ class _SpreadsheetSelectionOverlayState
                 ),
               ),
 
+            if (widget.viewportController.isEditing &&
+                widget.formulaReferenceStart != null &&
+                widget.formulaReferenceEnd != null)
+              Positioned(
+                left: (widget.formulaReferenceStart!.column <
+                            widget.formulaReferenceEnd!.column
+                        ? widget.formulaReferenceStart!.column
+                        : widget.formulaReferenceEnd!.column) *
+                    cellWidth -
+                    viewport.scrollX,
+                top: (widget.formulaReferenceStart!.row <
+                            widget.formulaReferenceEnd!.row
+                        ? widget.formulaReferenceStart!.row
+                        : widget.formulaReferenceEnd!.row) *
+                    cellHeight -
+                    viewport.scrollY,
+                width: ((widget.formulaReferenceStart!.column >
+                                widget.formulaReferenceEnd!.column
+                            ? widget.formulaReferenceStart!.column
+                            : widget.formulaReferenceEnd!.column) -
+                        (widget.formulaReferenceStart!.column <
+                                widget.formulaReferenceEnd!.column
+                            ? widget.formulaReferenceStart!.column
+                            : widget.formulaReferenceEnd!.column) +
+                        1) *
+                    cellWidth,
+                height: ((widget.formulaReferenceStart!.row >
+                                widget.formulaReferenceEnd!.row
+                            ? widget.formulaReferenceStart!.row
+                            : widget.formulaReferenceEnd!.row) -
+                        (widget.formulaReferenceStart!.row <
+                                widget.formulaReferenceEnd!.row
+                            ? widget.formulaReferenceStart!.row
+                            : widget.formulaReferenceEnd!.row) +
+                        1) *
+                    cellHeight,
+                child: IgnorePointer(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withValues(alpha: 0.12),
+                      border: Border.all(
+                        color: Colors.orange,
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
             // ====================================================
             // CELL EDITOR
             // ====================================================
@@ -186,8 +242,15 @@ class _SpreadsheetSelectionOverlayState
                   initialValue:
                       widget.viewportController.initialEditValue ??
                       activeCell.value,
+                    referenceInsertion: widget.referenceInsertion,
 
                   onCommit: (value) {
+                    debugPrint(
+                      '[SelectionOverlay.commit] '
+                      'targetRow=${selection.startRow} '
+                      'targetColumn=${selection.startColumn} '
+                      'text="$value"',
+                    );
                     widget.spreadsheetController.editCell(
                       row: selection.startRow,
                       column: selection.startColumn,

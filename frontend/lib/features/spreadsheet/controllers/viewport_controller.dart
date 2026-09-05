@@ -59,6 +59,18 @@ class ViewportController extends ChangeNotifier {
       viewportSize.height,
     );
   }
+  
+  CellPosition positionFromPixel({
+    required double x,
+    required double y,
+  }) {
+    return _hitTester.fromPixel(
+      x: x,
+      y: y,
+      scrollX: viewport.scrollX,
+      scrollY: viewport.scrollY,
+    );
+  }
 
   void selectCell(int row, int column) {
     if (_selection.startRow == row &&

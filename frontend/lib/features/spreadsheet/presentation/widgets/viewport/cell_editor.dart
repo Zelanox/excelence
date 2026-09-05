@@ -7,11 +7,13 @@ class CellEditor extends StatefulWidget {
     required this.initialValue,
     required this.onCommit,
     required this.onCancel,
+    this.referenceInsertion,
   });
 
   final String initialValue;
   final ValueChanged<String> onCommit;
   final VoidCallback onCancel;
+  final ValueNotifier<String?>? referenceInsertion;
 
   @override
   State<CellEditor> createState() => _CellEditorState();
@@ -35,6 +37,11 @@ class _CellEditorState extends State<CellEditor> {
     _controller = TextEditingController(
       text: widget.initialValue,
     );
+    _controller.selection = TextSelection.collapsed(
+      offset: _controller.text.length,
+    );
+
+    widget.referenceInsertion?.addListener(_insertReference);
 
     _keyboardFocusNode = FocusNode(
       debugLabel: 'CellEditorKeyboardFocus',
@@ -43,6 +50,7 @@ class _CellEditorState extends State<CellEditor> {
     _textFieldFocusNode = FocusNode(
       debugLabel: 'CellEditorTextFieldFocus',
     );
+    _textFieldFocusNode.addListener(_handleTextFieldFocusChange);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
@@ -51,19 +59,59 @@ class _CellEditorState extends State<CellEditor> {
 
       // The TextField must own the actual input focus.
       _textFieldFocusNode.requestFocus();
-
-      _controller.selection = TextSelection.collapsed(
-        offset: _controller.text.length,
-      );
     });
   }
 
   @override
   void dispose() {
+    widget.referenceInsertion?.removeListener(_insertReference);
+    _textFieldFocusNode.removeListener(_handleTextFieldFocusChange);
     _controller.dispose();
     _keyboardFocusNode.dispose();
     _textFieldFocusNode.dispose();
     super.dispose();
+  }
+
+  void _handleTextFieldFocusChange() {
+    if (!_textFieldFocusNode.hasFocus) {
+      return;
+    }
+
+    _collapseSelectionAtEnd();
+  }
+
+  void _insertReference() {
+    final reference = widget.referenceInsertion?.value;
+    if (reference == null || reference.isEmpty) {
+      return;
+    }
+
+    final selection = _controller.selection;
+    final start = selection.start < 0
+        ? _controller.text.length
+        : selection.start;
+    final end = selection.end < 0 ? start : selection.end;
+    final editorText =
+        _controller.text.replaceRange(start, end, reference);
+
+    debugPrint(
+      '[FormulaReference.insert] reference="$reference" '
+      'beforeText="${_controller.text}" oldSelection=$start:$end',
+    );
+
+    _controller.value = _controller.value.copyWith(
+      text: editorText,
+      selection: TextSelection.collapsed(
+        offset: start + reference.length,
+      ),
+      composing: TextRange.empty,
+    );
+    debugPrint(
+      '[FormulaReference.inserted] reference="$reference" '
+      'afterText="$editorText" '
+      'selection=${start + reference.length}:${start + reference.length}',
+    );
+    widget.referenceInsertion?.value = null;
   }
 
   // ============================================================
@@ -76,6 +124,8 @@ class _CellEditorState extends State<CellEditor> {
     }
 
     _finished = true;
+
+    debugPrint('[CellEditor.commit] text="${_controller.text}"');
 
     widget.onCommit(_controller.text);
   }
@@ -141,6 +191,7 @@ class _CellEditorState extends State<CellEditor> {
           maxLines: 1,
           textInputAction: TextInputAction.done,
           keyboardType: TextInputType.text,
+          onTap: _collapseSelectionAtEnd,
 
           decoration: const InputDecoration(
             contentPadding: EdgeInsets.symmetric(
@@ -173,5 +224,10 @@ class _CellEditorState extends State<CellEditor> {
         ),
       ),
     );
+  }
+
+  void _collapseSelectionAtEnd() {
+    final end = _controller.text.length;
+    _controller.selection = TextSelection.collapsed(offset: end);
   }
 }

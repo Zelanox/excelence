@@ -5,6 +5,7 @@ import '../controllers/spreadsheet_controller.dart';
 import '../controllers/viewport_controller.dart';
 import '../services/spreadsheet_service.dart';
 import 'spreadsheet_view.dart';
+import '../../shell/widgets/formula_bar.dart';
 
 class SpreadsheetFeature extends StatefulWidget {
   const SpreadsheetFeature({
@@ -18,6 +19,7 @@ class SpreadsheetFeature extends StatefulWidget {
 class _SpreadsheetFeatureState extends State<SpreadsheetFeature> {
   late final SpreadsheetController spreadsheetController;
   late final ViewportController viewportController;
+  late final FocusNode spreadsheetFocusNode;
 
   @override
   void initState() {
@@ -31,6 +33,9 @@ class _SpreadsheetFeatureState extends State<SpreadsheetFeature> {
 
     spreadsheetController = SpreadsheetController(service);
     viewportController = ViewportController();
+    spreadsheetFocusNode = FocusNode(
+      debugLabel: 'SpreadsheetViewportFocus',
+    );
 
     spreadsheetController.loadMockData();
   }
@@ -39,14 +44,27 @@ class _SpreadsheetFeatureState extends State<SpreadsheetFeature> {
   void dispose() {
     spreadsheetController.dispose();
     viewportController.dispose();
+    spreadsheetFocusNode.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return SpreadsheetView(
-      controller: spreadsheetController,
-      viewportController: viewportController,
+    return Column(
+      children: [
+        FormulaBar(
+          spreadsheetController: spreadsheetController,
+          viewportController: viewportController,
+          spreadsheetFocusNode: spreadsheetFocusNode,
+        ),
+        Expanded(
+          child: SpreadsheetView(
+            controller: spreadsheetController,
+            viewportController: viewportController,
+            focusNode: spreadsheetFocusNode,
+          ),
+        ),
+      ],
     );
   }
 }

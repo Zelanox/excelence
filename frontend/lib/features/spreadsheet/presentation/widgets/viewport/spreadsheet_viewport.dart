@@ -14,7 +14,9 @@ import 'selection_overlay.dart';
 import '../../../controllers/viewport_controller.dart';
 import '../../../models/spreadsheet_model.dart';
 import '../../../models/selection_model.dart';
+import '../../../models/cell_position.dart';
 import '../../../controllers/spreadsheet_controller.dart';
+import '../../../services/formula_dependency_graph.dart';
 
 class SpreadsheetViewport extends StatefulWidget {
   const SpreadsheetViewport({
@@ -22,11 +24,13 @@ class SpreadsheetViewport extends StatefulWidget {
     required this.viewportController,
     required this.spreadsheetController,
     required this.spreadsheet,
+    required this.focusNode,
   });
 
   final ViewportController viewportController;
   final SpreadsheetController spreadsheetController;
   final SpreadsheetModel spreadsheet;
+  final FocusNode focusNode;
 
   static const double rowHeaderWidth = 48;
   static const double columnHeaderHeight = 32;
@@ -39,12 +43,15 @@ class SpreadsheetViewport extends StatefulWidget {
 class _SpreadsheetViewportState
     extends State<SpreadsheetViewport> {
   late final ScrollCoordinator _scroll;
-  late final FocusNode _focusNode;
 
   int? _lastSelectedRow;
   int? _lastSelectedColumn;
 
   Size? _cellViewportSize;
+  final ValueNotifier<String?> _formulaReferenceInsertion =
+      ValueNotifier(null);
+  CellPosition? _formulaReferenceStart;
+  CellPosition? _formulaReferenceEnd;
 
   @override
   void initState() {
@@ -52,10 +59,6 @@ class _SpreadsheetViewportState
 
     _scroll = ScrollCoordinator(
       viewportController: widget.viewportController,
-    );
-
-    _focusNode = FocusNode(
-      debugLabel: 'SpreadsheetViewportFocus',
     );
 
     widget.viewportController.addListener(
@@ -76,7 +79,7 @@ class _SpreadsheetViewportState
     );
 
     _scroll.dispose();
-    _focusNode.dispose();
+    _formulaReferenceInsertion.dispose();
 
     super.dispose();
   }
@@ -138,7 +141,7 @@ class _SpreadsheetViewportState
       return;
     }
 
-    _focusNode.requestFocus();
+    widget.focusNode.requestFocus();
   }
 
   void _restoreSpreadsheetFocus() {
@@ -149,6 +152,110 @@ class _SpreadsheetViewportState
 
       _requestSpreadsheetFocus();
     });
+  }
+
+  void _startFormulaReferenceSelection(Offset offset) {
+    final position = widget.viewportController.positionFromPixel(
+      x: offset.dx,
+      y: offset.dy,
+    );
+    final viewport = widget.viewportController.viewport;
+    final address = FormulaDependencyGraph.addressFor(
+      row: position.row,
+      column: position.column,
+    );
+    debugPrint(
+      '[FormulaReference.position] pixel=(${offset.dx},${offset.dy}) '
+      'scroll=(${viewport.scrollX},${viewport.scrollY}) zoom=${viewport.zoom} '
+      'resolvedRow=${position.row} resolvedColumn=${position.column} '
+      'address=$address',
+    );
+    debugPrint(
+      '[FormulaReference.pointer] pixel=(${offset.dx},${offset.dy}) '
+      'scroll=(${widget.viewportController.viewport.scrollX},'
+      '${widget.viewportController.viewport.scrollY}) '
+      'resolved=(${position.row},${position.column})',
+    );
+
+    setState(() {
+      _formulaReferenceStart = position;
+      _formulaReferenceEnd = position;
+    });
+  }
+
+  void _updateFormulaReferenceSelection(Offset offset) {
+    if (_formulaReferenceStart == null) {
+      return;
+    }
+
+    final position = widget.viewportController.positionFromPixel(
+      x: offset.dx,
+      y: offset.dy,
+    );
+    debugPrint(
+      '[FormulaReference.pointer] pixel=(${offset.dx},${offset.dy}) '
+      'scroll=(${widget.viewportController.viewport.scrollX},'
+      '${widget.viewportController.viewport.scrollY}) '
+      'resolved=(${position.row},${position.column})',
+    );
+
+    setState(() {
+      _formulaReferenceEnd = position;
+    });
+  }
+
+  void _finishFormulaReferenceSelection(Offset offset) {
+    final start = _formulaReferenceStart;
+    if (start == null) {
+      return;
+    }
+
+    final end = widget.viewportController.positionFromPixel(
+      x: offset.dx,
+      y: offset.dy,
+    );
+    debugPrint(
+      '[FormulaReference.pointer] pixel=(${offset.dx},${offset.dy}) '
+      'scroll=(${widget.viewportController.viewport.scrollX},'
+      '${widget.viewportController.viewport.scrollY}) '
+      'resolved=(${end.row},${end.column})',
+    );
+    final firstRow = start.row < end.row ? start.row : end.row;
+    final lastRow = start.row > end.row ? start.row : end.row;
+    final firstColumn = start.column < end.column
+        ? start.column
+        : end.column;
+    final lastColumn = start.column > end.column
+        ? start.column
+        : end.column;
+    final firstReference = FormulaDependencyGraph.addressFor(
+      row: firstRow,
+      column: firstColumn,
+    );
+    final lastReference = FormulaDependencyGraph.addressFor(
+      row: lastRow,
+      column: lastColumn,
+    );
+    final reference = firstRow == lastRow && firstColumn == lastColumn
+        ? firstReference
+        : '$firstReference:$lastReference';
+    debugPrint(
+      '[FormulaReference.range] start=(${start.row},${start.column}) '
+      'end=(${end.row},${end.column}) address=$reference',
+    );
+
+    _formulaReferenceInsertion.value = reference;
+
+    setState(() {
+      _formulaReferenceStart = null;
+      _formulaReferenceEnd = null;
+    });
+  }
+
+  void _handleViewportPointerDown() {
+    if (!widget.viewportController.isEditing) {
+      _requestSpreadsheetFocus();
+    }
   }
 
   // ============================================================
@@ -242,6 +349,11 @@ class _SpreadsheetViewportState
 
     if (event.logicalKey ==
         LogicalKeyboardKey.enter) {
+      debugPrint(
+        '[SpreadsheetViewport] editing begins at '
+        '(${viewportController.selection.startRow}, '
+        '${viewportController.selection.startColumn})',
+      );
       viewportController.startEditing();
 
       return KeyEventResult.handled;
@@ -347,6 +459,12 @@ class _SpreadsheetViewportState
     if (character != null &&
         character.isNotEmpty &&
         !_isControlCharacter(character)) {
+      debugPrint(
+        '[SpreadsheetViewport] editing begins at '
+        '(${viewportController.selection.startRow}, '
+        '${viewportController.selection.startColumn}) '
+        'with initial text "$character"',
+      );
       viewportController.startEditing(
         replaceInitialValue: true,
         initialValue: character,
@@ -404,13 +522,11 @@ class _SpreadsheetViewportState
   @override
   Widget build(BuildContext context) {
     return KeyboardHandler(
-      focusNode: _focusNode,
+      focusNode: widget.focusNode,
       onKeyEvent: _handleKey,
       child: Listener(
         behavior: HitTestBehavior.translucent,
-        onPointerDown: (_) {
-          _requestSpreadsheetFocus();
-        },
+        onPointerDown: (_) => _handleViewportPointerDown(),
         child: Column(
           children: [
             // ====================================================
@@ -477,6 +593,12 @@ class _SpreadsheetViewportState
                                   widget.viewportController,
                               spreadsheet:
                                   widget.spreadsheet,
+                                onFormulaReferencePointerDown:
+                                  _startFormulaReferenceSelection,
+                                onFormulaReferencePointerMove:
+                                  _updateFormulaReferenceSelection,
+                                onFormulaReferencePointerUp:
+                                  _finishFormulaReferenceSelection,
                             ),
 
                             // ----------------------------------------
@@ -490,8 +612,13 @@ class _SpreadsheetViewportState
                                   widget.spreadsheet,
                               spreadsheetController:
                                   widget.spreadsheetController,
-                              focusNode:
-                                  _focusNode,
+                                focusNode: widget.focusNode,
+                                referenceInsertion:
+                                  _formulaReferenceInsertion,
+                                formulaReferenceStart:
+                                  _formulaReferenceStart,
+                                formulaReferenceEnd:
+                                  _formulaReferenceEnd,
                             ),
                           ],
                         );

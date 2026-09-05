@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../widgets/app_menu_bar.dart';
-import '../widgets/formula_bar.dart';
 import '../widgets/workspace.dart';
 import '../widgets/status_bar.dart';
 import '../widgets/toolbar.dart';
@@ -17,7 +16,6 @@ class ShellPage extends StatelessWidget {
           children: [
             AppMenuBar(),
             Toolbar(),
-            FormulaBar(),
             Workspace(),
             StatusBar(),
           ],

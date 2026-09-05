@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 
 import '../../../controllers/viewport_controller.dart';
+import '../../../models/cell_position.dart';
 import '../../../models/spreadsheet_model.dart';
 import '../../../models/visible_range_model.dart';
 
@@ -16,12 +17,18 @@ class CellCanvas extends StatefulWidget {
     required this.verticalController,
     required this.viewportController,
     required this.spreadsheet,
+    this.onFormulaReferencePointerDown,
+    this.onFormulaReferencePointerMove,
+    this.onFormulaReferencePointerUp,
   });
 
   final ScrollController horizontalController;
   final ScrollController verticalController;
   final ViewportController viewportController;
   final SpreadsheetModel spreadsheet;
+  final ValueChanged<Offset>? onFormulaReferencePointerDown;
+  final ValueChanged<Offset>? onFormulaReferencePointerMove;
+  final ValueChanged<Offset>? onFormulaReferencePointerUp;
 
   @override
   State<CellCanvas> createState() => _CellCanvasState();
@@ -29,6 +36,7 @@ class CellCanvas extends StatefulWidget {
 
 class _CellCanvasState extends State<CellCanvas> {
   bool _isDragging = false;
+  CellPosition? _lastFormulaReferencePosition;
 
   @override
   void initState() {
@@ -65,6 +73,25 @@ class _CellCanvasState extends State<CellCanvas> {
       return;
     }
 
+    if (widget.viewportController.isEditing &&
+        widget.onFormulaReferencePointerDown != null) {
+      _isDragging = true;
+      final position = widget.viewportController.positionFromPixel(
+        x: event.localPosition.dx,
+        y: event.localPosition.dy,
+      );
+      _lastFormulaReferencePosition = position;
+      debugPrint(
+        '[FormulaReference.pointerDown] '
+        'local=(${event.localPosition.dx},${event.localPosition.dy}) '
+        'global=(${event.position.dx},${event.position.dy}) '
+        'scroll=(${widget.viewportController.viewport.scrollX},'
+        '${widget.viewportController.viewport.scrollY})',
+      );
+      widget.onFormulaReferencePointerDown!(event.localPosition);
+      return;
+    }
+
     _isDragging = true;
 
     widget.viewportController.startSelectionFromPixel(
@@ -82,10 +109,30 @@ class _CellCanvasState extends State<CellCanvas> {
       return;
     }
 
-    widget.viewportController.updateSelectionFromPixel(
-      x: event.localPosition.dx,
-      y: event.localPosition.dy,
-    );
+    if (widget.viewportController.isEditing &&
+        widget.onFormulaReferencePointerMove != null) {
+      final position = widget.viewportController.positionFromPixel(
+        x: event.localPosition.dx,
+        y: event.localPosition.dy,
+      );
+      if (_lastFormulaReferencePosition?.row != position.row ||
+          _lastFormulaReferencePosition?.column != position.column) {
+        _lastFormulaReferencePosition = position;
+        debugPrint(
+          '[FormulaReference.pointerMove] '
+          'local=(${event.localPosition.dx},${event.localPosition.dy}) '
+          'resolved=(${position.row},${position.column}) '
+          'scroll=(${widget.viewportController.viewport.scrollX},'
+          '${widget.viewportController.viewport.scrollY})',
+        );
+      }
+      widget.onFormulaReferencePointerMove!(event.localPosition);
+    } else {
+      widget.viewportController.updateSelectionFromPixel(
+        x: event.localPosition.dx,
+        y: event.localPosition.dy,
+      );
+    }
   }
 
   void _onPointerUp(PointerUpEvent event) {
@@ -94,6 +141,19 @@ class _CellCanvasState extends State<CellCanvas> {
     }
 
     _isDragging = false;
+    if (widget.viewportController.isEditing &&
+        widget.onFormulaReferencePointerUp != null) {
+      final position = widget.viewportController.positionFromPixel(
+        x: event.localPosition.dx,
+        y: event.localPosition.dy,
+      );
+      debugPrint(
+        '[FormulaReference.pointerUp] '
+        'local=(${event.localPosition.dx},${event.localPosition.dy}) '
+        'resolved=(${position.row},${position.column})',
+      );
+      widget.onFormulaReferencePointerUp!(event.localPosition);
+    }
   }
 
   void _onPointerCancel(PointerCancelEvent event) {
@@ -138,6 +198,11 @@ class _CellCanvasState extends State<CellCanvas> {
 
           // Double-click → edit the selected cell.
           onDoubleTap: () {
+            debugPrint(
+              '[CellCanvas] editing begins at '
+              '(${widget.viewportController.selection.startRow}, '
+              '${widget.viewportController.selection.startColumn})',
+            );
             widget.viewportController.startEditing();
           },
 

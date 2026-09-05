@@ -8,11 +8,14 @@ import '../models/spreadsheet_model.dart';
 import '../models/selection_model.dart';
 
 import '../services/spreadsheet_service.dart';
+import '../services/formula_engine.dart';
+import '../services/formula_dependency_graph.dart';
 
 class SpreadsheetController extends ChangeNotifier {
   SpreadsheetController(this._service);
 
   final SpreadsheetService _service;
+  final FormulaEngine _formulaEngine = const FormulaEngine();
 
   SpreadsheetModel? _spreadsheet;
   final List<SpreadsheetModel> _undoStack = [];
@@ -97,6 +100,82 @@ class SpreadsheetController extends ChangeNotifier {
     return text.startsWith('=');
   }
 
+  SpreadsheetModel _recalculateDependents(
+    SpreadsheetModel spreadsheet,
+    Set<String> changedCells,
+  ) {
+    final graph = FormulaDependencyGraph(
+      spreadsheet,
+      _formulaEngine,
+    );
+    final cellsToRecalculate = graph.dependentsOf(changedCells);
+
+    for (final changedCell in changedCells) {
+      final position = FormulaDependencyGraph.positionFor(changedCell);
+      final cell = spreadsheet.activeSheet.rows[position.row]
+          .cells[position.column];
+      if (cell.formula != null) {
+        cellsToRecalculate.add(changedCell);
+      }
+    }
+
+    var recalculatedSpreadsheet = spreadsheet;
+    for (final address in cellsToRecalculate) {
+      final position = FormulaDependencyGraph.positionFor(address);
+      final cell = recalculatedSpreadsheet.activeSheet.rows[position.row]
+          .cells[position.column];
+      final formula = cell.formula;
+      if (formula == null) {
+        continue;
+      }
+
+      final value = _formulaEngine.evaluate(
+        formula,
+        recalculatedSpreadsheet,
+        resolving: {address},
+      );
+      recalculatedSpreadsheet = _replaceCell(
+        recalculatedSpreadsheet,
+        position.row,
+        position.column,
+        CellModel(
+          row: cell.row,
+          column: cell.column,
+          value: value,
+          formula: formula,
+          isSelected: cell.isSelected,
+          isEditing: false,
+        ),
+      );
+    }
+
+    return recalculatedSpreadsheet;
+  }
+
+  SpreadsheetModel _replaceCell(
+    SpreadsheetModel spreadsheet,
+    int row,
+    int column,
+    CellModel cell,
+  ) {
+    final sheet = spreadsheet.activeSheet;
+    final rows = List<RowModel>.from(sheet.rows);
+    final cells = List<CellModel>.from(rows[row].cells);
+    cells[column] = cell;
+    rows[row] = RowModel(index: rows[row].index, cells: cells);
+
+    final sheets = List<SheetModel>.from(spreadsheet.sheets);
+    sheets[spreadsheet.activeSheetIndex] = SheetModel(
+      name: sheet.name,
+      rows: rows,
+    );
+
+    return SpreadsheetModel(
+      sheets: sheets,
+      activeSheetIndex: spreadsheet.activeSheetIndex,
+    );
+  }
+
   // ============================================================
   // Cell editing
   // ============================================================
@@ -128,6 +207,48 @@ class SpreadsheetController extends ChangeNotifier {
       return;
     }
 
+    debugPrint(
+      '[SpreadsheetController.editCell] target=($row,$column) '
+      'activeSheet=$activeSheetIndex value="$value"',
+    );
+    final references = RegExp(r'[A-Z]+[1-9][0-9]*').allMatches(value);
+    for (final match in references) {
+      final reference = match.group(0)!;
+      final positionMatch =
+          RegExp(r'^([A-Z]+)([1-9][0-9]*)$').firstMatch(reference);
+      if (positionMatch == null) {
+        continue;
+      }
+      var referenceColumn = 0;
+      for (final code in positionMatch.group(1)!.codeUnits) {
+        referenceColumn = referenceColumn * 26 + code - 64;
+      }
+      final referenceRow = int.parse(positionMatch.group(2)!) - 1;
+      if (referenceRow >= 0 &&
+          referenceRow < currentSheet.rows.length &&
+          referenceColumn - 1 >= 0 &&
+          referenceColumn - 1 < currentSheet.rows[referenceRow].cells.length) {
+        final referencedCell =
+            currentSheet.rows[referenceRow].cells[referenceColumn - 1];
+        debugPrint(
+          '[SpreadsheetController.editCell] referenced cell $reference: '
+          'value="${referencedCell.value}"; '
+          'formula="${referencedCell.formula}"',
+        );
+      } else {
+        debugPrint(
+          '[SpreadsheetController.editCell] referenced cell $reference: '
+          'does not exist in active sheet',
+        );
+      }
+      if (referenceRow == row && referenceColumn - 1 == column) {
+        debugPrint(
+          '[FormulaEngine.selfReference] target=($row,$column) '
+          'reference=$reference',
+        );
+      }
+    }
+
     // ----------------------------------------------------------
     // Record history point before mutation
     // ----------------------------------------------------------
@@ -139,7 +260,20 @@ class SpreadsheetController extends ChangeNotifier {
     // ----------------------------------------------------------
 
     final isFormula = _isFormula(value);
-    final newValue = value;
+    late final String newValue;
+    if (isFormula) {
+      debugPrint(
+        '[SpreadsheetController.formula] formula="$value" '
+        'target=($row,$column)',
+      );
+      newValue = _formulaEngine.evaluate(value, currentSpreadsheet);
+      debugPrint(
+        '[SpreadsheetController.formula.result] formula="$value" '
+        'result="$newValue"',
+      );
+    } else {
+      newValue = value;
+    }
     final newFormula = isFormula ? value : null;
 
     // ----------------------------------------------------------
@@ -148,9 +282,12 @@ class SpreadsheetController extends ChangeNotifier {
 
     final oldCell = currentRow.cells[column];
 
-    final newCell = oldCell.copyWith(
+    final newCell = CellModel(
+      row: oldCell.row,
+      column: oldCell.column,
       value: newValue,
       formula: newFormula,
+      isSelected: oldCell.isSelected,
       isEditing: false,
     );
 
@@ -206,9 +343,19 @@ class SpreadsheetController extends ChangeNotifier {
     // Replace spreadsheet
     // ----------------------------------------------------------
 
-    _spreadsheet = SpreadsheetModel(
+    final updatedSpreadsheet = SpreadsheetModel(
       sheets: newSheets,
       activeSheetIndex: activeSheetIndex,
+    );
+
+    _spreadsheet = _recalculateDependents(
+      updatedSpreadsheet,
+      {
+        FormulaDependencyGraph.addressFor(
+          row: row,
+          column: column,
+        ),
+      },
     );
 
     notifyListeners();
@@ -257,9 +404,8 @@ class SpreadsheetController extends ChangeNotifier {
         column <= endColumn;
         column++
       ) {
-        cells.add(
-          currentSheet.rows[row].cells[column].value,
-        );
+        final cell = currentSheet.rows[row].cells[column];
+        cells.add(cell.formula ?? cell.value);
       }
 
       rows.add(cells.join('\t'));
@@ -336,6 +482,7 @@ class SpreadsheetController extends ChangeNotifier {
 
     final newRows =
         List<RowModel>.from(currentSheet.rows);
+    final changedCells = <String>{};
 
     for (int pastedRow = 0;
         pastedRow < pastedRows.length;
@@ -365,7 +512,6 @@ class SpreadsheetController extends ChangeNotifier {
         final oldCell = currentRow.cells[targetColumn];
         final pastedValue = values[pastedColumn];
 
-        // Determine if pasted value is a formula
         final isFormula = _isFormula(pastedValue);
         final cellFormula = isFormula ? pastedValue : null;
 
@@ -376,6 +522,12 @@ class SpreadsheetController extends ChangeNotifier {
           formula: cellFormula,
           isSelected: oldCell.isSelected,
           isEditing: false,
+        );
+        changedCells.add(
+          FormulaDependencyGraph.addressFor(
+            row: targetRow,
+            column: targetColumn,
+          ),
         );
       }
 
@@ -409,9 +561,14 @@ class SpreadsheetController extends ChangeNotifier {
     // Replace spreadsheet
     // ----------------------------------------------------------
 
-    _spreadsheet = SpreadsheetModel(
+    final updatedSpreadsheet = SpreadsheetModel(
       sheets: newSheets,
       activeSheetIndex: activeSheetIndex,
+    );
+
+    _spreadsheet = _recalculateDependents(
+      updatedSpreadsheet,
+      changedCells,
     );
 
     notifyListeners();
@@ -475,6 +632,7 @@ class SpreadsheetController extends ChangeNotifier {
 
     final newRows =
         List<RowModel>.from(currentSheet.rows);
+    final changedCells = <String>{};
 
     for (int row = startRow; row <= endRow; row++) {
       if (row >= currentSheet.rows.length) {
@@ -505,6 +663,12 @@ class SpreadsheetController extends ChangeNotifier {
           formula: null,
           isSelected: oldCell.isSelected,
           isEditing: false,
+        );
+        changedCells.add(
+          FormulaDependencyGraph.addressFor(
+            row: row,
+            column: column,
+          ),
         );
       }
 
@@ -538,9 +702,14 @@ class SpreadsheetController extends ChangeNotifier {
     // Replace spreadsheet
     // ----------------------------------------------------------
 
-    _spreadsheet = SpreadsheetModel(
+    final updatedSpreadsheet = SpreadsheetModel(
       sheets: newSheets,
       activeSheetIndex: activeSheetIndex,
+    );
+
+    _spreadsheet = _recalculateDependents(
+      updatedSpreadsheet,
+      changedCells,
     );
 
     notifyListeners();
