@@ -53,6 +53,29 @@ void main() {
     expect(textField.controller!.selection.baseOffset, 1);
   });
 
+  testWidgets('keeps the initial formula character caret collapsed', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: CellEditor(
+            initialValue: '=',
+            onCommit: (_) {},
+            onCancel: () {},
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final textField = tester.widget<TextField>(find.byType(TextField));
+    expect(
+      textField.controller!.selection,
+      const TextSelection.collapsed(offset: 1),
+    );
+  });
+
   testWidgets('places the cursor after existing cell text', (tester) async {
     await tester.pumpWidget(
       MaterialApp(

@@ -29,6 +29,7 @@ class _CellEditorState extends State<CellEditor> {
   late final FocusNode _textFieldFocusNode;
 
   bool _finished = false;
+  bool _initialFocusSelectionScheduled = false;
 
   @override
   void initState() {
@@ -59,6 +60,7 @@ class _CellEditorState extends State<CellEditor> {
 
       // The TextField must own the actual input focus.
       _textFieldFocusNode.requestFocus();
+      _collapseSelectionAtEnd();
     });
   }
 
@@ -73,11 +75,19 @@ class _CellEditorState extends State<CellEditor> {
   }
 
   void _handleTextFieldFocusChange() {
-    if (!_textFieldFocusNode.hasFocus) {
+    if (!_textFieldFocusNode.hasFocus ||
+        _initialFocusSelectionScheduled) {
       return;
     }
 
-    _collapseSelectionAtEnd();
+    _initialFocusSelectionScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+
+      _collapseSelectionAtEnd();
+    });
   }
 
   void _insertReference() {

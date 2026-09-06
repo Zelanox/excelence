@@ -197,7 +197,9 @@ class _CellCanvasState extends State<CellCanvas> {
           behavior: HitTestBehavior.translucent,
 
           // Double-click → edit the selected cell.
-          onDoubleTap: () {
+          onDoubleTap: widget.viewportController.isEditing
+              ? null
+              : () {
             debugPrint(
               '[CellCanvas] editing begins at '
               '(${widget.viewportController.selection.startRow}, '
