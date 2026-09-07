@@ -163,3 +163,8 @@
 2026-08-03 00:05:59,978 - INFO - document - Opened document C:\Users\OS_10\AppData\Local\Temp\tmp12x9ep_9\search.xlsx
 2026-08-03 00:05:59,990 - INFO - document - Opened document C:\Users\OS_10\AppData\Local\Temp\tmpnkfv67bc\editing.xlsx
 2026-08-03 00:06:00,012 - INFO - document - Opened document C:\Users\OS_10\AppData\Local\Temp\tmp49aw95zr\failures.xlsx
+2026-09-07 12:33:13,301 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-07 12:44:11,368 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-07 12:58:39,945 - INFO - document - Opened document test.xlsx
+2026-09-07 12:59:34,378 - INFO - document - Opened document test.xlsx
+2026-09-07 18:02:11,984 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json

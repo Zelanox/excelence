@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:http/http.dart' as http;
 
 class ApiClient {
@@ -8,7 +10,9 @@ class ApiClient {
   final String baseUrl;
 
   Future<http.Response> get(String endpoint) {
-    return http.get(Uri.parse('$baseUrl$endpoint'));
+    return http.get(
+      Uri.parse('$baseUrl$endpoint'),
+    );
   }
 
   Future<http.Response> post(
@@ -17,7 +21,10 @@ class ApiClient {
   }) {
     return http.post(
       Uri.parse('$baseUrl$endpoint'),
-      body: body,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: body == null ? null : jsonEncode(body),
     );
   }
 
@@ -27,11 +34,16 @@ class ApiClient {
   }) {
     return http.put(
       Uri.parse('$baseUrl$endpoint'),
-      body: body,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: body == null ? null : jsonEncode(body),
     );
   }
 
   Future<http.Response> delete(String endpoint) {
-    return http.delete(Uri.parse('$baseUrl$endpoint'));
+    return http.delete(
+      Uri.parse('$baseUrl$endpoint'),
+    );
   }
 }
