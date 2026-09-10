@@ -27,6 +27,75 @@ class SpreadsheetController extends ChangeNotifier {
   bool get canRedo => _redoStack.isNotEmpty;
 
   // ============================================================
+  // Backend data
+  // ============================================================
+
+  Future<void> loadDocument(String filename) async {
+    try {
+      // 1. Ask the backend to open the workbook.
+      await _service.openDocument(filename);
+
+      // 2. Retrieve the workbook data.
+      final data = await _service.loadData();
+
+      // 3. Convert API data into our Flutter spreadsheet model.
+      final rows = <RowModel>[];
+
+      for (int rowIndex = 0; rowIndex < data.rows.length; rowIndex++) {
+        final apiRow = data.rows[rowIndex];
+
+        final cells = <CellModel>[];
+
+        for (int columnIndex = 0;
+            columnIndex < data.headers.length;
+            columnIndex++) {
+          final header = data.headers[columnIndex];
+
+          final rawValue = apiRow[header];
+
+          cells.add(
+            CellModel(
+              row: rowIndex,
+              column: columnIndex,
+              value: rawValue?.toString() ?? '',
+            ),
+          );
+        }
+
+        rows.add(
+          RowModel(
+            index: rowIndex,
+            cells: cells,
+          ),
+        );
+      }
+
+      _spreadsheet = SpreadsheetModel(
+        activeSheetIndex: 0,
+        sheets: [
+          SheetModel(
+            name: 'Sheet1',
+            rows: rows,
+          ),
+        ],
+      );
+
+      // A newly loaded workbook has no local undo/redo history.
+      _undoStack.clear();
+      _redoStack.clear();
+
+      notifyListeners();
+    } catch (error, stackTrace) {
+      debugPrint(
+        '[SpreadsheetController.loadDocument] Error: $error',
+      );
+      debugPrintStack(stackTrace: stackTrace);
+
+      rethrow;
+    }
+  }
+
+  // ============================================================
   // Mock data
   // ============================================================
 

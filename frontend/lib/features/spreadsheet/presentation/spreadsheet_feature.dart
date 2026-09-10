@@ -37,7 +37,7 @@ class _SpreadsheetFeatureState extends State<SpreadsheetFeature> {
       debugLabel: 'SpreadsheetViewportFocus',
     );
 
-    spreadsheetController.loadMockData();
+    spreadsheetController.loadDocument('test.xlsx');
   }
 
   @override
