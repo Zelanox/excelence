@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/viewport_model.dart';
-import '../presentation/widgets/viewport/hit_tester.dart';
+import '../services/hit_tester.dart';
 import '../models/cell_position.dart';
 import '../models/selection_model.dart';
 import '../models/visible_range_model.dart';
@@ -110,8 +110,10 @@ class ViewportController extends ChangeNotifier {
   }
 
   void selectCell(int row, int column) {
-    if (_selection.startRow == row &&
-        _selection.startColumn == column) {
+    final movingToDifferentCell =
+        _selection.startRow != row || _selection.startColumn != column;
+
+    if (!movingToDifferentCell) {
       return;
     }
 
@@ -121,6 +123,16 @@ class ViewportController extends ChangeNotifier {
       startColumn: column,
       endColumn: column,
     );
+
+    // Selecting a different cell always exits edit mode for whatever was
+    // being edited before. Committing that previous cell's in-progress
+    // text is the editing widget's own responsibility (it does so via its
+    // own focus-loss handling before this runs) - this just guarantees
+    // the NEW cell never opens in edit mode as a side effect of a plain
+    // single-tap selection change.
+    _isEditing = false;
+    _replaceInitialValue = false;
+    _initialEditValue = null;
 
     notifyListeners();
   }

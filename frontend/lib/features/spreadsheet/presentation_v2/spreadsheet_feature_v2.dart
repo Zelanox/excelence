@@ -4,38 +4,37 @@ import '../../../core/api/api_client.dart';
 import '../controllers/spreadsheet_controller.dart';
 import '../controllers/viewport_controller.dart';
 import '../services/spreadsheet_service.dart';
-import 'spreadsheet_view.dart';
-import '../../shell/widgets/formula_bar.dart';
+import 'widgets/spreadsheet_grid.dart';
 
-class SpreadsheetFeature extends StatefulWidget {
-  const SpreadsheetFeature({
-    super.key,
-  });
+/// The new (v2) spreadsheet feature, embedded directly inside the app's
+/// existing shell (menu bar / toolbar / status bar) - this is the v2
+/// counterpart to SpreadsheetFeature (v1), and is what Workspace embeds
+/// now that v2 is the active UI.
+///
+/// Unlike SpreadsheetScreenV2 (which wraps itself in its own Scaffold +
+/// AppBar for standalone route-based testing), this widget assumes it is
+/// already inside a Scaffold provided by ShellPage, and renders only the
+/// spreadsheet content itself.
+class SpreadsheetFeatureV2 extends StatefulWidget {
+  const SpreadsheetFeatureV2({super.key});
 
   @override
-  State<SpreadsheetFeature> createState() => _SpreadsheetFeatureState();
+  State<SpreadsheetFeatureV2> createState() => _SpreadsheetFeatureV2State();
 }
 
-class _SpreadsheetFeatureState extends State<SpreadsheetFeature> {
+class _SpreadsheetFeatureV2State extends State<SpreadsheetFeatureV2> {
   late final SpreadsheetController spreadsheetController;
   late final ViewportController viewportController;
-  late final FocusNode spreadsheetFocusNode;
 
   @override
   void initState() {
     super.initState();
 
-    final api = ApiClient(
-      baseUrl: "http://localhost:8000",
-    );
-
+    final api = ApiClient(baseUrl: 'http://localhost:8000');
     final service = SpreadsheetService(api);
 
     spreadsheetController = SpreadsheetController(service);
     viewportController = ViewportController();
-    spreadsheetFocusNode = FocusNode(
-      debugLabel: 'SpreadsheetViewportFocus',
-    );
 
     spreadsheetController.loadDocument('test.xlsx').then((_) {
       final spreadsheet = spreadsheetController.spreadsheet;
@@ -55,27 +54,14 @@ class _SpreadsheetFeatureState extends State<SpreadsheetFeature> {
   void dispose() {
     spreadsheetController.dispose();
     viewportController.dispose();
-    spreadsheetFocusNode.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        FormulaBar(
-          spreadsheetController: spreadsheetController,
-          viewportController: viewportController,
-          spreadsheetFocusNode: spreadsheetFocusNode,
-        ),
-        Expanded(
-          child: SpreadsheetView(
-            controller: spreadsheetController,
-            viewportController: viewportController,
-            focusNode: spreadsheetFocusNode,
-          ),
-        ),
-      ],
+    return SpreadsheetGrid(
+      spreadsheetController: spreadsheetController,
+      viewportController: viewportController,
     );
   }
 }
