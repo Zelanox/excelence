@@ -19,12 +19,49 @@ class ViewportController extends ChangeNotifier {
   
   final HitTester _hitTester = const HitTester();
 
+  // Bounds of the currently loaded sheet. These default to the old
+  // mock-data size (100 rows x 26 columns) so nothing breaks before a
+  // real document has loaded; setSheetBounds() should be called with the
+  // real dimensions as soon as a document/sheet is loaded or switched.
+  int _maxRow = 99;
+  int _maxColumn = 25;
+
   ViewportModel get viewport => _viewport;
   SelectionModel get selection => _selection;
   
   bool get isEditing => _isEditing;
   bool get replaceInitialValue => _replaceInitialValue;
   String? get initialEditValue => _initialEditValue;
+
+  /// Updates the valid row/column range for movement and selection.
+  ///
+  /// [rowCount] and [columnCount] are the sheet's actual size (e.g. 3 rows,
+  /// 3 columns for a freshly loaded 3x3 workbook). Call this whenever a
+  /// document is loaded or the active sheet changes, so keyboard
+  /// navigation can never move the selection past real data.
+  void setSheetBounds({
+    required int rowCount,
+    required int columnCount,
+  }) {
+    _maxRow = (rowCount - 1).clamp(0, rowCount <= 0 ? 0 : rowCount - 1);
+    _maxColumn = (columnCount - 1).clamp(0, columnCount <= 0 ? 0 : columnCount - 1);
+
+    // Clamp any existing selection into the new bounds so switching to a
+    // smaller sheet can't leave a stale out-of-range selection behind.
+    final clampedStartRow = _selection.startRow.clamp(0, _maxRow);
+    final clampedEndRow = _selection.endRow.clamp(0, _maxRow);
+    final clampedStartColumn = _selection.startColumn.clamp(0, _maxColumn);
+    final clampedEndColumn = _selection.endColumn.clamp(0, _maxColumn);
+
+    _selection = SelectionModel(
+      startRow: clampedStartRow,
+      endRow: clampedEndRow,
+      startColumn: clampedStartColumn,
+      endColumn: clampedEndColumn,
+    );
+
+    notifyListeners();
+  }
 
   void updateViewport(ViewportModel newViewport) {
     _viewport = newViewport;
@@ -151,7 +188,7 @@ class ViewportController extends ChangeNotifier {
     _stopEditingWithoutNotify();
 
     final row = _selection.endRow;
-    final column = (_selection.endColumn - 1).clamp(0, 25);
+    final column = (_selection.endColumn - 1).clamp(0, _maxColumn);
 
     selectCell(row, column);
   }
@@ -160,7 +197,7 @@ class ViewportController extends ChangeNotifier {
     _stopEditingWithoutNotify();
 
     final row = _selection.endRow;
-    final column = (_selection.endColumn + 1).clamp(0, 25);
+    final column = (_selection.endColumn + 1).clamp(0, _maxColumn);
 
     selectCell(row, column);
   }
@@ -168,7 +205,7 @@ class ViewportController extends ChangeNotifier {
   void moveUp() {
     _stopEditingWithoutNotify();
 
-    final row = (_selection.endRow - 1).clamp(0, 99);
+    final row = (_selection.endRow - 1).clamp(0, _maxRow);
     final column = _selection.endColumn;
 
     selectCell(row, column);
@@ -177,7 +214,7 @@ class ViewportController extends ChangeNotifier {
   void moveDown() {
     _stopEditingWithoutNotify();
 
-    final row = (_selection.endRow + 1).clamp(0, 99);
+    final row = (_selection.endRow + 1).clamp(0, _maxRow);
     final column = _selection.endColumn;
 
     selectCell(row, column);
@@ -187,7 +224,7 @@ class ViewportController extends ChangeNotifier {
     _stopEditingWithoutNotify();
 
     final row = _selection.endRow;
-    final column = (_selection.endColumn - 1).clamp(0, 25); 
+    final column = (_selection.endColumn - 1).clamp(0, _maxColumn); 
 
     _selection = SelectionModel(
       startRow: _selection.startRow,
@@ -203,7 +240,7 @@ class ViewportController extends ChangeNotifier {
     _stopEditingWithoutNotify();
 
     final row = _selection.endRow;
-    final column = (_selection.endColumn + 1).clamp(0, 25);
+    final column = (_selection.endColumn + 1).clamp(0, _maxColumn);
 
     _selection = SelectionModel(
       startRow: _selection.startRow,
@@ -218,7 +255,7 @@ class ViewportController extends ChangeNotifier {
   void extendSelectionUp() {
     _stopEditingWithoutNotify();
 
-    final row = (_selection.endRow - 1).clamp(0, 99);
+    final row = (_selection.endRow - 1).clamp(0, _maxRow);
     final column = _selection.endColumn;
 
     _selection = SelectionModel(
@@ -234,7 +271,7 @@ class ViewportController extends ChangeNotifier {
   void extendSelectionDown() {
     _stopEditingWithoutNotify();
 
-    final row = (_selection.endRow + 1).clamp(0, 99);
+    final row = (_selection.endRow + 1).clamp(0, _maxRow);
     final column = _selection.endColumn;
 
     _selection = SelectionModel(
@@ -253,13 +290,13 @@ class ViewportController extends ChangeNotifier {
     final row = _selection.endRow;
     final column = _selection.endColumn;
 
-    if (column < 25) {
+    if (column < _maxColumn) {
       selectCell(row, column + 1);
       return;
     }
 
     // Move to the first column of the next row.
-    if (row < 99) {
+    if (row < _maxRow) {
       selectCell(row + 1, 0);
     }
   }
@@ -277,7 +314,7 @@ class ViewportController extends ChangeNotifier {
 
     // Move to the last column of the previous row.
     if (row > 0) {
-      selectCell(row - 1, 25);
+      selectCell(row - 1, _maxColumn);
     }
   }
 

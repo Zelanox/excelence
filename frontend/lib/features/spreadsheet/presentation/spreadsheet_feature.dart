@@ -37,7 +37,18 @@ class _SpreadsheetFeatureState extends State<SpreadsheetFeature> {
       debugLabel: 'SpreadsheetViewportFocus',
     );
 
-    spreadsheetController.loadDocument('test.xlsx');
+    spreadsheetController.loadDocument('test.xlsx').then((_) {
+      final spreadsheet = spreadsheetController.spreadsheet;
+      if (spreadsheet == null) {
+        return;
+      }
+      viewportController.setSheetBounds(
+        rowCount: spreadsheet.activeSheet.rows.length,
+        columnCount: spreadsheet.activeSheet.rows.isEmpty
+            ? 0
+            : spreadsheet.activeSheet.rows.first.cells.length,
+      );
+    });
   }
 
   @override

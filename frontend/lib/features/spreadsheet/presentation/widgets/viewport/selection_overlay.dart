@@ -152,119 +152,145 @@ class _SpreadsheetSelectionOverlayState
           children: [
             // ====================================================
             // SELECTION
+            //
+            // NOTE: every entry in this list is now ALWAYS present
+            // (never conditionally omitted). Previously these were
+            // `if (...) Positioned(...)` entries, which meant the
+            // list's length/order shifted depending on isEditing
+            // and the formula-reference drag state. That shifting
+            // defeated Flutter's key-based diffing for CellEditor
+            // below (its position in the children list kept
+            // changing), causing it to be destroyed and recreated
+            // on every pointer event instead of preserved - which
+            // wiped out in-progress formula text on every click.
+            // Using SizedBox.shrink() as an always-present "empty"
+            // placeholder keeps every child's list position and
+            // key stable across rebuilds.
             // ====================================================
 
-            if (!widget.viewportController.isEditing)
-              Positioned(
-                left: selectionLeft,
-                top: selectionTop,
-                width: selectionWidth,
-                height: selectionHeight,
-                child: IgnorePointer(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.blue.withValues(
-                        alpha: 0.08,
-                      ),
-                      border: Border.all(
-                        color: Colors.blue,
-                        width: 2,
+            KeyedSubtree(
+              key: const ValueKey('selection_highlight'),
+              child: widget.viewportController.isEditing
+                  ? const SizedBox.shrink()
+                  : Positioned(
+                      left: selectionLeft,
+                      top: selectionTop,
+                      width: selectionWidth,
+                      height: selectionHeight,
+                      child: IgnorePointer(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withValues(
+                              alpha: 0.08,
+                            ),
+                            border: Border.all(
+                              color: Colors.blue,
+                              width: 2,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
-              ),
+            ),
 
-            if (widget.viewportController.isEditing &&
-                widget.formulaReferenceStart != null &&
-                widget.formulaReferenceEnd != null)
-              Positioned(
-                left: (widget.formulaReferenceStart!.column <
-                            widget.formulaReferenceEnd!.column
-                        ? widget.formulaReferenceStart!.column
-                        : widget.formulaReferenceEnd!.column) *
-                    cellWidth -
-                    viewport.scrollX,
-                top: (widget.formulaReferenceStart!.row <
-                            widget.formulaReferenceEnd!.row
-                        ? widget.formulaReferenceStart!.row
-                        : widget.formulaReferenceEnd!.row) *
-                    cellHeight -
-                    viewport.scrollY,
-                width: ((widget.formulaReferenceStart!.column >
-                                widget.formulaReferenceEnd!.column
-                            ? widget.formulaReferenceStart!.column
-                            : widget.formulaReferenceEnd!.column) -
-                        (widget.formulaReferenceStart!.column <
-                                widget.formulaReferenceEnd!.column
-                            ? widget.formulaReferenceStart!.column
-                            : widget.formulaReferenceEnd!.column) +
-                        1) *
-                    cellWidth,
-                height: ((widget.formulaReferenceStart!.row >
-                                widget.formulaReferenceEnd!.row
-                            ? widget.formulaReferenceStart!.row
-                            : widget.formulaReferenceEnd!.row) -
-                        (widget.formulaReferenceStart!.row <
-                                widget.formulaReferenceEnd!.row
-                            ? widget.formulaReferenceStart!.row
-                            : widget.formulaReferenceEnd!.row) +
-                        1) *
-                    cellHeight,
-                child: IgnorePointer(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.orange.withValues(alpha: 0.12),
-                      border: Border.all(
-                        color: Colors.orange,
-                        width: 2,
+            KeyedSubtree(
+              key: const ValueKey('formula_reference_highlight'),
+              child: (widget.viewportController.isEditing &&
+                      widget.formulaReferenceStart != null &&
+                      widget.formulaReferenceEnd != null)
+                  ? Positioned(
+                      left: (widget.formulaReferenceStart!.column <
+                                  widget.formulaReferenceEnd!.column
+                              ? widget.formulaReferenceStart!.column
+                              : widget.formulaReferenceEnd!.column) *
+                          cellWidth -
+                          viewport.scrollX,
+                      top: (widget.formulaReferenceStart!.row <
+                                  widget.formulaReferenceEnd!.row
+                              ? widget.formulaReferenceStart!.row
+                              : widget.formulaReferenceEnd!.row) *
+                          cellHeight -
+                          viewport.scrollY,
+                      width: ((widget.formulaReferenceStart!.column >
+                                      widget.formulaReferenceEnd!.column
+                                  ? widget.formulaReferenceStart!.column
+                                  : widget.formulaReferenceEnd!.column) -
+                              (widget.formulaReferenceStart!.column <
+                                      widget.formulaReferenceEnd!.column
+                                  ? widget.formulaReferenceStart!.column
+                                  : widget.formulaReferenceEnd!.column) +
+                              1) *
+                          cellWidth,
+                      height: ((widget.formulaReferenceStart!.row >
+                                      widget.formulaReferenceEnd!.row
+                                  ? widget.formulaReferenceStart!.row
+                                  : widget.formulaReferenceEnd!.row) -
+                              (widget.formulaReferenceStart!.row <
+                                      widget.formulaReferenceEnd!.row
+                                  ? widget.formulaReferenceStart!.row
+                                  : widget.formulaReferenceEnd!.row) +
+                              1) *
+                          cellHeight,
+                      child: IgnorePointer(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withValues(alpha: 0.12),
+                            border: Border.all(
+                              color: Colors.orange,
+                              width: 2,
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                ),
-              ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
 
             // ====================================================
             // CELL EDITOR
             // ====================================================
 
-            if (widget.viewportController.isEditing)
-              Positioned(
-                left: editorLeft,
-                top: editorTop,
-                width: cellWidth,
-                height: cellHeight,
-                child: CellEditor(
-                  key: ValueKey(
-                    'editor_${selection.startRow}_${selection.startColumn}',
-                  ),
+            KeyedSubtree(
+              key: const ValueKey('cell_editor_slot'),
+              child: widget.viewportController.isEditing
+                  ? Positioned(
+                      left: editorLeft,
+                      top: editorTop,
+                      width: cellWidth,
+                      height: cellHeight,
+                      child: CellEditor(
+                        key: ValueKey(
+                          'editor_${selection.startRow}_${selection.startColumn}',
+                        ),
 
-                  initialValue:
-                      widget.viewportController.initialEditValue ??
-                      activeCell.value,
-                    referenceInsertion: widget.referenceInsertion,
+                        initialValue:
+                            widget.viewportController.initialEditValue ??
+                            activeCell.value,
+                        referenceInsertion: widget.referenceInsertion,
 
-                  onCommit: (value) {
-                    debugPrint(
-                      '[SelectionOverlay.commit] '
-                      'targetRow=${selection.startRow} '
-                      'targetColumn=${selection.startColumn} '
-                      'text="$value"',
-                    );
-                    widget.spreadsheetController.editCell(
-                      row: selection.startRow,
-                      column: selection.startColumn,
-                      value: value,
-                    );
+                        onCommit: (value) {
+                          debugPrint(
+                            '[SelectionOverlay.commit] '
+                            'targetRow=${selection.startRow} '
+                            'targetColumn=${selection.startColumn} '
+                            'text="$value"',
+                          );
+                          widget.spreadsheetController.editCell(
+                            row: selection.startRow,
+                            column: selection.startColumn,
+                            value: value,
+                          );
 
-                    _finishEditing();
-                  },
+                          _finishEditing();
+                        },
 
-                  onCancel: () {
-                    _finishEditing();
-                  },
-                ),
-              ),
+                        onCancel: () {
+                          _finishEditing();
+                        },
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
           ],
         );
       },

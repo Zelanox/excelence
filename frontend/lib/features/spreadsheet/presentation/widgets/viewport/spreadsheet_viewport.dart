@@ -50,8 +50,19 @@ class _SpreadsheetViewportState
   Size? _cellViewportSize;
   final ValueNotifier<String?> _formulaReferenceInsertion =
       ValueNotifier(null);
-  CellPosition? _formulaReferenceStart;
-  CellPosition? _formulaReferenceEnd;
+
+  // Formula-reference drag-selection range (while dragging across cells to
+  // insert e.g. "A1:C3" into a formula). This is a ValueNotifier rather
+  // than plain State fields so that updating it during pointer move/down
+  // only rebuilds the small overlay that displays the drag highlight -
+  // NOT the entire viewport tree (which previously included CellCanvas
+  // and the CellEditor inside SpreadsheetSelectionOverlay). Rebuilding
+  // that whole tree via setState() was destroying and recreating the
+  // CellEditor's TextEditingController on every click, which discarded
+  // whatever formula text had been typed/inserted so far.
+  final ValueNotifier<({CellPosition? start, CellPosition? end})>
+      _formulaReferenceRange =
+      ValueNotifier((start: null, end: null));
 
   @override
   void initState() {
@@ -80,6 +91,7 @@ class _SpreadsheetViewportState
 
     _scroll.dispose();
     _formulaReferenceInsertion.dispose();
+    _formulaReferenceRange.dispose();
 
     super.dispose();
   }
@@ -177,14 +189,12 @@ class _SpreadsheetViewportState
       'resolved=(${position.row},${position.column})',
     );
 
-    setState(() {
-      _formulaReferenceStart = position;
-      _formulaReferenceEnd = position;
-    });
+    _formulaReferenceRange.value = (start: position, end: position);
   }
 
   void _updateFormulaReferenceSelection(Offset offset) {
-    if (_formulaReferenceStart == null) {
+    final start = _formulaReferenceRange.value.start;
+    if (start == null) {
       return;
     }
 
@@ -199,13 +209,11 @@ class _SpreadsheetViewportState
       'resolved=(${position.row},${position.column})',
     );
 
-    setState(() {
-      _formulaReferenceEnd = position;
-    });
+    _formulaReferenceRange.value = (start: start, end: position);
   }
 
   void _finishFormulaReferenceSelection(Offset offset) {
-    final start = _formulaReferenceStart;
+    final start = _formulaReferenceRange.value.start;
     if (start == null) {
       return;
     }
@@ -246,10 +254,7 @@ class _SpreadsheetViewportState
 
     _formulaReferenceInsertion.value = reference;
 
-    setState(() {
-      _formulaReferenceStart = null;
-      _formulaReferenceEnd = null;
-    });
+    _formulaReferenceRange.value = (start: null, end: null);
   }
 
   void _handleViewportPointerDown() {
@@ -585,6 +590,7 @@ class _SpreadsheetViewportState
                             // ----------------------------------------
 
                             CellCanvas(
+                              key: const ValueKey('cell_canvas'),
                               horizontalController:
                                   _scroll.horizontal,
                               verticalController:
@@ -605,20 +611,26 @@ class _SpreadsheetViewportState
                             // SELECTION + EDITOR
                             // ----------------------------------------
 
-                            SpreadsheetSelectionOverlay(
-                              viewportController:
-                                  widget.viewportController,
-                              spreadsheet:
-                                  widget.spreadsheet,
-                              spreadsheetController:
-                                  widget.spreadsheetController,
-                                focusNode: widget.focusNode,
-                                referenceInsertion:
-                                  _formulaReferenceInsertion,
-                                formulaReferenceStart:
-                                  _formulaReferenceStart,
-                                formulaReferenceEnd:
-                                  _formulaReferenceEnd,
+                            ValueListenableBuilder<
+                                ({CellPosition? start, CellPosition? end})>(
+                              valueListenable: _formulaReferenceRange,
+                              builder: (context, range, _) {
+                                return SpreadsheetSelectionOverlay(
+                                  key: const ValueKey(
+                                      'spreadsheet_selection_overlay'),
+                                  viewportController:
+                                      widget.viewportController,
+                                  spreadsheet:
+                                      widget.spreadsheet,
+                                  spreadsheetController:
+                                      widget.spreadsheetController,
+                                  focusNode: widget.focusNode,
+                                  referenceInsertion:
+                                      _formulaReferenceInsertion,
+                                  formulaReferenceStart: range.start,
+                                  formulaReferenceEnd: range.end,
+                                );
+                              },
                             ),
                           ],
                         );

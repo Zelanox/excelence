@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from backend.api.status import router as status_router
@@ -16,6 +17,19 @@ app = FastAPI(
     description="Local spreadsheet API for Excelence.",
     docs_url="/docs",
     redoc_url="/redoc"
+)
+
+# Excelence is a local-first desktop/web app talking to a locally-run backend,
+# so we allow any localhost/127.0.0.1 origin regardless of port (flutter run
+# -d chrome picks a random port each launch). allow_credentials stays False
+# since we don't use cookies - this keeps allow_origin_regex valid under CORS
+# rules (browsers reject "*" + credentials=True together).
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:\d+)?",
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(status_router)

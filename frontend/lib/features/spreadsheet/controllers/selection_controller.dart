@@ -6,6 +6,7 @@ import '../presentation/widgets/viewport/hit_tester.dart';
 
 class SelectionController extends ChangeNotifier {
   SelectionModel _selection = const SelectionModel();
+  final HitTester _hitTester = const HitTester();
 
   SelectionModel get selection => _selection;
 
@@ -20,13 +21,17 @@ class SelectionController extends ChangeNotifier {
     notifyListeners();
   }
 
-    void selectFromPixel({
+  void selectFromPixel({
     required double x,
     required double y,
+    double scrollX = 0,
+    double scrollY = 0,
   }) {
     final CellPosition position = _hitTester.fromPixel(
       x: x,
       y: y,
+      scrollX: scrollX,
+      scrollY: scrollY,
     );
 
     selectCell(

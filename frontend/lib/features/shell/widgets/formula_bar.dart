@@ -63,8 +63,23 @@ class _FormulaBarState extends State<FormulaBar> {
     }
 
     final selection = widget.viewportController.selection;
-    final cell = spreadsheet.activeSheet.rows[selection.activeRow]
-        .cells[selection.activeColumn];
+    final rows = spreadsheet.activeSheet.rows;
+
+    // Defensive bounds check: the viewport controller is responsible for
+    // keeping the selection within the loaded sheet's size, but we guard
+    // here too so a stale/out-of-range selection can never crash the
+    // formula bar (e.g. right after switching to a smaller document).
+    if (selection.activeRow < 0 ||
+        selection.activeRow >= rows.length) {
+      return;
+    }
+    final cells = rows[selection.activeRow].cells;
+    if (selection.activeColumn < 0 ||
+        selection.activeColumn >= cells.length) {
+      return;
+    }
+
+    final cell = cells[selection.activeColumn];
     final text = cell.formula ?? cell.value;
     if (_controller.text != text) {
       _controller.value = TextEditingValue(
