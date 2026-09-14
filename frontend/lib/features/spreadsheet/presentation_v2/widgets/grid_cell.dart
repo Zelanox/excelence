@@ -31,12 +31,37 @@ class GridCell extends StatefulWidget {
     required this.column,
     required this.spreadsheetController,
     required this.viewportController,
+    required this.gridFocusNode,
+    this.onDragStart,
+    this.onDragEnter,
+    this.onDragEnd,
   });
 
   final int row;
   final int column;
   final SpreadsheetController spreadsheetController;
   final ViewportController viewportController;
+
+  /// The parent SpreadsheetGrid's FocusNode. Reclaimed by this cell after
+  /// committing an edit (Enter/Tab), since committing moves selection and
+  /// swaps this cell back to its non-editing (GestureDetector) form -
+  /// without explicitly requesting it, keyboard focus would otherwise be
+  /// left on the just-disposed TextField's focus node, leaving arrow-key
+  /// navigation unresponsive until the user clicks or tabs manually.
+  final FocusNode gridFocusNode;
+
+  /// Called when a drag gesture begins on this cell (mouse-down + move).
+  /// The grid uses this to start a range selection anchored here.
+  final void Function(int row, int column)? onDragStart;
+
+  /// Called when the pointer enters this cell's bounds while a drag is in
+  /// progress (regardless of which cell the drag started on). The grid
+  /// uses this to extend the in-progress range selection to include this
+  /// cell.
+  final void Function(int row, int column)? onDragEnter;
+
+  /// Called when the drag gesture ends (mouse-up) on this cell.
+  final VoidCallback? onDragEnd;
 
   @override
   State<GridCell> createState() => _GridCellState();
@@ -85,6 +110,31 @@ class _GridCellState extends State<GridCell> {
       value: _textController.text,
     );
     widget.viewportController.stopEditing();
+
+    // Return keyboard focus to the grid so arrow-key navigation works
+    // immediately after committing, without requiring an extra click or
+    // Tab press. Deferred to the next frame since this cell is mid-swap
+    // from its editing (TextField) form back to its plain form.
+    //
+    // Guarded against widget.viewportController.isEditing: if committing
+    // this cell was triggered by a double-click landing on a DIFFERENT
+    // cell (which starts editing that cell in the same gesture), we must
+    // not steal focus back from that new cell's TextField.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!widget.viewportController.isEditing) {
+        widget.gridFocusNode.requestFocus();
+      }
+    });
+  }
+
+  void _commitAndMoveDown() {
+    _commit();
+    widget.viewportController.moveDown();
+  }
+
+  void _commitAndMoveRight() {
+    _commit();
+    widget.viewportController.moveRight();
   }
 
   void _cancel() {
@@ -153,24 +203,28 @@ class _GridCellState extends State<GridCell> {
               border: Border.all(color: Colors.blue, width: 2),
             ),
             padding: const EdgeInsets.symmetric(horizontal: 2),
-            child: KeyboardListener(
-              focusNode: FocusNode(skipTraversal: true),
-              onKeyEvent: (event) {
+            child: Focus(
+              skipTraversal: true,
+              onKeyEvent: (node, event) {
                 if (event is! KeyDownEvent) {
-                  return;
+                  return KeyEventResult.ignored;
                 }
                 if (event.logicalKey == LogicalKeyboardKey.escape) {
                   _cancel();
-                } else if (event.logicalKey ==
-                        LogicalKeyboardKey.enter ||
-                    event.logicalKey == LogicalKeyboardKey.tab) {
-                  // TextField's onSubmitted handles Enter already; Tab
-                  // is handled here since TextField doesn't fire
-                  // onSubmitted for it.
-                  if (event.logicalKey == LogicalKeyboardKey.tab) {
-                    _commit();
-                  }
+                  return KeyEventResult.handled;
                 }
+                if (event.logicalKey == LogicalKeyboardKey.tab) {
+                  // TextField/EditableText has its own built-in Tab
+                  // handling (focus traversal to the next widget) which
+                  // would otherwise ALSO fire alongside our own
+                  // commit-and-move, causing a double move. Returning
+                  // "handled" here stops that built-in behavior from
+                  // running at all - we fully own Tab's meaning inside
+                  // an editing cell.
+                  _commitAndMoveRight();
+                  return KeyEventResult.handled;
+                }
+                return KeyEventResult.ignored;
               },
               child: TextField(
                 controller: _textController,
@@ -182,41 +236,53 @@ class _GridCellState extends State<GridCell> {
                   isDense: true,
                   contentPadding: EdgeInsets.symmetric(vertical: 4),
                 ),
-                onSubmitted: (_) => _commit(),
+                onSubmitted: (_) => _commitAndMoveDown(),
               ),
             ),
           );
         }
 
-        return GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () {
-            widget.viewportController.selectCell(widget.row, widget.column);
+        return MouseRegion(
+          onEnter: (_) {
+            widget.onDragEnter?.call(widget.row, widget.column);
           },
-          onDoubleTap: () {
-            widget.viewportController
-                .selectCell(widget.row, widget.column);
-            widget.viewportController.startEditing();
-          },
-          child: Container(
-            decoration: BoxDecoration(
-              color: isSelected
-                  ? Colors.blue.withValues(alpha: 0.08)
-                  : Colors.white,
-              border: Border.all(
-                color: isActiveCell
-                    ? Colors.blue
-                    : Colors.grey.shade300,
-                width: isActiveCell ? 2 : 0.5,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () {
+              widget.viewportController
+                  .selectCell(widget.row, widget.column);
+            },
+            onDoubleTap: () {
+              widget.viewportController
+                  .selectCell(widget.row, widget.column);
+              widget.viewportController.startEditing();
+            },
+            onPanStart: (_) {
+              widget.onDragStart?.call(widget.row, widget.column);
+            },
+            onPanEnd: (_) {
+              widget.onDragEnd?.call();
+            },
+            child: Container(
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? Colors.blue.withValues(alpha: 0.08)
+                    : Colors.white,
+                border: Border.all(
+                  color: isActiveCell
+                      ? Colors.blue
+                      : Colors.grey.shade300,
+                  width: isActiveCell ? 2 : 0.5,
+                ),
               ),
-            ),
-            alignment: Alignment.centerLeft,
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Text(
-              cell.value,
-              overflow: TextOverflow.ellipsis,
-              maxLines: 1,
-              style: const TextStyle(fontSize: 12),
+              alignment: Alignment.centerLeft,
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Text(
+                cell.value,
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+                style: const TextStyle(fontSize: 12),
+              ),
             ),
           ),
         );

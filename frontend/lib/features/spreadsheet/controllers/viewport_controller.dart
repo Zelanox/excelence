@@ -196,6 +196,51 @@ class ViewportController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Begins a drag-range selection anchored at the given cell. Unlike
+  /// [selectCell], this does not clear editing state via the same path -
+  /// callers (e.g. SpreadsheetGrid's drag handler) are expected to only
+  /// invoke this when not currently editing, since a drag gesture starting
+  /// on a cell is a selection action, not a navigation one.
+  void startSelectionAt(int row, int column) {
+    final clampedRow = row.clamp(0, _maxRow);
+    final clampedColumn = column.clamp(0, _maxColumn);
+
+    _selection = SelectionModel(
+      startRow: clampedRow,
+      endRow: clampedRow,
+      startColumn: clampedColumn,
+      endColumn: clampedColumn,
+    );
+
+    _isEditing = false;
+    _replaceInitialValue = false;
+    _initialEditValue = null;
+
+    notifyListeners();
+  }
+
+  /// Extends an in-progress drag-range selection to the given cell,
+  /// keeping the original anchor (the cell [startSelectionAt] was called
+  /// with) fixed as startRow/startColumn.
+  void extendSelectionTo(int row, int column) {
+    final clampedRow = row.clamp(0, _maxRow);
+    final clampedColumn = column.clamp(0, _maxColumn);
+
+    if (_selection.endRow == clampedRow &&
+        _selection.endColumn == clampedColumn) {
+      return;
+    }
+
+    _selection = SelectionModel(
+      startRow: _selection.startRow,
+      startColumn: _selection.startColumn,
+      endRow: clampedRow,
+      endColumn: clampedColumn,
+    );
+
+    notifyListeners();
+  }
+
   void moveLeft() {
     _stopEditingWithoutNotify();
 
