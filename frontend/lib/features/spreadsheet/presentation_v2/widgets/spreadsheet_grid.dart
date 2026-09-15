@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../controllers/spreadsheet_controller.dart';
 import '../../controllers/viewport_controller.dart';
+import '../column_naming.dart';
 import 'grid_cell.dart';
 import 'grid_column_header.dart';
 import 'grid_row_header.dart';
@@ -59,10 +60,36 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
   // IS the shared state other widgets (GridCell) read from.
   bool _isDragging = false;
 
+  // True while the actively-editing cell's in-progress text is a formula
+  // (starts with "="). Reported UP from the editing GridCell (which is
+  // the only widget that actually knows its own live, uncommitted text),
+  // via onFormulaEditingChanged. While true, a plain click on another
+  // cell means "insert a reference to that cell into the formula" rather
+  // than the normal "commit and select that cell" - so this flag changes
+  // what GridCell.onTap does grid-wide, not just the editing cell.
+  bool _isEditingFormula = false;
+
+  // Carries a clicked cell's reference text (e.g. "B3") DOWN to whichever
+  // GridCell is actively editing, so it can splice that text into its own
+  // TextField at the current cursor position. Owned by the grid (the only
+  // widget that knows about every cell), listened to by the editing cell
+  // only. Set back to null immediately after being read/consumed.
+  final ValueNotifier<String?> _formulaReferenceToInsert =
+      ValueNotifier(null);
+
   @override
   void dispose() {
     _gridFocusNode.dispose();
+    _formulaReferenceToInsert.dispose();
     super.dispose();
+  }
+
+  void _handleFormulaEditingChanged(bool isFormula) {
+    if (_isEditingFormula != isFormula) {
+      setState(() {
+        _isEditingFormula = isFormula;
+      });
+    }
   }
 
   void _handleDragStart(int row, int column) {
@@ -85,6 +112,59 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
     _isDragging = false;
   }
 
+  String _referenceFor(int row, int column) {
+    return '${columnLetterName(column)}${row + 1}';
+  }
+
+  void _handleCellTapDuringFormulaEdit(int row, int column) {
+    debugPrint(
+      '[SpreadsheetGrid._handleCellTapDuringFormulaEdit] '
+      'row=$row column=$column '
+      'primaryFocusBefore=${FocusManager.instance.primaryFocus}',
+    );
+    _formulaReferenceToInsert.value = _referenceFor(row, column);
+  }
+
+  Future<void> _handleCopy({required bool andClear}) async {
+    await widget.spreadsheetController
+        .copySelection(widget.viewportController.selection);
+    if (andClear) {
+      widget.spreadsheetController
+          .clearSelection(widget.viewportController.selection);
+    }
+  }
+
+  Future<void> _handlePaste() async {
+    final clipboardData =
+        await Clipboard.getData(Clipboard.kTextPlain);
+    final text = clipboardData?.text;
+    if (text == null) {
+      return;
+    }
+    final selection = widget.viewportController.selection;
+    final targetRow =
+        selection.startRow <= selection.endRow
+            ? selection.startRow
+            : selection.endRow;
+    final targetColumn =
+        selection.startColumn <= selection.endColumn
+            ? selection.startColumn
+            : selection.endColumn;
+
+    await widget.spreadsheetController.pasteClipboard(
+      row: targetRow,
+      column: targetColumn,
+      clipboardText: text,
+    );
+  }
+
+  void _startEditingWithCharacter(String character) {
+    widget.viewportController.startEditing(
+      replaceInitialValue: true,
+      initialValue: character,
+    );
+  }
+
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent) {
       return KeyEventResult.ignored;
@@ -94,6 +174,36 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
     // (for normal text-cursor movement) - don't intercept arrow keys here.
     if (widget.viewportController.isEditing) {
       return KeyEventResult.ignored;
+    }
+
+    final isCtrlOrCmd = HardwareKeyboard.instance.isControlPressed ||
+        HardwareKeyboard.instance.isMetaPressed;
+    final isShift = HardwareKeyboard.instance.isShiftPressed;
+
+    if (isCtrlOrCmd) {
+      switch (event.logicalKey) {
+        case LogicalKeyboardKey.keyC:
+          _handleCopy(andClear: false);
+          return KeyEventResult.handled;
+        case LogicalKeyboardKey.keyX:
+          _handleCopy(andClear: true);
+          return KeyEventResult.handled;
+        case LogicalKeyboardKey.keyV:
+          _handlePaste();
+          return KeyEventResult.handled;
+        case LogicalKeyboardKey.keyZ:
+          if (isShift) {
+            widget.spreadsheetController.redo();
+          } else {
+            widget.spreadsheetController.undo();
+          }
+          return KeyEventResult.handled;
+        case LogicalKeyboardKey.keyY:
+          widget.spreadsheetController.redo();
+          return KeyEventResult.handled;
+        default:
+          return KeyEventResult.ignored;
+      }
     }
 
     switch (event.logicalKey) {
@@ -115,7 +225,25 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
       case LogicalKeyboardKey.enter:
         widget.viewportController.moveDown();
         return KeyEventResult.handled;
+      case LogicalKeyboardKey.delete:
+      case LogicalKeyboardKey.backspace:
+        widget.spreadsheetController
+            .clearSelection(widget.viewportController.selection);
+        return KeyEventResult.handled;
       default:
+        // Typing a plain printable character while a cell is selected
+        // (but not yet editing) starts editing that cell, REPLACING its
+        // existing content with what was typed - matching standard
+        // spreadsheet behavior (Excel/Sheets). event.character is null
+        // for non-printable/modifier keys, so those fall through here
+        // harmlessly as ignored.
+        final character = event.character;
+        if (character != null &&
+            character.isNotEmpty &&
+            !HardwareKeyboard.instance.isAltPressed) {
+          _startEditingWithCharacter(character);
+          return KeyEventResult.handled;
+        }
         return KeyEventResult.ignored;
     }
   }
@@ -215,6 +343,14 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
                                 onDragStart: _handleDragStart,
                                 onDragEnter: _handleDragEnter,
                                 onDragEnd: _handleDragEnd,
+                                isFormulaReferencePickingActive:
+                                    _isEditingFormula,
+                                onCellTapDuringFormulaEdit:
+                                    _handleCellTapDuringFormulaEdit,
+                                onFormulaEditingChanged:
+                                    _handleFormulaEditingChanged,
+                                formulaReferenceToInsert:
+                                    _formulaReferenceToInsert,
                               ),
                             ),
                         ],
