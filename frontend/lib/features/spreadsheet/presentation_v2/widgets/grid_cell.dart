@@ -105,19 +105,41 @@ class _GridCellState extends State<GridCell> {
   void initState() {
     super.initState();
     _textController = TextEditingController();
-    _focusNode = FocusNode();
+    // The Escape/Tab key handling lives directly on this FocusNode (via
+    // onKeyEvent) rather than on a separate wrapping Focus widget. Per
+    // Flutter's own guidance, a FocusNode should not be shared between
+    // two different Focus-family widgets (they fight over managing it),
+    // and an extra unlabeled Focus ancestor around the TextField was
+    // creating a second, separate focus node in the tree - which is what
+    // was causing requestFocus() calls to not reliably land primary
+    // focus on the TextField's actual EditableText.
+    _focusNode = FocusNode(onKeyEvent: _handleEditorKeyEvent);
     _focusNode.addListener(_handleFocusChange);
     _textController.addListener(_handleTextChanged);
   }
 
+  KeyEventResult _handleEditorKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) {
+      return KeyEventResult.ignored;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.escape) {
+      _cancel();
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.tab) {
+      // TextField/EditableText has its own built-in Tab handling (focus
+      // traversal to the next widget) which would otherwise ALSO fire
+      // alongside our own commit-and-move, causing a double move.
+      // Returning "handled" here stops that built-in behavior from
+      // running at all - we fully own Tab's meaning inside an editing
+      // cell.
+      _commitAndMoveRight();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
   void _handleFocusChange() {
-    debugPrint(
-      '[GridCell._handleFocusChange] row=${widget.row} '
-      'column=${widget.column} hasFocus=${_focusNode.hasFocus} '
-      'isThisCellActive=$_isThisCellActive '
-      'viewportIsEditing=${widget.viewportController.isEditing} '
-      'isFormula=$_isFormula',
-    );
     // Losing focus while this cell is the one being edited means the user
     // clicked elsewhere (another cell, outside the grid, etc.) without
     // pressing Enter/Tab first. Standard spreadsheet behavior is to
@@ -132,7 +154,6 @@ class _GridCellState extends State<GridCell> {
         _isThisCellActive &&
         widget.viewportController.isEditing &&
         !_isFormula) {
-      debugPrint('[GridCell._handleFocusChange] COMMITTING due to focus loss');
       _commit();
     }
   }
@@ -153,12 +174,6 @@ class _GridCellState extends State<GridCell> {
     if (reference == null || reference.isEmpty) {
       return;
     }
-    debugPrint(
-      '[GridCell._handleReferenceToInsert] row=${widget.row} '
-      'column=${widget.column} reference="$reference" '
-      'focusHasFocus=${_focusNode.hasFocus} '
-      'primaryFocus=${FocusManager.instance.primaryFocus}',
-    );
     // Consume it immediately so it isn't re-applied on a future rebuild.
     widget.formulaReferenceToInsert!.value = null;
 
@@ -171,11 +186,16 @@ class _GridCellState extends State<GridCell> {
       text: newText,
       selection: TextSelection.collapsed(offset: insertAt + reference.length),
     );
-    debugPrint(
-      '[GridCell._handleReferenceToInsert] after insert, '
-      'focusHasFocus=${_focusNode.hasFocus} '
-      'primaryFocus=${FocusManager.instance.primaryFocus}',
-    );
+
+    // Explicitly reclaim focus after inserting a reference. Something in
+    // the tap-on-another-cell interaction is causing focus to end up
+    // elsewhere even though this cell remains the one being edited; this
+    // restores it so the caret and further typing keep working.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _isThisCellActive && widget.viewportController.isEditing) {
+        _focusNode.requestFocus();
+      }
+    });
   }
 
   void _syncReferenceListener() {
@@ -361,12 +381,6 @@ class _GridCellState extends State<GridCell> {
             if (mounted) {
               _handleTextChanged();
               _focusNode.requestFocus();
-              debugPrint(
-                '[GridCell] requested focus for row=${widget.row} '
-                'column=${widget.column}, hasFocus after request='
-                '${_focusNode.hasFocus}, '
-                'primaryFocus=${FocusManager.instance.primaryFocus}',
-              );
             }
           });
         }
@@ -380,41 +394,28 @@ class _GridCellState extends State<GridCell> {
               border: Border.all(color: Colors.blue, width: 2),
             ),
             padding: const EdgeInsets.symmetric(horizontal: 2),
-            child: Focus(
-              skipTraversal: true,
-              onKeyEvent: (node, event) {
-                if (event is! KeyDownEvent) {
-                  return KeyEventResult.ignored;
-                }
-                if (event.logicalKey == LogicalKeyboardKey.escape) {
-                  _cancel();
-                  return KeyEventResult.handled;
-                }
-                if (event.logicalKey == LogicalKeyboardKey.tab) {
-                  // TextField/EditableText has its own built-in Tab
-                  // handling (focus traversal to the next widget) which
-                  // would otherwise ALSO fire alongside our own
-                  // commit-and-move, causing a double move. Returning
-                  // "handled" here stops that built-in behavior from
-                  // running at all - we fully own Tab's meaning inside
-                  // an editing cell.
-                  _commitAndMoveRight();
-                  return KeyEventResult.handled;
-                }
-                return KeyEventResult.ignored;
-              },
-              child: TextField(
-                controller: _textController,
-                focusNode: _focusNode,
-                autofocus: true,
-                style: const TextStyle(fontSize: 12),
-                decoration: const InputDecoration(
-                  border: InputBorder.none,
-                  isDense: true,
-                  contentPadding: EdgeInsets.symmetric(vertical: 4),
-                ),
-                onSubmitted: (_) => _commitAndMoveDown(),
+            child: TextField(
+              controller: _textController,
+              focusNode: _focusNode,
+              autofocus: true,
+              // Flutter web (and desktop) defaults to selecting ALL text
+              // whenever a TextField (re)gains focus. That's fine for a
+              // normal text field, but is actively harmful here: every
+              // time focus is reclaimed after inserting a formula
+              // reference (see _handleReferenceToInsert), the platform
+              // default was selecting the entire formula text - so the
+              // NEXT reference click would replace everything typed so
+              // far instead of inserting at the cursor. Disabling it
+              // makes focus changes preserve whatever selection/cursor
+              // position we've explicitly set.
+              selectAllOnFocus: false,
+              style: const TextStyle(fontSize: 12),
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                isDense: true,
+                contentPadding: EdgeInsets.symmetric(vertical: 4),
               ),
+              onSubmitted: (_) => _commitAndMoveDown(),
             ),
           );
         }
@@ -431,21 +432,22 @@ class _GridCellState extends State<GridCell> {
                     ?.call(widget.row, widget.column);
                 return;
               }
-              widget.viewportController
-                  .selectCell(widget.row, widget.column);
-            },
-            onDoubleTap: () {
-              if (widget.isFormulaReferencePickingActive) {
-                // Double-clicking a cell while picking a formula
-                // reference still just means "insert this reference" -
-                // it should not also start editing THIS cell.
-                widget.onCellTapDuringFormulaEdit
-                    ?.call(widget.row, widget.column);
-                return;
+
+              // Single-click-to-select, click-again-on-already-selected
+              // to edit. This intentionally avoids onDoubleTap: Flutter's
+              // tap/double-tap disambiguation fires onTap for the FIRST
+              // click before it knows whether a second one is coming,
+              // which raced against this cell's own edit-mode focus
+              // request when double-click was used to enter editing -
+              // sometimes leaving focus stuck on the grid instead of the
+              // TextField. A single onTap that checks "am I already the
+              // selected cell" has no such timing window.
+              if (isActiveCell) {
+                widget.viewportController.startEditing();
+              } else {
+                widget.viewportController
+                    .selectCell(widget.row, widget.column);
               }
-              widget.viewportController
-                  .selectCell(widget.row, widget.column);
-              widget.viewportController.startEditing();
             },
             onPanStart: widget.isFormulaReferencePickingActive
                 ? null

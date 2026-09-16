@@ -117,11 +117,6 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
   }
 
   void _handleCellTapDuringFormulaEdit(int row, int column) {
-    debugPrint(
-      '[SpreadsheetGrid._handleCellTapDuringFormulaEdit] '
-      'row=$row column=$column '
-      'primaryFocusBefore=${FocusManager.instance.primaryFocus}',
-    );
     _formulaReferenceToInsert.value = _referenceFor(row, column);
   }
 
