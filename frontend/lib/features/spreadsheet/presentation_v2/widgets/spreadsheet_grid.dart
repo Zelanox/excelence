@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../controllers/spreadsheet_controller.dart';
 import '../../controllers/viewport_controller.dart';
+import '../../models/cell_position.dart';
 import '../column_naming.dart';
 import 'grid_cell.dart';
 import 'grid_column_header.dart';
@@ -77,10 +78,28 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
   final ValueNotifier<String?> _formulaReferenceToInsert =
       ValueNotifier(null);
 
+  // True while a REFERENCE-RANGE drag is in progress (dragging across
+  // cells during formula editing to build e.g. "B1:B3", as opposed to
+  // _isDragging which is for normal cell-range selection). These are
+  // deliberately separate flags/handlers rather than reusing the normal
+  // drag-selection path, since the two have completely different
+  // endpoints: normal dragging writes to viewportController.selection
+  // live; a reference-range drag only produces a reference STRING, and
+  // only inserts it into the editing cell's text once the drag ends.
+  bool _isDraggingReferenceRange = false;
+
+  // The start/end cells of an in-progress reference-range drag, exposed
+  // as a single ValueNotifier so GridCell can show a live highlight over
+  // the spanned cells without the grid needing setState() on every
+  // pointer-move (which would rebuild the whole Table unnecessarily).
+  final ValueNotifier<({CellPosition? start, CellPosition? end})>
+      _referenceRangeDrag = ValueNotifier((start: null, end: null));
+
   @override
   void dispose() {
     _gridFocusNode.dispose();
     _formulaReferenceToInsert.dispose();
+    _referenceRangeDrag.dispose();
     super.dispose();
   }
 
@@ -114,6 +133,53 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
 
   String _referenceFor(int row, int column) {
     return '${columnLetterName(column)}${row + 1}';
+  }
+
+  String _rangeReferenceFor(CellPosition start, CellPosition end) {
+    final startRef = _referenceFor(start.row, start.column);
+    if (start.row == end.row && start.column == end.column) {
+      // A "drag" that never actually left the starting cell is just a
+      // single-cell reference, not a degenerate "B1:B1" range.
+      return startRef;
+    }
+    final endRef = _referenceFor(end.row, end.column);
+    return '$startRef:$endRef';
+  }
+
+  void _handleReferenceRangeDragStart(int row, int column) {
+    _isDraggingReferenceRange = true;
+    final position = CellPosition(row: row, column: column);
+    _referenceRangeDrag.value = (start: position, end: position);
+  }
+
+  void _handleReferenceRangeDragEnter(int row, int column) {
+    if (!_isDraggingReferenceRange) {
+      return;
+    }
+    final start = _referenceRangeDrag.value.start;
+    if (start == null) {
+      return;
+    }
+    _referenceRangeDrag.value = (
+      start: start,
+      end: CellPosition(row: row, column: column),
+    );
+  }
+
+  void _handleReferenceRangeDragEnd() {
+    if (!_isDraggingReferenceRange) {
+      return;
+    }
+    _isDraggingReferenceRange = false;
+
+    final start = _referenceRangeDrag.value.start;
+    final end = _referenceRangeDrag.value.end;
+    _referenceRangeDrag.value = (start: null, end: null);
+
+    if (start == null || end == null) {
+      return;
+    }
+    _formulaReferenceToInsert.value = _rangeReferenceFor(start, end);
   }
 
   void _handleCellTapDuringFormulaEdit(int row, int column) {
@@ -346,6 +412,13 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
                                     _handleFormulaEditingChanged,
                                 formulaReferenceToInsert:
                                     _formulaReferenceToInsert,
+                                onReferenceRangeDragStart:
+                                    _handleReferenceRangeDragStart,
+                                onReferenceRangeDragEnter:
+                                    _handleReferenceRangeDragEnter,
+                                onReferenceRangeDragEnd:
+                                    _handleReferenceRangeDragEnd,
+                                referenceRangeDrag: _referenceRangeDrag,
                               ),
                             ),
                         ],

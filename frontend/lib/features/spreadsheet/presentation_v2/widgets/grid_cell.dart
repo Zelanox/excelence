@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../controllers/spreadsheet_controller.dart';
 import '../../controllers/viewport_controller.dart';
+import '../../models/cell_position.dart';
 import '../../models/selection_model.dart';
 
 /// A single spreadsheet cell.
@@ -39,6 +40,10 @@ class GridCell extends StatefulWidget {
     this.onCellTapDuringFormulaEdit,
     this.onFormulaEditingChanged,
     this.formulaReferenceToInsert,
+    this.onReferenceRangeDragStart,
+    this.onReferenceRangeDragEnter,
+    this.onReferenceRangeDragEnd,
+    required this.referenceRangeDrag,
   });
 
   final int row;
@@ -91,6 +96,28 @@ class GridCell extends StatefulWidget {
   /// TextField. Only meaningful to the currently-editing cell - every
   /// other cell ignores it.
   final ValueNotifier<String?>? formulaReferenceToInsert;
+
+  /// Called when a drag gesture begins on this cell WHILE
+  /// [isFormulaReferencePickingActive] is true - the start of dragging
+  /// out a range reference like "B1:B3", as opposed to [onDragStart]
+  /// which is for normal cell-range selection outside of formula editing.
+  final void Function(int row, int column)? onReferenceRangeDragStart;
+
+  /// Called when the pointer enters this cell's bounds during an
+  /// in-progress reference-range drag.
+  final void Function(int row, int column)? onReferenceRangeDragEnter;
+
+  /// Called when a reference-range drag ends (mouse-up). The grid builds
+  /// the final "B1:B3"-style reference and routes it to the editing cell
+  /// at this point - not live during the drag, since a range reference
+  /// only makes sense as a complete whole.
+  final VoidCallback? onReferenceRangeDragEnd;
+
+  /// The start/end cells of an in-progress reference-range drag, so this
+  /// cell can show a live highlight if it falls within the spanned range.
+  /// Null start/end means no reference-range drag is in progress.
+  final ValueNotifier<({CellPosition? start, CellPosition? end})>
+      referenceRangeDrag;
 
   @override
   State<GridCell> createState() => _GridCellState();
@@ -422,7 +449,12 @@ class _GridCellState extends State<GridCell> {
 
         return MouseRegion(
           onEnter: (_) {
-            widget.onDragEnter?.call(widget.row, widget.column);
+            if (widget.isFormulaReferencePickingActive) {
+              widget.onReferenceRangeDragEnter
+                  ?.call(widget.row, widget.column);
+            } else {
+              widget.onDragEnter?.call(widget.row, widget.column);
+            }
           },
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
@@ -450,37 +482,79 @@ class _GridCellState extends State<GridCell> {
               }
             },
             onPanStart: widget.isFormulaReferencePickingActive
-                ? null
+                ? (_) {
+                    widget.onReferenceRangeDragStart
+                        ?.call(widget.row, widget.column);
+                  }
                 : (_) {
                     widget.onDragStart?.call(widget.row, widget.column);
                   },
             onPanEnd: widget.isFormulaReferencePickingActive
-                ? null
+                ? (_) {
+                    widget.onReferenceRangeDragEnd?.call();
+                  }
                 : (_) {
                     widget.onDragEnd?.call();
                   },
-            child: Container(
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? Colors.blue.withValues(alpha: 0.08)
-                    : Colors.white,
-                border: _cellBorder(
-                  edges: selectionEdges,
-                ),
-              ),
-              alignment: Alignment.centerLeft,
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Text(
-                cell.value,
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
-                style: const TextStyle(fontSize: 12),
-              ),
+            child: ValueListenableBuilder<
+                ({CellPosition? start, CellPosition? end})>(
+              valueListenable: widget.referenceRangeDrag,
+              builder: (context, dragRange, _) {
+                final isInReferenceRangeDrag = _isWithinCellRange(
+                  dragRange.start,
+                  dragRange.end,
+                  widget.row,
+                  widget.column,
+                );
+
+                return Container(
+                  decoration: BoxDecoration(
+                    color: isInReferenceRangeDrag
+                        ? Colors.orange.withValues(alpha: 0.15)
+                        : isSelected
+                            ? Colors.blue.withValues(alpha: 0.08)
+                            : Colors.white,
+                    border: isInReferenceRangeDrag
+                        ? Border.all(color: Colors.orange, width: 1)
+                        : _cellBorder(edges: selectionEdges),
+                  ),
+                  alignment: Alignment.centerLeft,
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Text(
+                    cell.value,
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                );
+              },
             ),
           ),
         );
       },
     );
+  }
+
+  bool _isWithinCellRange(
+    CellPosition? start,
+    CellPosition? end,
+    int row,
+    int column,
+  ) {
+    if (start == null || end == null) {
+      return false;
+    }
+    final firstRow = start.row <= end.row ? start.row : end.row;
+    final lastRow = start.row >= end.row ? start.row : end.row;
+    final firstColumn =
+        start.column <= end.column ? start.column : end.column;
+    final lastColumn =
+        start.column >= end.column ? start.column : end.column;
+
+    return row >= firstRow &&
+        row <= lastRow &&
+        column >= firstColumn &&
+        column <= lastColumn;
   }
 
   bool _isWithinSelection(SelectionModel selection, int row, int column) {
