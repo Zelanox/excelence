@@ -259,20 +259,23 @@ class _GridCellState extends State<GridCell> {
       widget.viewportController.selection.startColumn == widget.column;
 
   /// Builds the cell's border. A plain unselected cell gets a uniform
-  /// light gridline. Any cell within the current selection - including
-  /// the active cell (the drag anchor / single selected cell) - only
-  /// draws a blue line on the sides given by [edges] that sit on the
-  /// outer boundary of the range; interior sides between two selected
-  /// neighbors get the plain gridline instead. This applies equally to
-  /// the active cell: being the drag anchor does not mean it sits on the
-  /// range's boundary (e.g. it can be the top-left corner of a range
-  /// dragged down-and-right, in which case only its top and left sides
-  /// are actually on the boundary).
+  /// light gridline. Any cell within a range - the normal selection
+  /// (blue) or an in-progress reference-range drag (orange) - only draws
+  /// a colored line on the sides given by [edges] that sit on the outer
+  /// boundary of that range; interior sides between two cells in the same
+  /// range get the plain gridline instead, so the whole range reads as
+  /// one unified outline rather than a grid of separate boxes. This
+  /// applies equally to a range's anchor cell: being the drag/selection
+  /// anchor does not mean it sits on the range's boundary (e.g. it can be
+  /// the top-left corner of a range dragged down-and-right, in which case
+  /// only its top and left sides are actually on the boundary).
   Border _cellBorder({
     required _SelectionEdges? edges,
+    Color rangeColor = Colors.blue,
+    double rangeWidth = 2,
   }) {
     final gridline = BorderSide(color: Colors.grey.shade300, width: 0.5);
-    final rangeLine = BorderSide(color: Colors.blue, width: 2);
+    final rangeLine = BorderSide(color: rangeColor, width: rangeWidth);
 
     if (edges == null) {
       return Border.fromBorderSide(gridline);
@@ -507,6 +510,17 @@ class _GridCellState extends State<GridCell> {
                   widget.column,
                 );
 
+                final referenceRangeEdges = isInReferenceRangeDrag
+                    ? _rangeEdges(
+                        startRow: dragRange.start!.row,
+                        endRow: dragRange.end!.row,
+                        startColumn: dragRange.start!.column,
+                        endColumn: dragRange.end!.column,
+                        row: widget.row,
+                        column: widget.column,
+                      )
+                    : null;
+
                 return Container(
                   decoration: BoxDecoration(
                     color: isInReferenceRangeDrag
@@ -515,7 +529,11 @@ class _GridCellState extends State<GridCell> {
                             ? Colors.blue.withValues(alpha: 0.08)
                             : Colors.white,
                     border: isInReferenceRangeDrag
-                        ? Border.all(color: Colors.orange, width: 1)
+                        ? _cellBorder(
+                            edges: referenceRangeEdges,
+                            rangeColor: Colors.orange,
+                            rangeWidth: 1,
+                          )
                         : _cellBorder(edges: selectionEdges),
                   ),
                   alignment: Alignment.centerLeft,
@@ -588,18 +606,33 @@ class _GridCellState extends State<GridCell> {
     int row,
     int column,
   ) {
-    final firstRow = selection.startRow <= selection.endRow
-        ? selection.startRow
-        : selection.endRow;
-    final lastRow = selection.startRow >= selection.endRow
-        ? selection.startRow
-        : selection.endRow;
-    final firstColumn = selection.startColumn <= selection.endColumn
-        ? selection.startColumn
-        : selection.endColumn;
-    final lastColumn = selection.startColumn >= selection.endColumn
-        ? selection.startColumn
-        : selection.endColumn;
+    return _rangeEdges(
+      startRow: selection.startRow,
+      endRow: selection.endRow,
+      startColumn: selection.startColumn,
+      endColumn: selection.endColumn,
+      row: row,
+      column: column,
+    );
+  }
+
+  /// Which sides of the cell at (row, column) sit on the outer boundary
+  /// of the range spanning (startRow, startColumn) to (endRow, endColumn)
+  /// - the shared min/max math behind both [_selectionEdges] (for the
+  /// normal cell selection) and the reference-range-drag highlight (for
+  /// a formula range like "B1:B3" being dragged out).
+  _SelectionEdges _rangeEdges({
+    required int startRow,
+    required int endRow,
+    required int startColumn,
+    required int endColumn,
+    required int row,
+    required int column,
+  }) {
+    final firstRow = startRow <= endRow ? startRow : endRow;
+    final lastRow = startRow >= endRow ? startRow : endRow;
+    final firstColumn = startColumn <= endColumn ? startColumn : endColumn;
+    final lastColumn = startColumn >= endColumn ? startColumn : endColumn;
 
     return _SelectionEdges(
       top: row == firstRow,
