@@ -39,44 +39,10 @@ class SpreadsheetController extends ChangeNotifier {
       final data = await _service.loadData();
 
       // 3. Convert API data into our Flutter spreadsheet model.
-      final rows = <RowModel>[];
-
-      for (int rowIndex = 0; rowIndex < data.rows.length; rowIndex++) {
-        final apiRow = data.rows[rowIndex];
-
-        final cells = <CellModel>[];
-
-        for (int columnIndex = 0;
-            columnIndex < data.headers.length;
-            columnIndex++) {
-          final header = data.headers[columnIndex];
-
-          final rawValue = apiRow[header];
-
-          cells.add(
-            CellModel(
-              row: rowIndex,
-              column: columnIndex,
-              value: rawValue?.toString() ?? '',
-            ),
-          );
-        }
-
-        rows.add(
-          RowModel(
-            index: rowIndex,
-            cells: cells,
-          ),
-        );
-      }
-
       _spreadsheet = SpreadsheetModel(
         activeSheetIndex: 0,
         sheets: [
-          SheetModel(
-            name: 'Sheet1',
-            rows: rows,
-          ),
+          _sheetFromApiData(name: 'Sheet1', data: data),
         ],
       );
 
@@ -93,6 +59,183 @@ class SpreadsheetController extends ChangeNotifier {
 
       rethrow;
     }
+  }
+
+  /// Converts a raw API [SpreadsheetData] response into a [SheetModel].
+  /// Shared by loadDocument and every row/column mutation (insert/delete),
+  /// since each of those endpoints returns the same shape - the sheet's
+  /// full refreshed data - after applying its change.
+  SheetModel _sheetFromApiData({
+    required String name,
+    required SpreadsheetData data,
+  }) {
+    final rows = <RowModel>[];
+
+    for (int rowIndex = 0; rowIndex < data.rows.length; rowIndex++) {
+      final apiRow = data.rows[rowIndex];
+
+      final cells = <CellModel>[];
+
+      for (int columnIndex = 0;
+          columnIndex < data.headers.length;
+          columnIndex++) {
+        final header = data.headers[columnIndex];
+
+        final rawValue = apiRow[header];
+
+        cells.add(
+          CellModel(
+            row: rowIndex,
+            column: columnIndex,
+            value: rawValue?.toString() ?? '',
+          ),
+        );
+      }
+
+      rows.add(
+        RowModel(
+          index: rowIndex,
+          cells: cells,
+        ),
+      );
+    }
+
+    return SheetModel(
+      name: name,
+      rows: rows,
+      headers: data.headers,
+    );
+  }
+
+  // ============================================================
+  // Rows and columns
+  // ============================================================
+
+  /// Inserts a new row at [index] (zero-based), pushing existing rows at
+  /// and after that index down by one. Refreshes the active sheet from
+  /// the backend's response rather than reconstructing it locally, since
+  /// the backend is the source of truth for how the insertion actually
+  /// landed (e.g. formula adjustments it may perform).
+  Future<void> insertRow({required int index}) async {
+    final currentSpreadsheet = _spreadsheet;
+    if (currentSpreadsheet == null) {
+      return;
+    }
+
+    _recordHistoryPoint();
+
+    try {
+      final data = await _service.insertRow(index: index);
+      _replaceActiveSheet(data);
+      notifyListeners();
+    } catch (error, stackTrace) {
+      debugPrint('[SpreadsheetController.insertRow] Error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      // Undo the speculative history point since nothing actually
+      // changed - there's no new state to redo back to.
+      if (_undoStack.isNotEmpty) {
+        _undoStack.removeLast();
+      }
+      rethrow;
+    }
+  }
+
+  /// Deletes the row at [index] (zero-based).
+  Future<void> deleteRow({required int index}) async {
+    final currentSpreadsheet = _spreadsheet;
+    if (currentSpreadsheet == null) {
+      return;
+    }
+
+    _recordHistoryPoint();
+
+    try {
+      final data = await _service.deleteRow(index: index);
+      _replaceActiveSheet(data);
+      notifyListeners();
+    } catch (error, stackTrace) {
+      debugPrint('[SpreadsheetController.deleteRow] Error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      if (_undoStack.isNotEmpty) {
+        _undoStack.removeLast();
+      }
+      rethrow;
+    }
+  }
+
+  /// Inserts a new column named [name] at [index] (zero-based).
+  Future<void> insertColumn({required String name, required int index}) async {
+    final currentSpreadsheet = _spreadsheet;
+    if (currentSpreadsheet == null) {
+      return;
+    }
+
+    _recordHistoryPoint();
+
+    try {
+      final data = await _service.insertColumn(name: name, index: index);
+      _replaceActiveSheet(data);
+      notifyListeners();
+    } catch (error, stackTrace) {
+      debugPrint('[SpreadsheetController.insertColumn] Error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      if (_undoStack.isNotEmpty) {
+        _undoStack.removeLast();
+      }
+      rethrow;
+    }
+  }
+
+  /// Deletes the column named [name]. The backend identifies columns by
+  /// header name, not by letter/index - callers should look up the
+  /// current header name for the column they mean to delete (see
+  /// SheetModel.headers) before calling this.
+  Future<void> deleteColumn({required String name}) async {
+    final currentSpreadsheet = _spreadsheet;
+    if (currentSpreadsheet == null) {
+      return;
+    }
+
+    _recordHistoryPoint();
+
+    try {
+      final data = await _service.deleteColumn(name: name);
+      _replaceActiveSheet(data);
+      notifyListeners();
+    } catch (error, stackTrace) {
+      debugPrint('[SpreadsheetController.deleteColumn] Error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      if (_undoStack.isNotEmpty) {
+        _undoStack.removeLast();
+      }
+      rethrow;
+    }
+  }
+
+  /// Replaces the active sheet's data with a fresh conversion of [data],
+  /// preserving the sheet's name and every other sheet untouched. Shared
+  /// by every row/column mutation, which all refresh the active sheet
+  /// from the backend's response after applying their change.
+  void _replaceActiveSheet(SpreadsheetData data) {
+    final currentSpreadsheet = _spreadsheet;
+    if (currentSpreadsheet == null) {
+      return;
+    }
+
+    final activeSheetIndex = currentSpreadsheet.activeSheetIndex;
+    final activeSheetName =
+        currentSpreadsheet.sheets[activeSheetIndex].name;
+
+    final updatedSheets = List<SheetModel>.from(currentSpreadsheet.sheets);
+    updatedSheets[activeSheetIndex] = _sheetFromApiData(
+      name: activeSheetName,
+      data: data,
+    );
+
+    _spreadsheet = SpreadsheetModel(
+      activeSheetIndex: activeSheetIndex,
+      sheets: updatedSheets,
+    );
   }
 
   // ============================================================

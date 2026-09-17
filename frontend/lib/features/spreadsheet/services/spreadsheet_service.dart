@@ -84,6 +84,36 @@ class SpreadsheetService {
     return SpreadsheetData.fromJson(json);
   }
 
+  /// Shared POST + response handling for the row/column edit endpoints,
+  /// which all return the same SpreadsheetEditResponse shape (success,
+  /// message, headers, rows, row_count, column_count) after applying
+  /// their change.
+  Future<SpreadsheetData> _postEdit(
+    String endpoint, {
+    required Map<String, dynamic> body,
+    required String failureMessage,
+  }) async {
+    final response = await _api.post(endpoint, body: body);
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(
+        '$failureMessage: ${response.statusCode} ${response.body}',
+      );
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+
+    if (json['success'] != true) {
+      throw Exception(
+        json['message']?.toString().isNotEmpty == true
+            ? json['message'].toString()
+            : failureMessage,
+      );
+    }
+
+    return SpreadsheetData.fromJson(json);
+  }
+
   Future<void> createDocument() async {}
 
   Future<void> saveDocument() async {}
@@ -102,13 +132,52 @@ class SpreadsheetService {
 
   Future<void> editCell() async {}
 
-  Future<void> insertRow() async {}
+  /// Inserts a new row at [index] (zero-based). If [index] is omitted,
+  /// the backend appends the row at the end.
+  Future<SpreadsheetData> insertRow({int? index}) {
+    return _postEdit(
+      '/spreadsheet/rows/insert',
+      body: {
+        if (index != null) 'index': index,
+      },
+      failureMessage: 'Failed to insert row',
+    );
+  }
 
-  Future<void> deleteRow() async {}
+  /// Deletes the row at [index] (zero-based).
+  Future<SpreadsheetData> deleteRow({required int index}) {
+    return _postEdit(
+      '/spreadsheet/rows/delete',
+      body: {'index': index},
+      failureMessage: 'Failed to delete row',
+    );
+  }
 
-  Future<void> insertColumn() async {}
+  /// Inserts a new column named [name] at [index] (zero-based). If
+  /// [index] is omitted, the backend appends the column at the end.
+  Future<SpreadsheetData> insertColumn({
+    required String name,
+    int? index,
+  }) {
+    return _postEdit(
+      '/spreadsheet/columns/insert',
+      body: {
+        'name': name,
+        if (index != null) 'index': index,
+      },
+      failureMessage: 'Failed to insert column',
+    );
+  }
 
-  Future<void> deleteColumn() async {}
+  /// Deletes the column named [name]. The backend identifies columns by
+  /// their header name, not by letter/index.
+  Future<SpreadsheetData> deleteColumn({required String name}) {
+    return _postEdit(
+      '/spreadsheet/columns/delete',
+      body: {'name': name},
+      failureMessage: 'Failed to delete column',
+    );
+  }
 
   Future<void> addSheet() async {}
 
