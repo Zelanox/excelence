@@ -123,6 +123,7 @@ def search(
     return SearchResponse(
         success=success,
         message=message,
+        headers=controller.headers(),
         rows=controller.data(),
         row_count=controller.row_count(),
         column_count=controller.column_count()
@@ -143,6 +144,7 @@ def clear_search(
     return SearchResponse(
         success=success,
         message=message,
+        headers=controller.headers(),
         rows=controller.data(),
         row_count=controller.row_count(),
         column_count=controller.column_count()
@@ -168,6 +170,7 @@ def sort(
     return SortResponse(
         success=success,
         message=message,
+        headers=controller.headers(),
         rows=controller.data(),
         row_count=controller.row_count(),
         column_count=controller.column_count()
@@ -188,6 +191,7 @@ def clear_sort(
     return SortResponse(
         success=success,
         message=message,
+        headers=controller.headers(),
         rows=controller.data(),
         row_count=controller.row_count(),
         column_count=controller.column_count()
@@ -209,6 +213,7 @@ def edit_cell(
     return SpreadsheetEditResponse(
         success=success,
         message=message,
+        headers=controller.headers(),
         rows=controller.data(),
         row_count=controller.row_count(),
         column_count=controller.column_count()
@@ -230,6 +235,7 @@ def insert_row(
     return SpreadsheetEditResponse(
         success=success,
         message=message,
+        headers=controller.headers(),
         rows=controller.data(),
         row_count=controller.row_count(),
         column_count=controller.column_count()
@@ -251,6 +257,7 @@ def delete_row(
     return SpreadsheetEditResponse(
         success=success,
         message=message,
+        headers=controller.headers(),
         rows=controller.data(),
         row_count=controller.row_count(),
         column_count=controller.column_count()
@@ -272,6 +279,7 @@ def insert_column(
     return SpreadsheetEditResponse(
         success=success,
         message=message,
+        headers=controller.headers(),
         rows=controller.data(),
         row_count=controller.row_count(),
         column_count=controller.column_count()
@@ -293,6 +301,29 @@ def delete_column(
     return SpreadsheetEditResponse(
         success=success,
         message=message,
+        headers=controller.headers(),
+        rows=controller.data(),
+        row_count=controller.row_count(),
+        column_count=controller.column_count()
+    )
+
+
+@router.post(
+    "/columns/rename",
+    response_model=SpreadsheetEditResponse
+)
+def rename_column(
+    request: RenameColumnRequest,
+    controller: Controller = Depends(get_controller)
+):
+    """Rename a column in the active worksheet."""
+    success = controller.rename_column(request.old_name, request.new_name)
+
+    message = "Column renamed." if success else "Unable to rename column."
+    return SpreadsheetEditResponse(
+        success=success,
+        message=message,
+        headers=controller.headers(),
         rows=controller.data(),
         row_count=controller.row_count(),
         column_count=controller.column_count()

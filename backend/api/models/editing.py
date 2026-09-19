@@ -36,6 +36,13 @@ class DeleteColumnRequest(BaseModel):
     name: str = Field(..., description="Existing column name to delete.", json_schema_extra={"example": "age"})
 
 
+class RenameColumnRequest(BaseModel):
+
+    old_name: str = Field(..., description="Current column name.", json_schema_extra={"example": "age"})
+
+    new_name: str = Field(..., description="New column name.", json_schema_extra={"example": "Age"})
+
+
 class RenameSheetRequest(BaseModel):
 
     old_name: str = Field(..., description="Current worksheet name.", json_schema_extra={"example": "Sheet1"})

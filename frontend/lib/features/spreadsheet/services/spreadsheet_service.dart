@@ -122,13 +122,54 @@ class SpreadsheetService {
 
   Future<void> reloadDocument() async {}
 
-  Future<void> search(String query) async {}
+  /// Filters the active worksheet's visible rows to those matching
+  /// [query]. Row-filtering search, not cell highlighting - matching rows
+  /// stay, everything else drops out of the response until cleared.
+  Future<SpreadsheetData> search(String query) {
+    return _postEdit(
+      '/spreadsheet/search',
+      body: {'text': query},
+      failureMessage: 'Failed to search',
+    );
+  }
 
-  Future<void> clearSearch() async {}
+  /// Clears the active search filter, restoring every row.
+  Future<SpreadsheetData> clearSearch() {
+    return _postEdit(
+      '/spreadsheet/search/clear',
+      body: const {},
+      failureMessage: 'Failed to clear search',
+    );
+  }
 
-  Future<void> sort() async {}
+  /// Sorts the active worksheet's visible rows by a single column - the
+  /// backend supports multi-level sort (a list of {column, ascending}
+  /// rules), but the header-click UI only ever drives one rule at a time,
+  /// so this wraps that as a single-rule list rather than exposing the
+  /// full multi-level shape to callers that don't need it.
+  Future<SpreadsheetData> sort({
+    required String column,
+    required bool ascending,
+  }) {
+    return _postEdit(
+      '/spreadsheet/sort',
+      body: {
+        'rules': [
+          {'column': column, 'ascending': ascending},
+        ],
+      },
+      failureMessage: 'Failed to sort',
+    );
+  }
 
-  Future<void> clearSort() async {}
+  /// Clears the active sort, restoring the sheet's natural row order.
+  Future<SpreadsheetData> clearSort() {
+    return _postEdit(
+      '/spreadsheet/sort/clear',
+      body: const {},
+      failureMessage: 'Failed to clear sort',
+    );
+  }
 
   Future<void> editCell() async {}
 
@@ -176,6 +217,21 @@ class SpreadsheetService {
       '/spreadsheet/columns/delete',
       body: {'name': name},
       failureMessage: 'Failed to delete column',
+    );
+  }
+
+  /// Renames the column currently named [oldName] to [newName]. The
+  /// backend rejects this (success: false) if [oldName] doesn't exist, if
+  /// [newName] is blank, or if [newName] collides with another existing
+  /// header.
+  Future<SpreadsheetData> renameColumn({
+    required String oldName,
+    required String newName,
+  }) {
+    return _postEdit(
+      '/spreadsheet/columns/rename',
+      body: {'old_name': oldName, 'new_name': newName},
+      failureMessage: 'Failed to rename column',
     );
   }
 

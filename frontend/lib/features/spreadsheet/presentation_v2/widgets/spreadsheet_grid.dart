@@ -186,6 +186,84 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
     _formulaReferenceToInsert.value = _referenceFor(row, column);
   }
 
+  /// Generates a column name that doesn't collide with any header already
+  /// present on the active sheet - "Column A", "Column B", etc. Mirrors
+  /// the same collision-avoidance approach used elsewhere for
+  /// auto-generated column names.
+  String _nextColumnName() {
+    final headers =
+        widget.spreadsheetController.spreadsheet?.activeSheet.headers ??
+            const <String>[];
+    final existing = headers.toSet();
+
+    var index = headers.length;
+    String candidate;
+    do {
+      candidate = 'Column ${columnLetterName(index)}';
+      index++;
+    } while (existing.contains(candidate));
+
+    return candidate;
+  }
+
+  Future<void> _appendColumn() async {
+    final name = _nextColumnName();
+    try {
+      await widget.spreadsheetController.insertColumn(
+        name: name,
+        index: _currentColumnCount(),
+      );
+      _refreshSheetBounds();
+    } catch (error) {
+      _showError('Failed to insert column: $error');
+    }
+  }
+
+  Future<void> _appendRow() async {
+    try {
+      await widget.spreadsheetController.insertRow(
+        index: _currentRowCount(),
+      );
+      _refreshSheetBounds();
+    } catch (error) {
+      _showError('Failed to insert row: $error');
+    }
+  }
+
+  int _currentRowCount() {
+    return widget.spreadsheetController.spreadsheet?.activeSheet.rows.length ??
+        0;
+  }
+
+  int _currentColumnCount() {
+    final sheet = widget.spreadsheetController.spreadsheet?.activeSheet;
+    if (sheet == null || sheet.rows.isEmpty) {
+      return 0;
+    }
+    return sheet.rows
+        .map((row) => row.cells.length)
+        .fold<int>(0, (max, length) => length > max ? length : max);
+  }
+
+  void _refreshSheetBounds() {
+    final sheet = widget.spreadsheetController.spreadsheet?.activeSheet;
+    if (sheet == null) {
+      return;
+    }
+    widget.viewportController.setSheetBounds(
+      rowCount: sheet.rows.length,
+      columnCount:
+          sheet.rows.isEmpty ? 0 : sheet.rows.first.cells.length,
+    );
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
   Future<void> _handleCopy({required bool andClear}) async {
     await widget.spreadsheetController
         .copySelection(widget.viewportController.selection);
@@ -348,10 +426,17 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
               return const SizedBox.shrink();
             }
 
+            // An extra trailing column/row hosts the hover "+" append
+            // affordance (Obsidian/Word-table style) - a slim handle past
+            // the last real column and below the last real row, only
+            // visible/active on hover, that appends a new column/row.
+            const addHandleSize = 20.0;
+
             final columnWidths = <int, TableColumnWidth>{
               0: const FixedColumnWidth(SpreadsheetGrid.headerSize),
               for (var c = 0; c < columnCount; c++)
                 c + 1: const FixedColumnWidth(SpreadsheetGrid.columnWidth),
+              columnCount + 1: const FixedColumnWidth(addHandleSize),
             };
 
             return SingleChildScrollView(
@@ -364,7 +449,7 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
                       TableCellVerticalAlignment.middle,
                   children: [
                     // ------------------------------------------------
-                    // Header row: blank corner + column letters
+                    // Header row: blank corner + column headers + "+"
                     // ------------------------------------------------
                     TableRow(
                       children: [
@@ -375,20 +460,37 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
                         for (var c = 0; c < columnCount; c++)
                           SizedBox(
                             height: SpreadsheetGrid.headerSize,
-                            child: GridColumnHeader(columnIndex: c),
+                            child: GridColumnHeader(
+                              columnIndex: c,
+                              spreadsheetController:
+                                  widget.spreadsheetController,
+                            ),
                           ),
+                        SizedBox(
+                          width: addHandleSize,
+                          height: SpreadsheetGrid.headerSize,
+                          child: _HoverAddHandle(
+                            axis: Axis.horizontal,
+                            tooltip: 'Add column to the right',
+                            onTap: _appendColumn,
+                          ),
+                        ),
                       ],
                     ),
 
                     // ------------------------------------------------
-                    // Data rows: row number + cells
+                    // Data rows: row number + cells + blank "+" filler
                     // ------------------------------------------------
                     for (var r = 0; r < rowCount; r++)
                       TableRow(
                         children: [
                           SizedBox(
                             height: SpreadsheetGrid.rowHeight,
-                            child: GridRowHeader(rowIndex: r),
+                            child: GridRowHeader(
+                              rowIndex: r,
+                              spreadsheetController:
+                                  widget.spreadsheetController,
+                            ),
                           ),
                           for (var c = 0; c < columnCount; c++)
                             SizedBox(
@@ -421,8 +523,43 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
                                 referenceRangeDrag: _referenceRangeDrag,
                               ),
                             ),
+                          const SizedBox(
+                            width: addHandleSize,
+                            height: SpreadsheetGrid.rowHeight,
+                          ),
                         ],
                       ),
+
+                    // ------------------------------------------------
+                    // Trailing row: row-header-width filler + "+" spans
+                    // the data columns + blank corner
+                    // ------------------------------------------------
+                    TableRow(
+                      children: [
+                        const SizedBox(
+                          width: SpreadsheetGrid.headerSize,
+                          height: addHandleSize,
+                        ),
+                        for (var c = 0; c < columnCount; c++)
+                          SizedBox(
+                            width: SpreadsheetGrid.columnWidth,
+                            height: addHandleSize,
+                            child: c == 0
+                                ? _HoverAddHandle(
+                                    axis: Axis.vertical,
+                                    tooltip: 'Add row below',
+                                    onTap: _appendRow,
+                                    spanWidth: SpreadsheetGrid.columnWidth *
+                                        columnCount,
+                                  )
+                                : const SizedBox.shrink(),
+                          ),
+                        const SizedBox(
+                          width: addHandleSize,
+                          height: addHandleSize,
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -430,6 +567,96 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
           },
         ),
       ),
+    );
+  }
+}
+
+/// A slim "+" handle shown past the last column (or below the last row)
+/// that appends a new column/row on tap - the Obsidian/Word-table style
+/// insert affordance. Mostly invisible until hovered, at which point it
+/// highlights and shows a tooltip explaining what it does.
+///
+/// For the row-append handle, [spanWidth] stretches the hoverable/visible
+/// area across the full width of the data columns (matching the
+/// reference screenshot, where the "+" row runs the width of the table)
+/// even though the handle itself renders as a single Table cell - the
+/// visible bar is drawn wider than its cell via a Stack + OverflowBox so
+/// hovering anywhere along the bottom edge triggers it, not just the
+/// leftmost cell.
+class _HoverAddHandle extends StatefulWidget {
+  const _HoverAddHandle({
+    required this.axis,
+    required this.tooltip,
+    required this.onTap,
+    this.spanWidth,
+  });
+
+  final Axis axis;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  /// For a horizontal (row-append) bar, the full width to visually span.
+  /// Null for the vertical (column-append) handle, which only ever needs
+  /// its own single cell's height.
+  final double? spanWidth;
+
+  @override
+  State<_HoverAddHandle> createState() => _HoverAddHandleState();
+}
+
+class _HoverAddHandleState extends State<_HoverAddHandle> {
+  bool _isHovered = false;
+
+  void _setHovered(bool value) {
+    if (_isHovered != value) {
+      setState(() {
+        _isHovered = value;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final highlightColor = Theme.of(context).colorScheme.primary;
+
+    final bar = AnimatedContainer(
+      duration: const Duration(milliseconds: 120),
+      color: _isHovered
+          ? highlightColor.withValues(alpha: 0.12)
+          : Colors.transparent,
+      alignment: Alignment.center,
+      child: _isHovered
+          ? Icon(Icons.add, size: 14, color: highlightColor)
+          : null,
+    );
+
+    final handle = MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => _setHovered(true),
+      onExit: (_) => _setHovered(false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: widget.onTap,
+        child: Tooltip(
+          message: widget.tooltip,
+          waitDuration: const Duration(milliseconds: 300),
+          child: bar,
+        ),
+      ),
+    );
+
+    if (widget.spanWidth == null) {
+      return handle;
+    }
+
+    // Row-append handle: visually and interactively span the full table
+    // width, not just this one Table cell, using an OverflowBox so the
+    // hover/tap target matches the reference screenshot's full-width bar.
+    return OverflowBox(
+      minWidth: widget.spanWidth,
+      maxWidth: widget.spanWidth,
+      alignment: Alignment.centerLeft,
+      child: handle,
     );
   }
 }

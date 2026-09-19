@@ -21,8 +21,17 @@ class SpreadsheetController extends ChangeNotifier {
   final List<SpreadsheetModel> _undoStack = [];
   final List<SpreadsheetModel> _redoStack = [];
 
+  // The currently active single-column sort, if any - tracked here so
+  // GridColumnHeader can show an ascending/descending indicator without
+  // each header needing its own separate source of truth. Null means no
+  // column is currently sorted.
+  String? _sortedColumn;
+  bool _sortAscending = true;
+
   SpreadsheetModel? get spreadsheet => _spreadsheet;
-  
+  String? get sortedColumn => _sortedColumn;
+  bool get sortAscending => _sortAscending;
+
   bool get canUndo => _undoStack.isNotEmpty;
   bool get canRedo => _redoStack.isNotEmpty;
 
@@ -208,6 +217,138 @@ class SpreadsheetController extends ChangeNotifier {
       if (_undoStack.isNotEmpty) {
         _undoStack.removeLast();
       }
+      rethrow;
+    }
+  }
+
+  /// Renames the column currently named [oldName] to [newName]. Like the
+  /// other row/column mutations, this refreshes the active sheet from the
+  /// backend's response rather than reconstructing it locally.
+  Future<void> renameColumn({
+    required String oldName,
+    required String newName,
+  }) async {
+    final currentSpreadsheet = _spreadsheet;
+    if (currentSpreadsheet == null) {
+      return;
+    }
+
+    _recordHistoryPoint();
+
+    try {
+      final data = await _service.renameColumn(
+        oldName: oldName,
+        newName: newName,
+      );
+      _replaceActiveSheet(data);
+      notifyListeners();
+    } catch (error, stackTrace) {
+      debugPrint('[SpreadsheetController.renameColumn] Error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      if (_undoStack.isNotEmpty) {
+        _undoStack.removeLast();
+      }
+      rethrow;
+    }
+  }
+
+  /// Filters the active sheet's visible rows to those matching [query].
+  /// Unlike row/column mutations, search does NOT record an undo history
+  /// point - filtering which rows are shown isn't a document edit the
+  /// user should be able to Ctrl+Z, any more than scrolling would be.
+  Future<void> search(String query) async {
+    final currentSpreadsheet = _spreadsheet;
+    if (currentSpreadsheet == null) {
+      return;
+    }
+
+    try {
+      final data = await _service.search(query);
+      _replaceActiveSheet(data);
+      notifyListeners();
+    } catch (error, stackTrace) {
+      debugPrint('[SpreadsheetController.search] Error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      rethrow;
+    }
+  }
+
+  /// Clears the active search filter, restoring every row. Like [search],
+  /// this does not touch undo/redo history.
+  Future<void> clearSearch() async {
+    final currentSpreadsheet = _spreadsheet;
+    if (currentSpreadsheet == null) {
+      return;
+    }
+
+    try {
+      final data = await _service.clearSearch();
+      _replaceActiveSheet(data);
+      notifyListeners();
+    } catch (error, stackTrace) {
+      debugPrint('[SpreadsheetController.clearSearch] Error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      rethrow;
+    }
+  }
+
+  /// Sorts the active sheet by [column]. Like [search], this does not
+  /// touch undo/redo history - a sort is a view arrangement, not a
+  /// document edit the user should be able to Ctrl+Z.
+  Future<void> sort({required String column, required bool ascending}) async {
+    final currentSpreadsheet = _spreadsheet;
+    if (currentSpreadsheet == null) {
+      return;
+    }
+
+    try {
+      final data = await _service.sort(column: column, ascending: ascending);
+      _replaceActiveSheet(data);
+      _sortedColumn = column;
+      _sortAscending = ascending;
+      notifyListeners();
+    } catch (error, stackTrace) {
+      debugPrint('[SpreadsheetController.sort] Error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      rethrow;
+    }
+  }
+
+  /// Cycles [column]'s sort state on each call, matching standard
+  /// spreadsheet header-click behavior: unsorted -> ascending -> ->
+  /// descending -> unsorted (clearing the sort entirely on the third
+  /// click).
+  Future<void> toggleSort(String column) async {
+    if (_sortedColumn != column) {
+      await sort(column: column, ascending: true);
+      return;
+    }
+
+    if (_sortAscending) {
+      await sort(column: column, ascending: false);
+      return;
+    }
+
+    await clearSort();
+  }
+
+  /// Clears the active sort, restoring natural row order. Does not touch
+  /// undo/redo history, same as [sort].
+  Future<void> clearSort() async {
+    final currentSpreadsheet = _spreadsheet;
+    if (currentSpreadsheet == null) {
+      return;
+    }
+
+    try {
+      final data = await _service.clearSort();
+      _replaceActiveSheet(data);
+      _sortedColumn = null;
+      _sortAscending = true;
+      notifyListeners();
+    } catch (error, stackTrace) {
+      debugPrint('[SpreadsheetController.clearSort] Error: $error');
+      debugPrintStack(stackTrace: stackTrace);
       rethrow;
     }
   }
