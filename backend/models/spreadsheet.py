@@ -205,4 +205,15 @@ class Spreadsheet:
 
         return sheet.delete_column(name)
 
-    
+    def rename_column(
+        self,
+        old_name,
+        new_name
+    ):
+
+        sheet = self.current_sheet()
+
+        if sheet is None:
+            return False
+
+        return sheet.rename_column(old_name, new_name)

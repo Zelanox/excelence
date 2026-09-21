@@ -28,10 +28,16 @@ class GridColumnHeader extends StatefulWidget {
     super.key,
     required this.columnIndex,
     required this.spreadsheetController,
+    this.onRenamingChanged,
   });
 
   final int columnIndex;
   final SpreadsheetController spreadsheetController;
+
+  /// Notifies the parent grid when this header starts/stops renaming, so
+  /// the grid can suspend its own focus-stealing and keystroke handling
+  /// while this header's inline TextField owns keyboard input.
+  final ValueChanged<bool>? onRenamingChanged;
 
   @override
   State<GridColumnHeader> createState() => _GridColumnHeaderState();
@@ -44,6 +50,9 @@ class _GridColumnHeaderState extends State<GridColumnHeader> {
 
   @override
   void dispose() {
+    if (_isRenaming) {
+      widget.onRenamingChanged?.call(false);
+    }
     _textController?.dispose();
     _focusNode?.dispose();
     super.dispose();
@@ -94,6 +103,7 @@ class _GridColumnHeaderState extends State<GridColumnHeader> {
       _textController = controller;
       _focusNode = focusNode;
     });
+    widget.onRenamingChanged?.call(true);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -119,6 +129,7 @@ class _GridColumnHeaderState extends State<GridColumnHeader> {
       _textController = null;
       _focusNode = null;
     });
+    widget.onRenamingChanged?.call(false);
     controller?.dispose();
     focusNode?.dispose();
 
@@ -151,6 +162,7 @@ class _GridColumnHeaderState extends State<GridColumnHeader> {
       _textController = null;
       _focusNode = null;
     });
+    widget.onRenamingChanged?.call(false);
     controller?.dispose();
     focusNode?.dispose();
   }

@@ -21,14 +21,14 @@ class GridRowHeader extends StatelessWidget {
   final SpreadsheetController spreadsheetController;
 
   Future<void> _deleteRow(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+
     try {
       await spreadsheetController.deleteRow(index: rowIndex);
     } catch (error) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to delete row: $error')),
-        );
-      }
+      messenger.showSnackBar(
+        SnackBar(content: Text('Failed to delete row: $error')),
+      );
     }
   }
 
@@ -50,8 +50,8 @@ class GridRowHeader extends StatelessWidget {
       ],
     );
 
-    if (selected == 'delete') {
-      _deleteRow(context);
+    if (selected == 'delete' && context.mounted) {
+      await _deleteRow(context);
     }
   }
 

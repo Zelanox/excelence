@@ -243,3 +243,945 @@
 2026-09-19 20:20:07,214 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
 2026-09-19 20:21:57,796 - INFO - document - Opened document test.xlsx
 2026-09-19 20:25:25,123 - INFO - document - Opened document test.xlsx
+2026-09-19 20:28:14,134 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-19 20:30:08,574 - INFO - document - Opened document test.xlsx
+2026-09-20 08:57:10,997 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-20 09:09:56,994 - INFO - document - Opened document test.xlsx
+2026-09-20 10:38:00,604 - INFO - document - Opened document test.xlsx
+2026-09-20 10:44:41,915 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-20 10:44:54,276 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-20 10:46:36,595 - INFO - document - Opened document test.xlsx
+2026-09-20 10:55:19,632 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-20 10:55:32,782 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-20 10:57:16,619 - INFO - document - Opened document test.xlsx
+2026-09-20 11:19:24,123 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-20 11:19:59,426 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-20 11:21:43,423 - INFO - document - Opened document test.xlsx
+2026-09-20 14:05:32,564 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-20 14:06:15,336 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-20 14:26:17,557 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-20 14:38:20,870 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-20 14:57:11,528 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-21 09:01:48,257 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-21 09:04:03,953 - INFO - document - Opened document test.xlsx
+2026-09-21 10:01:46,844 - INFO - document - Opened document test.xlsx
+2026-09-21 10:01:58,280 - ERROR - main - Unhandled API error for /spreadsheet/columns/rename
+Traceback (most recent call last):
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\cors.py", line 96, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\cors.py", line 154, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\routing.py", line 670, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 2734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1780, in handle
+    await self.original_router.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 2789, in handle
+    await included_router._handle_selected(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1800, in _handle_selected
+    await original_route.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1279, in handle
+    await app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 158, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 144, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 706, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 354, in run_endpoint_function
+    return await run_in_threadpool(dependant.call, **values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\concurrency.py", line 34, in run_in_threadpool
+    return await anyio.to_thread.run_sync(func)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\to_thread.py", line 65, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        func, args, abandon_on_cancel=abandon_on_cancel, limiter=limiter
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\_backends\_asyncio.py", line 2706, in run_sync_in_worker_thread
+    return await future
+           ^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\_backends\_asyncio.py", line 1100, in run
+    result = context.run(func, *args)
+  File "E:\Projects\excelence\backend\api\spreadsheet.py", line 320, in rename_column
+    success = controller.rename_column(request.old_name, request.new_name)
+              ^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'Controller' object has no attribute 'rename_column'. Did you mean: 'delete_column'?
+2026-09-21 10:02:12,532 - ERROR - main - Unhandled API error for /spreadsheet/columns/rename
+Traceback (most recent call last):
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\cors.py", line 96, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\cors.py", line 154, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\routing.py", line 670, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 2734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1780, in handle
+    await self.original_router.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 2789, in handle
+    await included_router._handle_selected(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1800, in _handle_selected
+    await original_route.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1279, in handle
+    await app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 158, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 144, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 706, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 354, in run_endpoint_function
+    return await run_in_threadpool(dependant.call, **values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\concurrency.py", line 34, in run_in_threadpool
+    return await anyio.to_thread.run_sync(func)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\to_thread.py", line 65, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        func, args, abandon_on_cancel=abandon_on_cancel, limiter=limiter
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\_backends\_asyncio.py", line 2706, in run_sync_in_worker_thread
+    return await future
+           ^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\_backends\_asyncio.py", line 1100, in run
+    result = context.run(func, *args)
+  File "E:\Projects\excelence\backend\api\spreadsheet.py", line 320, in rename_column
+    success = controller.rename_column(request.old_name, request.new_name)
+              ^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'Controller' object has no attribute 'rename_column'. Did you mean: 'delete_column'?
+2026-09-21 10:02:20,523 - ERROR - main - Unhandled API error for /spreadsheet/columns/rename
+Traceback (most recent call last):
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\cors.py", line 96, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\cors.py", line 154, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\routing.py", line 670, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 2734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1780, in handle
+    await self.original_router.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 2789, in handle
+    await included_router._handle_selected(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1800, in _handle_selected
+    await original_route.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1279, in handle
+    await app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 158, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 144, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 706, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 354, in run_endpoint_function
+    return await run_in_threadpool(dependant.call, **values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\concurrency.py", line 34, in run_in_threadpool
+    return await anyio.to_thread.run_sync(func)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\to_thread.py", line 65, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        func, args, abandon_on_cancel=abandon_on_cancel, limiter=limiter
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\_backends\_asyncio.py", line 2706, in run_sync_in_worker_thread
+    return await future
+           ^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\_backends\_asyncio.py", line 1100, in run
+    result = context.run(func, *args)
+  File "E:\Projects\excelence\backend\api\spreadsheet.py", line 320, in rename_column
+    success = controller.rename_column(request.old_name, request.new_name)
+              ^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'Controller' object has no attribute 'rename_column'. Did you mean: 'delete_column'?
+2026-09-21 10:02:29,711 - ERROR - main - Unhandled API error for /spreadsheet/columns/rename
+Traceback (most recent call last):
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\cors.py", line 96, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\cors.py", line 154, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\routing.py", line 670, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 2734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1780, in handle
+    await self.original_router.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 2789, in handle
+    await included_router._handle_selected(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1800, in _handle_selected
+    await original_route.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1279, in handle
+    await app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 158, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 144, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 706, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 354, in run_endpoint_function
+    return await run_in_threadpool(dependant.call, **values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\concurrency.py", line 34, in run_in_threadpool
+    return await anyio.to_thread.run_sync(func)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\to_thread.py", line 65, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        func, args, abandon_on_cancel=abandon_on_cancel, limiter=limiter
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\_backends\_asyncio.py", line 2706, in run_sync_in_worker_thread
+    return await future
+           ^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\_backends\_asyncio.py", line 1100, in run
+    result = context.run(func, *args)
+  File "E:\Projects\excelence\backend\api\spreadsheet.py", line 320, in rename_column
+    success = controller.rename_column(request.old_name, request.new_name)
+              ^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'Controller' object has no attribute 'rename_column'. Did you mean: 'delete_column'?
+2026-09-21 10:05:05,541 - ERROR - main - Unhandled API error for /spreadsheet/columns/rename
+Traceback (most recent call last):
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\cors.py", line 96, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\cors.py", line 154, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\routing.py", line 670, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 2734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1780, in handle
+    await self.original_router.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 2789, in handle
+    await included_router._handle_selected(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1800, in _handle_selected
+    await original_route.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1279, in handle
+    await app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 158, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 144, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 706, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 354, in run_endpoint_function
+    return await run_in_threadpool(dependant.call, **values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\concurrency.py", line 34, in run_in_threadpool
+    return await anyio.to_thread.run_sync(func)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\to_thread.py", line 65, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        func, args, abandon_on_cancel=abandon_on_cancel, limiter=limiter
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\_backends\_asyncio.py", line 2706, in run_sync_in_worker_thread
+    return await future
+           ^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\_backends\_asyncio.py", line 1100, in run
+    result = context.run(func, *args)
+  File "E:\Projects\excelence\backend\api\spreadsheet.py", line 320, in rename_column
+    success = controller.rename_column(request.old_name, request.new_name)
+              ^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'Controller' object has no attribute 'rename_column'. Did you mean: 'delete_column'?
+2026-09-21 10:16:21,293 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-21 10:17:00,320 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-21 10:17:49,773 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-21 10:18:17,765 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-21 10:20:16,047 - INFO - document - Opened document test.xlsx
+2026-09-21 10:20:26,131 - ERROR - main - Unhandled API error for /spreadsheet/columns/rename
+Traceback (most recent call last):
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\cors.py", line 96, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\cors.py", line 154, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\routing.py", line 670, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 2734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1780, in handle
+    await self.original_router.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 2789, in handle
+    await included_router._handle_selected(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1800, in _handle_selected
+    await original_route.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1279, in handle
+    await app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 158, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 144, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 706, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 354, in run_endpoint_function
+    return await run_in_threadpool(dependant.call, **values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\concurrency.py", line 34, in run_in_threadpool
+    return await anyio.to_thread.run_sync(func)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\to_thread.py", line 65, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        func, args, abandon_on_cancel=abandon_on_cancel, limiter=limiter
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\_backends\_asyncio.py", line 2706, in run_sync_in_worker_thread
+    return await future
+           ^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\_backends\_asyncio.py", line 1100, in run
+    result = context.run(func, *args)
+  File "E:\Projects\excelence\backend\api\spreadsheet.py", line 320, in rename_column
+    success = controller.rename_column(request.old_name, request.new_name)
+  File "E:\Projects\excelence\backend\controller\controller.py", line 384, in rename_column
+    return self.spreadsheet_service.rename_column(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        old_name,
+        ^^^^^^^^^
+        new_name,
+        ^^^^^^^^^
+    )
+    ^
+  File "E:\Projects\excelence\backend\services\spreadsheet_service.py", line 89, in rename_column
+    return self._execute(command)
+           ~~~~~~~~~~~~~^^^^^^^^^
+  File "E:\Projects\excelence\backend\services\spreadsheet_service.py", line 33, in _execute
+    return self.command_manager.execute(command)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "E:\Projects\excelence\backend\commands\manager.py", line 9, in execute
+    result = command.execute()
+  File "E:\Projects\excelence\backend\commands\spreadsheet\rename_column.py", line 17, in execute
+    return self.document.rename_column(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self.old_name,
+        ^^^^^^^^^^^^^^
+        self.new_name
+        ^^^^^^^^^^^^^
+    )
+    ^
+  File "E:\Projects\excelence\backend\document\document.py", line 491, in rename_column
+    success = self.spreadsheet.rename_column(old_name, new_name)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'Spreadsheet' object has no attribute 'rename_column'. Did you mean: 'delete_column'?
+2026-09-21 10:21:16,707 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-21 10:24:18,683 - INFO - document - Opened document test.xlsx
+2026-09-21 10:24:28,269 - ERROR - main - Unhandled API error for /spreadsheet/columns/rename
+Traceback (most recent call last):
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\cors.py", line 96, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\cors.py", line 154, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\routing.py", line 670, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 2734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1780, in handle
+    await self.original_router.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 2789, in handle
+    await included_router._handle_selected(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1800, in _handle_selected
+    await original_route.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1279, in handle
+    await app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 158, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 144, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 706, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 354, in run_endpoint_function
+    return await run_in_threadpool(dependant.call, **values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\concurrency.py", line 34, in run_in_threadpool
+    return await anyio.to_thread.run_sync(func)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\to_thread.py", line 65, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        func, args, abandon_on_cancel=abandon_on_cancel, limiter=limiter
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\_backends\_asyncio.py", line 2706, in run_sync_in_worker_thread
+    return await future
+           ^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\_backends\_asyncio.py", line 1100, in run
+    result = context.run(func, *args)
+  File "E:\Projects\excelence\backend\api\spreadsheet.py", line 320, in rename_column
+    success = controller.rename_column(request.old_name, request.new_name)
+  File "E:\Projects\excelence\backend\controller\controller.py", line 384, in rename_column
+    return self.spreadsheet_service.rename_column(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        old_name,
+        ^^^^^^^^^
+        new_name,
+        ^^^^^^^^^
+    )
+    ^
+  File "E:\Projects\excelence\backend\services\spreadsheet_service.py", line 89, in rename_column
+    return self._execute(command)
+           ~~~~~~~~~~~~~^^^^^^^^^
+  File "E:\Projects\excelence\backend\services\spreadsheet_service.py", line 33, in _execute
+    return self.command_manager.execute(command)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "E:\Projects\excelence\backend\commands\manager.py", line 9, in execute
+    result = command.execute()
+  File "E:\Projects\excelence\backend\commands\spreadsheet\rename_column.py", line 17, in execute
+    return self.document.rename_column(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self.old_name,
+        ^^^^^^^^^^^^^^
+        self.new_name
+        ^^^^^^^^^^^^^
+    )
+    ^
+  File "E:\Projects\excelence\backend\document\document.py", line 491, in rename_column
+    success = self.spreadsheet.rename_column(old_name, new_name)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'Spreadsheet' object has no attribute 'rename_column'. Did you mean: 'delete_column'?
+2026-09-21 10:27:53,571 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-21 10:29:27,554 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-21 10:48:46,625 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-21 10:48:52,487 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-21 10:52:25,652 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-21 10:52:30,853 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-21 10:54:50,113 - INFO - document - Opened document test.xlsx
+2026-09-21 10:55:00,463 - ERROR - main - Unhandled API error for /spreadsheet/columns/rename
+Traceback (most recent call last):
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\cors.py", line 96, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\cors.py", line 154, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\routing.py", line 670, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 2734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1780, in handle
+    await self.original_router.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 2789, in handle
+    await included_router._handle_selected(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1800, in _handle_selected
+    await original_route.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1279, in handle
+    await app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 158, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 144, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 706, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 354, in run_endpoint_function
+    return await run_in_threadpool(dependant.call, **values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\concurrency.py", line 34, in run_in_threadpool
+    return await anyio.to_thread.run_sync(func)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\to_thread.py", line 65, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        func, args, abandon_on_cancel=abandon_on_cancel, limiter=limiter
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\_backends\_asyncio.py", line 2706, in run_sync_in_worker_thread
+    return await future
+           ^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\_backends\_asyncio.py", line 1100, in run
+    result = context.run(func, *args)
+  File "E:\Projects\excelence\backend\api\spreadsheet.py", line 320, in rename_column
+    success = controller.rename_column(request.old_name, request.new_name)
+  File "E:\Projects\excelence\backend\controller\controller.py", line 384, in rename_column
+    return self.spreadsheet_service.rename_column(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        old_name,
+        ^^^^^^^^^
+        new_name,
+        ^^^^^^^^^
+    )
+    ^
+  File "E:\Projects\excelence\backend\services\spreadsheet_service.py", line 89, in rename_column
+    return self._execute(command)
+           ~~~~~~~~~~~~~^^^^^^^^^
+  File "E:\Projects\excelence\backend\services\spreadsheet_service.py", line 33, in _execute
+    return self.command_manager.execute(command)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "E:\Projects\excelence\backend\commands\manager.py", line 9, in execute
+    result = command.execute()
+  File "E:\Projects\excelence\backend\commands\spreadsheet\rename_column.py", line 17, in execute
+    return self.document.rename_column(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self.old_name,
+        ^^^^^^^^^^^^^^
+        self.new_name
+        ^^^^^^^^^^^^^
+    )
+    ^
+  File "E:\Projects\excelence\backend\document\document.py", line 491, in rename_column
+    success = self.spreadsheet.rename_column(old_name, new_name)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'Spreadsheet' object has no attribute 'rename_column'. Did you mean: 'delete_column'?
+2026-09-21 10:58:01,910 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-21 10:59:54,591 - INFO - document - Opened document test.xlsx
+2026-09-21 11:00:09,292 - ERROR - main - Unhandled API error for /spreadsheet/columns/rename
+Traceback (most recent call last):
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\cors.py", line 96, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\cors.py", line 154, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\routing.py", line 670, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 2734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1780, in handle
+    await self.original_router.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 2789, in handle
+    await included_router._handle_selected(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1800, in _handle_selected
+    await original_route.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1279, in handle
+    await app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 158, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 144, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 706, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 354, in run_endpoint_function
+    return await run_in_threadpool(dependant.call, **values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\concurrency.py", line 34, in run_in_threadpool
+    return await anyio.to_thread.run_sync(func)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\to_thread.py", line 65, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        func, args, abandon_on_cancel=abandon_on_cancel, limiter=limiter
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\_backends\_asyncio.py", line 2706, in run_sync_in_worker_thread
+    return await future
+           ^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\_backends\_asyncio.py", line 1100, in run
+    result = context.run(func, *args)
+  File "E:\Projects\excelence\backend\api\spreadsheet.py", line 320, in rename_column
+    success = controller.rename_column(request.old_name, request.new_name)
+  File "E:\Projects\excelence\backend\controller\controller.py", line 384, in rename_column
+    return self.spreadsheet_service.rename_column(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        old_name,
+        ^^^^^^^^^
+        new_name,
+        ^^^^^^^^^
+    )
+    ^
+  File "E:\Projects\excelence\backend\services\spreadsheet_service.py", line 89, in rename_column
+    return self._execute(command)
+           ~~~~~~~~~~~~~^^^^^^^^^
+  File "E:\Projects\excelence\backend\services\spreadsheet_service.py", line 33, in _execute
+    return self.command_manager.execute(command)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "E:\Projects\excelence\backend\commands\manager.py", line 9, in execute
+    result = command.execute()
+  File "E:\Projects\excelence\backend\commands\spreadsheet\rename_column.py", line 17, in execute
+    return self.document.rename_column(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self.old_name,
+        ^^^^^^^^^^^^^^
+        self.new_name
+        ^^^^^^^^^^^^^
+    )
+    ^
+  File "E:\Projects\excelence\backend\document\document.py", line 491, in rename_column
+    success = self.spreadsheet.rename_column(old_name, new_name)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'Spreadsheet' object has no attribute 'rename_column'. Did you mean: 'delete_column'?
+2026-09-21 11:02:59,401 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-21 11:05:22,645 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-21 11:07:41,936 - INFO - document - Opened document test.xlsx
+2026-09-21 11:07:50,114 - ERROR - main - Unhandled API error for /spreadsheet/columns/rename
+Traceback (most recent call last):
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\cors.py", line 96, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\cors.py", line 154, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\routing.py", line 670, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 2734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1780, in handle
+    await self.original_router.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 2789, in handle
+    await included_router._handle_selected(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1800, in _handle_selected
+    await original_route.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1279, in handle
+    await app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 158, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 144, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 706, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 354, in run_endpoint_function
+    return await run_in_threadpool(dependant.call, **values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\concurrency.py", line 34, in run_in_threadpool
+    return await anyio.to_thread.run_sync(func)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\to_thread.py", line 65, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        func, args, abandon_on_cancel=abandon_on_cancel, limiter=limiter
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\_backends\_asyncio.py", line 2706, in run_sync_in_worker_thread
+    return await future
+           ^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\_backends\_asyncio.py", line 1100, in run
+    result = context.run(func, *args)
+  File "E:\Projects\excelence\backend\api\spreadsheet.py", line 320, in rename_column
+    success = controller.rename_column(request.old_name, request.new_name)
+  File "E:\Projects\excelence\backend\controller\controller.py", line 384, in rename_column
+    return self.spreadsheet_service.rename_column(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        old_name,
+        ^^^^^^^^^
+        new_name,
+        ^^^^^^^^^
+    )
+    ^
+  File "E:\Projects\excelence\backend\services\spreadsheet_service.py", line 89, in rename_column
+    return self._execute(command)
+           ~~~~~~~~~~~~~^^^^^^^^^
+  File "E:\Projects\excelence\backend\services\spreadsheet_service.py", line 33, in _execute
+    return self.command_manager.execute(command)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "E:\Projects\excelence\backend\commands\manager.py", line 9, in execute
+    result = command.execute()
+  File "E:\Projects\excelence\backend\commands\spreadsheet\rename_column.py", line 17, in execute
+    return self.document.rename_column(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self.old_name,
+        ^^^^^^^^^^^^^^
+        self.new_name
+        ^^^^^^^^^^^^^
+    )
+    ^
+  File "E:\Projects\excelence\backend\document\document.py", line 491, in rename_column
+    success = self.spreadsheet.rename_column(old_name, new_name)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'Spreadsheet' object has no attribute 'rename_column'. Did you mean: 'delete_column'?
+2026-09-21 11:17:51,813 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-21 11:19:37,567 - INFO - document - Opened document test.xlsx
+2026-09-21 11:19:45,673 - ERROR - main - Unhandled API error for /spreadsheet/columns/rename
+Traceback (most recent call last):
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\cors.py", line 96, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\cors.py", line 154, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\routing.py", line 670, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 2734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1780, in handle
+    await self.original_router.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 2789, in handle
+    await included_router._handle_selected(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1800, in _handle_selected
+    await original_route.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1279, in handle
+    await app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 158, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 144, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 706, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 354, in run_endpoint_function
+    return await run_in_threadpool(dependant.call, **values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\concurrency.py", line 34, in run_in_threadpool
+    return await anyio.to_thread.run_sync(func)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\to_thread.py", line 65, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        func, args, abandon_on_cancel=abandon_on_cancel, limiter=limiter
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\_backends\_asyncio.py", line 2706, in run_sync_in_worker_thread
+    return await future
+           ^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\_backends\_asyncio.py", line 1100, in run
+    result = context.run(func, *args)
+  File "E:\Projects\excelence\backend\api\spreadsheet.py", line 320, in rename_column
+    success = controller.rename_column(request.old_name, request.new_name)
+  File "E:\Projects\excelence\backend\controller\controller.py", line 384, in rename_column
+    return self.spreadsheet_service.rename_column(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        old_name,
+        ^^^^^^^^^
+        new_name,
+        ^^^^^^^^^
+    )
+    ^
+  File "E:\Projects\excelence\backend\services\spreadsheet_service.py", line 89, in rename_column
+    return self._execute(command)
+           ~~~~~~~~~~~~~^^^^^^^^^
+  File "E:\Projects\excelence\backend\services\spreadsheet_service.py", line 33, in _execute
+    return self.command_manager.execute(command)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "E:\Projects\excelence\backend\commands\manager.py", line 9, in execute
+    result = command.execute()
+  File "E:\Projects\excelence\backend\commands\spreadsheet\rename_column.py", line 17, in execute
+    return self.document.rename_column(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self.old_name,
+        ^^^^^^^^^^^^^^
+        self.new_name
+        ^^^^^^^^^^^^^
+    )
+    ^
+  File "E:\Projects\excelence\backend\document\document.py", line 491, in rename_column
+    success = self.spreadsheet.rename_column(old_name, new_name)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'Spreadsheet' object has no attribute 'rename_column'. Did you mean: 'delete_column'?
+2026-09-21 11:25:37,974 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-21 11:40:43,851 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-21 11:47:47,161 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-21 11:49:31,452 - INFO - document - Opened document test.xlsx
+2026-09-21 12:32:15,502 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-21 12:33:23,630 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-21 12:33:43,943 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-21 12:34:18,378 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-21 12:35:15,247 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-21 12:35:55,123 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-21 12:36:04,464 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-21 12:39:06,418 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-21 12:39:26,036 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-21 12:41:14,784 - WARNING - document - Failed to open workbook: test.xlsx
+2026-09-21 13:07:17,166 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-21 13:10:19,669 - INFO - document - Opened document test.xlsx

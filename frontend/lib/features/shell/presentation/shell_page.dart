@@ -9,6 +9,7 @@ import '../widgets/workspace.dart';
 import '../widgets/status_bar.dart';
 import '../widgets/toolbar.dart';
 import '../widgets/search_bar.dart';
+import '../widgets/sheet_tabs.dart';
 
 /// Owns the SpreadsheetController and ViewportController for the whole
 /// shell. These used to be created privately inside SpreadsheetFeatureV2,
@@ -38,22 +39,36 @@ class _ShellPageState extends State<ShellPage> {
     spreadsheetController = SpreadsheetController(service);
     viewportController = ViewportController();
 
+    // Keep the viewport's valid row/column range in sync with whatever
+    // sheet is currently active - this covers every path that can change
+    // the grid's dimensions (row/column insert/delete, search, sheet
+    // switch/add/delete) in one place, rather than duplicating a bounds
+    // refresh into each feature that can trigger one. Individual features
+    // (Toolbar, SpreadsheetGrid, the search bar) also call
+    // setSheetBounds directly after their own mutations for immediate
+    // feedback - setSheetBounds is a pure recompute, so the occasional
+    // redundant call here is harmless.
+    spreadsheetController.addListener(_syncViewportBounds);
+
     spreadsheetController.loadDocument('test.xlsx').then((_) {
-      final spreadsheet = spreadsheetController.spreadsheet;
-      if (spreadsheet == null) {
-        return;
-      }
-      viewportController.setSheetBounds(
-        rowCount: spreadsheet.activeSheet.rows.length,
-        columnCount: spreadsheet.activeSheet.rows.isEmpty
-            ? 0
-            : spreadsheet.activeSheet.rows.first.cells.length,
-      );
+      _syncViewportBounds();
     });
+  }
+
+  void _syncViewportBounds() {
+    final spreadsheet = spreadsheetController.spreadsheet;
+    if (spreadsheet == null) {
+      return;
+    }
+    viewportController.setSheetBounds(
+      rowCount: spreadsheet.activeSheet.rows.length,
+      columnCount: spreadsheet.activeSheet.headers.length,
+    );
   }
 
   @override
   void dispose() {
+    spreadsheetController.removeListener(_syncViewportBounds);
     spreadsheetController.dispose();
     viewportController.dispose();
     super.dispose();
@@ -65,7 +80,7 @@ class _ShellPageState extends State<ShellPage> {
       body: SafeArea(
         child: Column(
           children: [
-            const AppMenuBar(),
+            AppMenuBar(spreadsheetController: spreadsheetController),
             Toolbar(
               spreadsheetController: spreadsheetController,
               viewportController: viewportController,
@@ -78,6 +93,7 @@ class _ShellPageState extends State<ShellPage> {
               spreadsheetController: spreadsheetController,
               viewportController: viewportController,
             ),
+            SheetTabs(spreadsheetController: spreadsheetController),
             const StatusBar(),
           ],
         ),

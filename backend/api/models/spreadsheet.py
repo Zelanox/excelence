@@ -89,4 +89,3 @@ class SpreadsheetStatusResponse(ApiResponse):
     rows: int = Field(default=0, description="Number of visible rows.")
 
     columns: int = Field(default=0, description="Number of visible columns.")
-

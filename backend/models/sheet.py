@@ -191,7 +191,32 @@ class Sheet:
         if name not in self.dataframe.columns:
             return False
 
+        if len(self.dataframe.columns) == 1:
+            # A sheet must always have at least one column - deleting the
+            # last one would leave a zero-column DataFrame, which pandas
+            # treats as "empty" the same way a zero-ROW DataFrame is,
+            # collapsing headers/column_count to nothing even though rows
+            # still exist. That self-contradictory shape (row_count > 0,
+            # column_count == 0) is what a completely columnless sheet
+            # produces - refuse it the same way a workbook is never
+            # allowed to drop its last remaining sheet.
+            return False
+
         self.dataframe.drop(columns=[name], inplace=True)
+        self.active_view = self.dataframe.copy()
+        return True
+
+    def rename_column(self, old_name: str, new_name: str) -> bool:
+        if old_name not in self.dataframe.columns:
+            return False
+
+        if not isinstance(new_name, str) or not new_name.strip():
+            return False
+
+        if new_name != old_name and new_name in self.dataframe.columns:
+            return False
+
+        self.dataframe.rename(columns={old_name: new_name}, inplace=True)
         self.active_view = self.dataframe.copy()
         return True
 

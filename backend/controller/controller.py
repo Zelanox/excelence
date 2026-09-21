@@ -370,6 +370,22 @@ class Controller:
         """
         return self.spreadsheet_service.delete_column(name)
 
+    def rename_column(self, old_name: str, new_name: str) -> bool:
+        """
+        Rename a column in the active document.
+
+        Args:
+            old_name: Current column name.
+            new_name: New column name.
+
+        Returns:
+            True if the column was renamed successfully, otherwise False.
+        """
+        return self.spreadsheet_service.rename_column(
+            old_name,
+            new_name,
+        )
+
     def rename_sheet(self, old_name: str, new_name: str) -> bool:
         """
         Rename a worksheet in the active document.
@@ -414,17 +430,33 @@ class Controller:
     # File Management
     # ==========================================================
 
-    def list_documents(self, folder: str) -> list[str]:
+    def list_documents(self, folder: str = "") -> list[str]:
         """
         List Excel documents in a folder.
 
         Args:
-            folder: Folder to inspect.
+            folder: Folder to inspect, relative to the documents root.
+                Defaults to the documents root itself.
 
         Returns:
             A sorted list of workbook filenames.
         """
         return self.document.list_documents(folder)
+
+    def list_folder_entries(self, folder: str = "") -> dict[str, list[str]] | None:
+        """
+        List the subfolders and Excel documents directly inside a folder,
+        for file-browser navigation.
+
+        Args:
+            folder: Folder to inspect, relative to the documents root.
+                Defaults to the documents root itself.
+
+        Returns:
+            A dict with "folders" and "documents" lists, or None if
+            folder is invalid or escapes the documents root.
+        """
+        return self.document.list_folder_entries(folder)
 
     def delete_document(self, filename: str) -> bool:
         """

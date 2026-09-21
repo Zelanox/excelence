@@ -53,6 +53,23 @@ class SpreadsheetGrid extends StatefulWidget {
 class _SpreadsheetGridState extends State<SpreadsheetGrid> {
   final FocusNode _gridFocusNode = FocusNode(debugLabel: 'SpreadsheetGrid');
 
+  // Whether a column header is currently mid-rename (its own inline
+  // TextField is showing and owns keyboard input). Column-header renaming
+  // is tracked entirely inside GridColumnHeader's State, not in
+  // viewportController.isEditing (that flag is cell-editing only), so the
+  // grid needs its own signal here to avoid stealing focus back from the
+  // header's TextField - which previously caused renames to fail and
+  // keystrokes to fall through to whatever cell was selected instead.
+  bool _isRenamingHeader = false;
+
+  void _setRenamingHeader(bool value) {
+    if (_isRenamingHeader != value) {
+      setState(() {
+        _isRenamingHeader = value;
+      });
+    }
+  }
+
   // True while a drag-range selection gesture is in progress (mouse down
   // and moving across cells). Purely a local interaction flag for THIS
   // gesture - it does not describe spreadsheet state, so it stays local
@@ -311,7 +328,9 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
 
     // While a cell is being edited, its own TextField owns the keyboard
     // (for normal text-cursor movement) - don't intercept arrow keys here.
-    if (widget.viewportController.isEditing) {
+    // Same for a column header mid-rename - its TextField should get the
+    // keystrokes, not trigger cell navigation/edit-start.
+    if (widget.viewportController.isEditing || _isRenamingHeader) {
       return KeyEventResult.ignored;
     }
 
@@ -403,7 +422,7 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
           // being edited (in which case its own TextField should keep
           // focus - which it already has, since GridCell requests focus
           // itself when entering edit mode).
-          if (!widget.viewportController.isEditing) {
+          if (!widget.viewportController.isEditing && !_isRenamingHeader) {
             _gridFocusNode.requestFocus();
           }
         },
@@ -464,6 +483,7 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
                               columnIndex: c,
                               spreadsheetController:
                                   widget.spreadsheetController,
+                              onRenamingChanged: _setRenamingHeader,
                             ),
                           ),
                         SizedBox(

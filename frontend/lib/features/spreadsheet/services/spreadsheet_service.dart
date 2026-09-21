@@ -30,6 +30,59 @@ class SpreadsheetData {
   }
 }
 
+/// The response shape for every sheet-management endpoint (switch, add,
+/// delete, rename) - deliberately lighter than [SpreadsheetData]. These
+/// endpoints only report which worksheets exist and which is now active;
+/// they never include grid data (headers/rows), so switching sheets
+/// always needs a separate loadData() call to fetch the newly-active
+/// sheet's actual content.
+class SheetsData {
+  SheetsData({
+    required this.sheetNames,
+    required this.currentSheet,
+  });
+
+  final List<String> sheetNames;
+  final String currentSheet;
+
+  factory SheetsData.fromJson(Map<String, dynamic> json) {
+    final rawSheets = json['sheets'] as List<dynamic>? ?? [];
+
+    return SheetsData(
+      sheetNames: rawSheets.map((name) => name.toString()).toList(),
+      currentSheet: json['current_sheet']?.toString() ?? '',
+    );
+  }
+}
+
+/// One level of the server-side documents tree, as returned by
+/// GET /documents/browse - the subfolders and .xlsx files sitting
+/// directly inside [folder] (not recursive). Powers the file-explorer
+/// dialog's navigation; [folder] echoes back the path that was browsed
+/// so the dialog can update its breadcrumb after a navigation call.
+class FolderEntries {
+  FolderEntries({
+    required this.folder,
+    required this.folders,
+    required this.documents,
+  });
+
+  final String folder;
+  final List<String> folders;
+  final List<String> documents;
+
+  factory FolderEntries.fromJson(Map<String, dynamic> json) {
+    final rawFolders = json['folders'] as List<dynamic>? ?? [];
+    final rawDocuments = json['documents'] as List<dynamic>? ?? [];
+
+    return FolderEntries(
+      folder: json['folder']?.toString() ?? '',
+      folders: rawFolders.map((name) => name.toString()).toList(),
+      documents: rawDocuments.map((name) => name.toString()).toList(),
+    );
+  }
+}
+
 class SpreadsheetService {
   SpreadsheetService(this._api);
 
@@ -61,6 +114,60 @@ class SpreadsheetService {
     }
   }
 
+  Future<void> createDocument(String filename) async {
+    final response = await _api.post(
+      '/documents/create',
+      body: {
+        'filename': filename,
+      },
+    );
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(
+        'Failed to create document: '
+        '${response.statusCode} ${response.body}',
+      );
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+
+    if (json['success'] != true) {
+      throw Exception(
+        json['message']?.toString().isNotEmpty == true
+            ? json['message'].toString()
+            : 'Failed to create document.',
+      );
+    }
+  }
+
+  /// Lists the subfolders and .xlsx files directly inside [folder] (a
+  /// path relative to the backend's documents root; empty string means
+  /// the root itself) - powers the file-explorer dialog's navigation.
+  Future<FolderEntries> browseFolder(String folder) async {
+    final response = await _api.get(
+      '/documents/browse?path=${Uri.encodeQueryComponent(folder)}',
+    );
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(
+        'Failed to browse folder: '
+        '${response.statusCode} ${response.body}',
+      );
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+
+    if (json['success'] != true) {
+      throw Exception(
+        json['message']?.toString().isNotEmpty == true
+            ? json['message'].toString()
+            : 'Failed to browse folder.',
+      );
+    }
+
+    return FolderEntries.fromJson(json);
+  }
+
   Future<SpreadsheetData> loadData() async {
     final response = await _api.get('/spreadsheet/data');
 
@@ -82,6 +189,32 @@ class SpreadsheetService {
     }
 
     return SpreadsheetData.fromJson(json);
+  }
+
+  /// Fetches the workbook's available worksheet names and which one is
+  /// currently active. Read-only - unlike setActiveSheet/addSheet/etc,
+  /// this never changes anything server-side.
+  Future<SheetsData> sheets() async {
+    final response = await _api.get('/spreadsheet/sheets');
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(
+        'Failed to load sheet list: '
+        '${response.statusCode} ${response.body}',
+      );
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+
+    if (json['success'] != true) {
+      throw Exception(
+        json['message']?.toString().isNotEmpty == true
+            ? json['message'].toString()
+            : 'Failed to load sheet list.',
+      );
+    }
+
+    return SheetsData.fromJson(json);
   }
 
   /// Shared POST + response handling for the row/column edit endpoints,
@@ -114,9 +247,56 @@ class SpreadsheetService {
     return SpreadsheetData.fromJson(json);
   }
 
-  Future<void> createDocument() async {}
+  /// Shared POST + response handling for the sheet-management endpoints
+  /// (switch/add/delete/rename), which all return the same lighter
+  /// SheetsData shape (success, message, sheets, current_sheet) - no grid
+  /// data, unlike _postEdit's SpreadsheetEditResponse.
+  Future<SheetsData> _postSheets(
+    String endpoint, {
+    required Map<String, dynamic> body,
+    required String failureMessage,
+  }) async {
+    final response = await _api.post(endpoint, body: body);
 
-  Future<void> saveDocument() async {}
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(
+        '$failureMessage: ${response.statusCode} ${response.body}',
+      );
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+
+    if (json['success'] != true) {
+      throw Exception(
+        json['message']?.toString().isNotEmpty == true
+            ? json['message'].toString()
+            : failureMessage,
+      );
+    }
+
+    return SheetsData.fromJson(json);
+  }
+
+  Future<void> saveDocument() async {
+    final response = await _api.post('/documents/save');
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(
+        'Failed to save document: '
+        '${response.statusCode} ${response.body}',
+      );
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+
+    if (json['success'] != true) {
+      throw Exception(
+        json['message']?.toString().isNotEmpty == true
+            ? json['message'].toString()
+            : 'Failed to save document.',
+      );
+    }
+  }
 
   Future<void> closeDocument() async {}
 
@@ -171,7 +351,25 @@ class SpreadsheetService {
     );
   }
 
-  Future<void> editCell() async {}
+  /// Persists a single cell edit to the backend. The response's fresh
+  /// grid data is intentionally discarded here (see
+  /// [SpreadsheetController._persistCellEdits]) - callers only care
+  /// whether the save succeeded, not the echoed sheet snapshot.
+  Future<void> editCell({
+    required int row,
+    required int column,
+    required String value,
+  }) {
+    return _postEdit(
+      '/spreadsheet/edit-cell',
+      body: {
+        'row': row,
+        'column': column,
+        'value': value,
+      },
+      failureMessage: 'Failed to save cell edit',
+    );
+  }
 
   /// Inserts a new row at [index] (zero-based). If [index] is omitted,
   /// the backend appends the row at the end.
@@ -179,7 +377,7 @@ class SpreadsheetService {
     return _postEdit(
       '/spreadsheet/rows/insert',
       body: {
-        if (index != null) 'index': index,
+        'index': ?index,
       },
       failureMessage: 'Failed to insert row',
     );
@@ -204,7 +402,7 @@ class SpreadsheetService {
       '/spreadsheet/columns/insert',
       body: {
         'name': name,
-        if (index != null) 'index': index,
+        'index': ?index,
       },
       failureMessage: 'Failed to insert column',
     );
@@ -235,11 +433,49 @@ class SpreadsheetService {
     );
   }
 
-  Future<void> addSheet() async {}
+  /// Switches the active worksheet to [sheetName]. Callers must follow
+  /// this with loadData() to fetch the newly-active sheet's actual grid
+  /// content - this call alone only updates which sheet is active.
+  Future<SheetsData> setActiveSheet(String sheetName) {
+    return _postSheets(
+      '/spreadsheet/sheet',
+      body: {'sheet_name': sheetName},
+      failureMessage: 'Failed to switch sheet',
+    );
+  }
 
-  Future<void> deleteSheet() async {}
+  /// Creates a new worksheet named [name] and makes it active. Like
+  /// [setActiveSheet], callers must follow this with loadData() to fetch
+  /// the new (empty) sheet's grid content.
+  Future<SheetsData> addSheet(String name) {
+    return _postSheets(
+      '/spreadsheet/sheets/add',
+      body: {'name': name},
+      failureMessage: 'Failed to add sheet',
+    );
+  }
 
-  Future<void> renameSheet() async {}
+  /// Deletes the worksheet named [name]. The backend refuses (success:
+  /// false) to delete the last remaining sheet in a workbook - a workbook
+  /// must always have at least one sheet.
+  Future<SheetsData> deleteSheet(String name) {
+    return _postSheets(
+      '/spreadsheet/sheets/delete',
+      body: {'name': name},
+      failureMessage: 'Failed to delete sheet',
+    );
+  }
 
-  Future<void> setActiveSheet() async {}
+  /// Renames the worksheet currently named [oldName] to [newName].
+  /// Renaming does not change which sheet is active.
+  Future<SheetsData> renameSheet({
+    required String oldName,
+    required String newName,
+  }) {
+    return _postSheets(
+      '/spreadsheet/sheets/rename',
+      body: {'old_name': oldName, 'new_name': newName},
+      failureMessage: 'Failed to rename sheet',
+    );
+  }
 }

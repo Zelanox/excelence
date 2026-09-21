@@ -1,5 +1,6 @@
 from typing import Any
 
+import os
 import pandas as pd
 from openpyxl import Workbook
 
@@ -71,7 +72,7 @@ class Document:
         Open an Excel document from disk.
 
         Args:
-            filename: Path to the workbook.
+            filename: Path to the workbook, relative to documents_folder.
 
         Returns:
             True if the document was loaded successfully, otherwise False.
@@ -95,12 +96,13 @@ class Document:
         Create a new Excel document.
 
         Args:
-            filename: Path for the new workbook.
+            filename: Path for the new workbook, relative to
+                documents_folder.
 
         Returns:
             True if the new document was created successfully, otherwise False.
         """
-        if not self._is_valid_filename(filename):
+        if self._resolve_path(filename) is None:
             logger.warning("Create rejected for invalid filename: %s", filename)
             return False
 
@@ -112,6 +114,7 @@ class Document:
         self.sheet_name = self.sheet.title
 
         self._clear_view_data()
+        self._seed_blank_worksheet(self.sheet)
         self.dataframe_to_spreadsheet()
 
         self.loaded = True
@@ -193,15 +196,17 @@ class Document:
         Load a workbook from storage into memory.
 
         Args:
-            filename: Path to the workbook.
+            filename: Path to the workbook, relative to documents_folder.
 
         Returns:
             True if the workbook was loaded successfully, otherwise False.
         """
-        if not self._is_valid_filename(filename):
+        resolved = self._resolve_path(filename)
+
+        if resolved is None:
             return False
 
-        self.workbook = self.storage.open(filename)
+        self.workbook = self.storage.open(resolved)
 
         if self.workbook is None:
             return False
@@ -225,8 +230,14 @@ class Document:
             logger.warning("Save skipped because no active workbook is available")
             return False
 
+        resolved = self._resolve_path(self.filename)
+
+        if resolved is None:
+            logger.warning("Save rejected for invalid filename: %s", self.filename)
+            return False
+
         self.storage.write_sheet(self.sheet, self.df)
-        saved = self.storage.save(self.workbook, self.filename)
+        saved = self.storage.save(self.workbook, resolved)
         self.modified = False
 
         if saved:
@@ -362,12 +373,6 @@ class Document:
         if row < 0 or column < 0:
             return False
 
-        if row >= len(self.df):
-            return False
-
-        if column >= len(self.df.columns):
-            return False
-
         success = self.spreadsheet.edit_cell(row, column, value)
 
         if not success:
@@ -395,12 +400,6 @@ class Document:
         if self.workbook is None:
             return False
 
-        if index is None:
-            index = len(self.df)
-
-        if index < 0 or index > len(self.df):
-            return False
-
         success = self.spreadsheet.insert_row(index)
 
         if not success:
@@ -423,9 +422,6 @@ class Document:
             True if the row was deleted successfully, otherwise False.
         """
         if self.workbook is None:
-            return False
-
-        if index < 0 or index >= len(self.df):
             return False
 
         success = self.spreadsheet.delete_row(index)
@@ -453,18 +449,6 @@ class Document:
         if self.workbook is None:
             return False
 
-        if not self._is_valid_filename(name):
-            return False
-
-        if name in self.df.columns:
-            return False
-
-        if index is None:
-            index = len(self.df.columns)
-
-        if index < 0 or index > len(self.df.columns):
-            return False
-
         success = self.spreadsheet.insert_column(name, index)
 
         if not success:
@@ -489,10 +473,32 @@ class Document:
         if self.workbook is None:
             return False
 
-        if name not in self.df.columns:
+        success = self.spreadsheet.delete_column(name)
+
+        if not success:
             return False
 
-        success = self.spreadsheet.delete_column(name)
+        self._sync_from_active_sheet()
+        self._sync_active_sheet()
+        self.modified = True
+        self.search(self.search_text)
+        return True
+
+    def rename_column(self, old_name: str, new_name: str) -> bool:
+        """
+        Rename a column in the active document.
+
+        Args:
+            old_name: Current column name.
+            new_name: New column name.
+
+        Returns:
+            True if the column was renamed successfully, otherwise False.
+        """
+        if self.workbook is None:
+            return False
+
+        success = self.spreadsheet.rename_column(old_name, new_name)
 
         if not success:
             return False
@@ -530,6 +536,7 @@ class Document:
         self.sheet_name = new_name
         self.sheet = self.workbook[new_name]
         self._sync_active_sheet()
+        self.dataframe_to_spreadsheet()
         self.modified = True
         return True
 
@@ -557,6 +564,8 @@ class Document:
         self.sheet_name = name
         self._clear_view_data()
         self._sync_active_sheet()
+        self._seed_blank_worksheet(self.sheet)
+        self.dataframe_to_spreadsheet()
         self.modified = True
         self.search(self.search_text)
         return True
@@ -593,6 +602,7 @@ class Document:
             self.sheet = self.workbook[remaining_sheet]
             self.sheet_name = remaining_sheet
             self._refresh_view()
+            self.dataframe_to_spreadsheet()
             return True
 
         if self.sheet_name in self.workbook.sheetnames:
@@ -602,6 +612,7 @@ class Document:
             self.sheet_name = self.sheet.title
 
         self._refresh_view()
+        self.dataframe_to_spreadsheet()
         return True
 
     # ==========================================================
@@ -652,33 +663,75 @@ class Document:
     # File Management
     # ==========================================================
 
-    def list_documents(self, folder: str) -> list[str]:
+    def list_documents(self, folder: str = "") -> list[str]:
         """
         List Excel documents in a folder.
 
         Args:
-            folder: Folder to inspect.
+            folder: Folder to inspect, relative to documents_folder.
+                Empty string means documents_folder itself.
 
         Returns:
-            A sorted list of workbook filenames.
+            A sorted list of workbook filenames, or an empty list if
+            folder is invalid or escapes documents_folder.
         """
-        return self.storage.list_documents(folder)
+        resolved = self._resolve_folder(folder)
+
+        if resolved is None:
+            return []
+
+        return self.storage.list_documents(resolved)
+
+    def list_folder_entries(self, folder: str = "") -> dict[str, list[str]] | None:
+        """
+        List the subfolders and Excel documents directly inside a folder,
+        for file-browser navigation.
+
+        Args:
+            folder: Folder to inspect, relative to documents_folder.
+                Empty string means documents_folder itself.
+
+        Returns:
+            A dict with "folders" and "documents" (both sorted lists of
+            names, not full paths), or None if folder is invalid or
+            escapes documents_folder.
+        """
+        resolved = self._resolve_folder(folder)
+
+        if resolved is None:
+            return None
+
+        if not os.path.isdir(resolved):
+            return {"folders": [], "documents": []}
+
+        folders = []
+        documents = self.storage.list_documents(resolved)
+
+        for entry in os.listdir(resolved):
+            if os.path.isdir(os.path.join(resolved, entry)):
+                folders.append(entry)
+
+        folders.sort()
+
+        return {"folders": folders, "documents": documents}
 
     def delete_document(self, filename: str) -> bool:
         """
         Delete an Excel document from disk.
 
         Args:
-            filename: Path to the workbook.
+            filename: Path to the workbook, relative to documents_folder.
 
         Returns:
             True if the workbook was deleted successfully, otherwise False.
         """
-        if not self._is_valid_filename(filename):
+        resolved = self._resolve_path(filename)
+
+        if resolved is None:
             logger.warning("Delete rejected for invalid filename: %s", filename)
             return False
 
-        deleted = self.storage.delete(filename)
+        deleted = self.storage.delete(resolved)
 
         if deleted:
             logger.info("Deleted document %s", filename)
@@ -692,31 +745,39 @@ class Document:
         Copy an Excel document to a new location.
 
         Args:
-            source: Source workbook path.
-            destination: Destination workbook path.
+            source: Source workbook path, relative to documents_folder.
+            destination: Destination workbook path, relative to
+                documents_folder.
 
         Returns:
             True if the workbook was copied successfully, otherwise False.
         """
-        if not self._is_valid_filename(source) or not self._is_valid_filename(destination):
+        resolved_source = self._resolve_path(source)
+        resolved_destination = self._resolve_path(destination)
+
+        if resolved_source is None or resolved_destination is None:
             return False
-        return self.storage.copy(source, destination)
+
+        return self.storage.copy(resolved_source, resolved_destination)
 
     def rename_document(self, old_name: str, new_name: str) -> bool:
         """
         Rename an Excel document on disk.
 
         Args:
-            old_name: Current workbook path.
-            new_name: New workbook path.
+            old_name: Current workbook path, relative to documents_folder.
+            new_name: New workbook path, relative to documents_folder.
 
         Returns:
             True if the workbook was renamed successfully, otherwise False.
         """
-        if not self._is_valid_filename(old_name) or not self._is_valid_filename(new_name):
+        resolved_old = self._resolve_path(old_name)
+        resolved_new = self._resolve_path(new_name)
+
+        if resolved_old is None or resolved_new is None:
             return False
 
-        return self.storage.rename(old_name, new_name)
+        return self.storage.rename(resolved_old, resolved_new)
 
     # ==========================================================
     # Helpers
@@ -849,6 +910,91 @@ class Document:
         """Validate that a filename is a non-empty string."""
         return isinstance(filename, str) and bool(filename.strip())
 
+    def _resolve_path(self, relative_path: str) -> str | None:
+        """
+        Resolve a user-supplied relative path against documents_folder,
+        rejecting anything that would escape it (absolute paths, "..").
+
+        This is the single place filenames coming from the API turn into
+        real filesystem paths - open/create/save/list/delete/rename all
+        route through here rather than handing storage a raw path, so a
+        request can never read or write outside documents_folder.
+
+        Args:
+            relative_path: Path relative to documents_folder, using "/"
+                as the separator regardless of platform (the frontend
+                and API always send "/"; os.path.join below produces the
+                correct native separator for wherever this runs).
+
+        Returns:
+            The resolved absolute path, or None if relative_path is
+            empty, absolute, or escapes documents_folder.
+        """
+        if not self._is_valid_filename(relative_path):
+            return None
+
+        if os.path.isabs(relative_path) or ":" in relative_path:
+            return None
+
+        base = os.path.abspath(self.documents_folder)
+        candidate = os.path.abspath(
+            os.path.join(base, *relative_path.split("/"))
+        )
+
+        if candidate != base and not candidate.startswith(base + os.sep):
+            return None
+
+        return candidate
+
+    def _resolve_folder(self, relative_folder: str) -> str | None:
+        """
+        Resolve a user-supplied relative folder against documents_folder,
+        rejecting anything that would escape it. Unlike _resolve_path,
+        an empty string is valid here and means documents_folder itself
+        (the root of the browsable tree).
+
+        Args:
+            relative_folder: Folder path relative to documents_folder,
+                using "/" as the separator. Empty string means the root.
+
+        Returns:
+            The resolved absolute path, or None if relative_folder is
+            not a string, absolute, or escapes documents_folder.
+        """
+        if not isinstance(relative_folder, str):
+            return None
+
+        if relative_folder == "":
+            return os.path.abspath(self.documents_folder)
+
+        return self._resolve_path(relative_folder)
+
+    def _seed_blank_worksheet(
+        self,
+        worksheet: Any,
+        column_count: int = 1,
+        row_count: int = 1,
+    ) -> None:
+        """
+        Write a starter header row (and enough blank rows beneath it) into
+        a brand-new, otherwise completely empty worksheet.
+
+        Without this, a freshly created sheet has zero columns - openpyxl
+        reports no cell values at all, so read_sheet() returns a totally
+        empty DataFrame (headers=[], column_count=0), which the frontend
+        can't render into anything usable. This gives a new sheet the
+        same "Column A", "Column B", ... naming the frontend already uses
+        for columns it adds itself, so a brand-new sheet looks and
+        behaves like any other freshly inserted column.
+        """
+        headers = [
+            f"Column {chr(65 + index)}" for index in range(column_count)
+        ]
+        worksheet.append(headers)
+
+        for _ in range(row_count):
+            worksheet.append(["" for _ in headers])
+
     def _clear_view_data(self) -> None:
         """Reset the in-memory DataFrame view state."""
         self.df = pd.DataFrame()
@@ -896,5 +1042,3 @@ class Document:
         ]
 
         self._set_view_data(pd.DataFrame(rows))
-
-    

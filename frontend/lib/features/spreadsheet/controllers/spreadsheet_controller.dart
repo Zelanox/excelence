@@ -21,6 +21,31 @@ class SpreadsheetController extends ChangeNotifier {
   final List<SpreadsheetModel> _undoStack = [];
   final List<SpreadsheetModel> _redoStack = [];
 
+  // Tracks cell-edit/paste saves that have been fired at the backend but
+  // haven't landed yet (see _persistCellEdits). Anything that's about to
+  // replace the sheet with a fresh full-sheet response from the backend
+  // (insert/delete row or column, search, sort, switch sheet) must wait
+  // for these first via _flushPendingSaves() - otherwise a save that's
+  // still in flight can land AFTER that refresh applies, and the refresh
+  // itself reflects the backend's still-unedited state, silently
+  // reverting the user's just-made edit. This is what "my edit
+  // disappeared after I did something else" looks like from the outside.
+  final Set<Future<void>> _pendingSaves = {};
+
+  /// Waits for every in-flight cell-edit/paste save to finish before
+  /// proceeding. Call this before any operation that's about to fetch a
+  /// fresh full-sheet snapshot from the backend and replace the local
+  /// model with it.
+  Future<void> _flushPendingSaves() async {
+    if (_pendingSaves.isEmpty) {
+      return;
+    }
+    // Copy first - awaiting can let new saves be added to _pendingSaves
+    // while this wait is in progress, and iterating the live set while
+    // it mutates is unsafe.
+    await Future.wait(List<Future<void>>.of(_pendingSaves));
+  }
+
   // The currently active single-column sort, if any - tracked here so
   // GridColumnHeader can show an ascending/descending indicator without
   // each header needing its own separate source of truth. Null means no
@@ -44,15 +69,22 @@ class SpreadsheetController extends ChangeNotifier {
       // 1. Ask the backend to open the workbook.
       await _service.openDocument(filename);
 
-      // 2. Retrieve the workbook data.
+      // 2. Retrieve the real worksheet list and active sheet name -
+      // previously this was hardcoded to 'Sheet1' locally, which only
+      // happened to work because every test workbook so far had exactly
+      // one sheet named that.
+      final sheetsData = await _service.sheets();
+
+      // 3. Retrieve the active sheet's grid data.
       final data = await _service.loadData();
 
-      // 3. Convert API data into our Flutter spreadsheet model.
+      // 4. Convert API data into our Flutter spreadsheet model.
       _spreadsheet = SpreadsheetModel(
         activeSheetIndex: 0,
         sheets: [
-          _sheetFromApiData(name: 'Sheet1', data: data),
+          _sheetFromApiData(name: sheetsData.currentSheet, data: data),
         ],
+        availableSheetNames: sheetsData.sheetNames,
       );
 
       // A newly loaded workbook has no local undo/redo history.
@@ -68,6 +100,56 @@ class SpreadsheetController extends ChangeNotifier {
 
       rethrow;
     }
+  }
+
+  /// Creates a new workbook at [filename] (relative to the backend's
+  /// documents root) on the server, then loads it the same way
+  /// loadDocument does - a freshly created workbook still needs its
+  /// (seeded, 1x1) grid data and sheet list fetched, it isn't returned
+  /// inline by the create call itself.
+  Future<void> newDocument(String filename) async {
+    try {
+      await _service.createDocument(filename);
+      await loadDocument(filename);
+    } catch (error, stackTrace) {
+      debugPrint(
+        '[SpreadsheetController.newDocument] Error: $error',
+      );
+      debugPrintStack(stackTrace: stackTrace);
+
+      rethrow;
+    }
+  }
+
+  /// Persists the active workbook to disk. Doesn't touch the local grid
+  /// model - the backend saves exactly what it already has in memory
+  /// (which is already kept current by every edit/insert/delete this
+  /// controller makes), so there's nothing here to re-fetch or
+  /// re-render. Failures propagate to the caller to surface to the user;
+  /// _lastSaveError isn't used here since that's reserved for the
+  /// fire-and-forget cell-edit path (_persistCellEdits), not an
+  /// explicit, awaited user action like Save.
+  Future<void> saveDocument() async {
+    try {
+      await _service.saveDocument();
+    } catch (error, stackTrace) {
+      debugPrint(
+        '[SpreadsheetController.saveDocument] Error: $error',
+      );
+      debugPrintStack(stackTrace: stackTrace);
+
+      rethrow;
+    }
+  }
+
+  /// Lists the subfolders and .xlsx files directly inside [folder] (a
+  /// path relative to the backend's documents root; empty string means
+  /// the root) - read-only, purely for the file-explorer dialog to
+  /// render a folder's contents. Doesn't touch _spreadsheet or notify
+  /// listeners, since browsing available files has nothing to do with
+  /// the currently-open document.
+  Future<FolderEntries> browseFolder(String folder) {
+    return _service.browseFolder(folder);
   }
 
   /// Converts a raw API [SpreadsheetData] response into a [SheetModel].
@@ -117,6 +199,157 @@ class SpreadsheetController extends ChangeNotifier {
   }
 
   // ============================================================
+  // Sheets
+  // ============================================================
+
+  /// Switches to the worksheet named [sheetName] and loads its data.
+  /// Clears undo/redo history, same as loadDocument - the stack holds
+  /// snapshots scoped to whichever sheet was active when each snapshot
+  /// was taken, so carrying it across a sheet switch would let undo
+  /// restore a different sheet's data under the new sheet's identity.
+  Future<void> switchSheet(String sheetName) async {
+    if (_spreadsheet?.activeSheet.name == sheetName) {
+      return;
+    }
+
+    try {
+      await _flushPendingSaves();
+      final sheetsData = await _service.setActiveSheet(sheetName);
+      final data = await _service.loadData();
+
+      _spreadsheet = SpreadsheetModel(
+        activeSheetIndex: 0,
+        sheets: [
+          _sheetFromApiData(name: sheetsData.currentSheet, data: data),
+        ],
+        availableSheetNames: sheetsData.sheetNames,
+      );
+
+      _undoStack.clear();
+      _redoStack.clear();
+      _sortedColumn = null;
+      _sortAscending = true;
+
+      notifyListeners();
+    } catch (error, stackTrace) {
+      debugPrint('[SpreadsheetController.switchSheet] Error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      rethrow;
+    }
+  }
+
+  /// Creates a new worksheet named [name] and switches to it. Like
+  /// [switchSheet], this clears undo/redo history and any active sort.
+  Future<void> addSheet(String name) async {
+    try {
+      await _flushPendingSaves();
+      final sheetsData = await _service.addSheet(name);
+      final data = await _service.loadData();
+
+      _spreadsheet = SpreadsheetModel(
+        activeSheetIndex: 0,
+        sheets: [
+          _sheetFromApiData(name: sheetsData.currentSheet, data: data),
+        ],
+        availableSheetNames: sheetsData.sheetNames,
+      );
+
+      _undoStack.clear();
+      _redoStack.clear();
+      _sortedColumn = null;
+      _sortAscending = true;
+
+      notifyListeners();
+    } catch (error, stackTrace) {
+      debugPrint('[SpreadsheetController.addSheet] Error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      rethrow;
+    }
+  }
+
+  /// Deletes the worksheet named [name]. The backend refuses to delete a
+  /// workbook's last remaining sheet (the call fails rather than leaving
+  /// zero sheets); this surfaces that failure as a thrown exception, same
+  /// as every other mutation here.
+  ///
+  /// If the deleted sheet was the active one, the backend has already
+  /// switched to a remaining sheet - this fetches THAT sheet's data
+  /// rather than assuming which one it landed on.
+  Future<void> deleteSheet(String name) async {
+    try {
+      await _flushPendingSaves();
+      final sheetsData = await _service.deleteSheet(name);
+      final data = await _service.loadData();
+
+      _spreadsheet = SpreadsheetModel(
+        activeSheetIndex: 0,
+        sheets: [
+          _sheetFromApiData(name: sheetsData.currentSheet, data: data),
+        ],
+        availableSheetNames: sheetsData.sheetNames,
+      );
+
+      _undoStack.clear();
+      _redoStack.clear();
+      _sortedColumn = null;
+      _sortAscending = true;
+
+      notifyListeners();
+    } catch (error, stackTrace) {
+      debugPrint('[SpreadsheetController.deleteSheet] Error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      rethrow;
+    }
+  }
+
+  /// Renames the worksheet currently named [oldName] to [newName].
+  /// Renaming doesn't change which sheet is active or its data, so this
+  /// only needs to refresh the sheet name/tab list - no data reload, no
+  /// undo/redo reset.
+  Future<void> renameSheet({
+    required String oldName,
+    required String newName,
+  }) async {
+    final currentSpreadsheet = _spreadsheet;
+    if (currentSpreadsheet == null) {
+      return;
+    }
+
+    try {
+      final sheetsData = await _service.renameSheet(
+        oldName: oldName,
+        newName: newName,
+      );
+
+      final activeSheetIndex = currentSpreadsheet.activeSheetIndex;
+      final activeSheet = currentSpreadsheet.sheets[activeSheetIndex];
+
+      final renamedActiveSheet = activeSheet.name == oldName
+          ? SheetModel(
+              name: sheetsData.currentSheet,
+              rows: activeSheet.rows,
+              headers: activeSheet.headers,
+            )
+          : activeSheet;
+
+      final updatedSheets = List<SheetModel>.of(currentSpreadsheet.sheets);
+      updatedSheets[activeSheetIndex] = renamedActiveSheet;
+
+      _spreadsheet = SpreadsheetModel(
+        activeSheetIndex: activeSheetIndex,
+        sheets: updatedSheets,
+        availableSheetNames: sheetsData.sheetNames,
+      );
+
+      notifyListeners();
+    } catch (error, stackTrace) {
+      debugPrint('[SpreadsheetController.renameSheet] Error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      rethrow;
+    }
+  }
+
+  // ============================================================
   // Rows and columns
   // ============================================================
 
@@ -134,6 +367,7 @@ class SpreadsheetController extends ChangeNotifier {
     _recordHistoryPoint();
 
     try {
+      await _flushPendingSaves();
       final data = await _service.insertRow(index: index);
       _replaceActiveSheet(data);
       notifyListeners();
@@ -159,6 +393,7 @@ class SpreadsheetController extends ChangeNotifier {
     _recordHistoryPoint();
 
     try {
+      await _flushPendingSaves();
       final data = await _service.deleteRow(index: index);
       _replaceActiveSheet(data);
       notifyListeners();
@@ -182,6 +417,7 @@ class SpreadsheetController extends ChangeNotifier {
     _recordHistoryPoint();
 
     try {
+      await _flushPendingSaves();
       final data = await _service.insertColumn(name: name, index: index);
       _replaceActiveSheet(data);
       notifyListeners();
@@ -208,6 +444,7 @@ class SpreadsheetController extends ChangeNotifier {
     _recordHistoryPoint();
 
     try {
+      await _flushPendingSaves();
       final data = await _service.deleteColumn(name: name);
       _replaceActiveSheet(data);
       notifyListeners();
@@ -236,6 +473,7 @@ class SpreadsheetController extends ChangeNotifier {
     _recordHistoryPoint();
 
     try {
+      await _flushPendingSaves();
       final data = await _service.renameColumn(
         oldName: oldName,
         newName: newName,
@@ -263,6 +501,7 @@ class SpreadsheetController extends ChangeNotifier {
     }
 
     try {
+      await _flushPendingSaves();
       final data = await _service.search(query);
       _replaceActiveSheet(data);
       notifyListeners();
@@ -282,6 +521,7 @@ class SpreadsheetController extends ChangeNotifier {
     }
 
     try {
+      await _flushPendingSaves();
       final data = await _service.clearSearch();
       _replaceActiveSheet(data);
       notifyListeners();
@@ -302,6 +542,7 @@ class SpreadsheetController extends ChangeNotifier {
     }
 
     try {
+      await _flushPendingSaves();
       final data = await _service.sort(column: column, ascending: ascending);
       _replaceActiveSheet(data);
       _sortedColumn = column;
@@ -341,6 +582,7 @@ class SpreadsheetController extends ChangeNotifier {
     }
 
     try {
+      await _flushPendingSaves();
       final data = await _service.clearSort();
       _replaceActiveSheet(data);
       _sortedColumn = null;
@@ -376,6 +618,7 @@ class SpreadsheetController extends ChangeNotifier {
     _spreadsheet = SpreadsheetModel(
       activeSheetIndex: activeSheetIndex,
       sheets: updatedSheets,
+      availableSheetNames: currentSpreadsheet.availableSheetNames,
     );
   }
 
@@ -521,11 +764,13 @@ class SpreadsheetController extends ChangeNotifier {
     sheets[spreadsheet.activeSheetIndex] = SheetModel(
       name: sheet.name,
       rows: rows,
+      headers: sheet.headers,
     );
 
     return SpreadsheetModel(
       sheets: sheets,
       activeSheetIndex: spreadsheet.activeSheetIndex,
+      availableSheetNames: spreadsheet.availableSheetNames,
     );
   }
 
@@ -680,6 +925,7 @@ class SpreadsheetController extends ChangeNotifier {
     final newSheet = SheetModel(
       name: currentSheet.name,
       rows: newRows,
+      headers: currentSheet.headers,
     );
 
     // ----------------------------------------------------------
@@ -699,6 +945,7 @@ class SpreadsheetController extends ChangeNotifier {
     final updatedSpreadsheet = SpreadsheetModel(
       sheets: newSheets,
       activeSheetIndex: activeSheetIndex,
+      availableSheetNames: currentSpreadsheet.availableSheetNames,
     );
 
     _spreadsheet = _recalculateDependents(
@@ -712,6 +959,69 @@ class SpreadsheetController extends ChangeNotifier {
     );
 
     notifyListeners();
+
+    _persistCellEdits([(row: row, column: column, value: newValue)]);
+  }
+
+  /// The most recent background save failure (cell edit, paste, clear),
+  /// if any - surfaced this way rather than thrown, since those calls
+  /// aren't awaited by their callers and the local edit already
+  /// succeeded from the user's point of view; only the persistence
+  /// failed. UI code that wants to show this can read it after
+  /// [notifyListeners] fires and clear it via [clearLastSaveError].
+  String? _lastSaveError;
+  String? get lastSaveError => _lastSaveError;
+
+  void clearLastSaveError() {
+    _lastSaveError = null;
+  }
+
+  /// Persists one or more cell edits to the backend, fire-and-forget.
+  /// Every local mutation path that changes cell values (single-cell
+  /// edit, paste, clear-selection) funnels through here so the backend
+  /// save logic - and its failure handling - lives in exactly one place.
+  ///
+  /// Without this, an edit only ever lives in the frontend's in-memory
+  /// model, and any subsequent full-sheet refresh (insert row/column,
+  /// search, sort, switching sheets and back) silently overwrites it with
+  /// the backend's still-unedited data - which is what "my edit
+  /// disappeared after I did something else" looks like from the
+  /// outside. Each edit's `value` is the cell's already-evaluated display
+  /// value, not raw formula text - the backend has no concept of
+  /// formulas and just stores whatever value it's given.
+  ///
+  /// Requests are sent concurrently (not one-at-a-time) since the backend
+  /// applies each by (row, column) independently and order between
+  /// different cells doesn't matter; only the first failure is surfaced
+  /// via [lastSaveError] even if several edits in the same batch fail, to
+  /// avoid stacking up redundant error messages for what's usually one
+  /// underlying cause (e.g. the connection dropping).
+  void _persistCellEdits(
+    List<({int row, int column, String value})> edits,
+  ) {
+    if (edits.isEmpty) {
+      return;
+    }
+
+    var hasReportedError = false;
+
+    for (final edit in edits) {
+      late final Future<void> save;
+      save = _service
+          .editCell(row: edit.row, column: edit.column, value: edit.value)
+          .then((_) {}, onError: (Object error) {
+        debugPrint('[SpreadsheetController] Save failed: $error');
+        if (!hasReportedError) {
+          hasReportedError = true;
+          _lastSaveError = 'Failed to save changes: $error';
+          notifyListeners();
+        }
+      }).whenComplete(() {
+        _pendingSaves.remove(save);
+      });
+
+      _pendingSaves.add(save);
+    }
   }
 
   Future<void> copySelection(SelectionModel selection) async {
@@ -836,6 +1146,7 @@ class SpreadsheetController extends ChangeNotifier {
     final newRows =
         List<RowModel>.from(currentSheet.rows);
     final changedCells = <String>{};
+    final pastedEdits = <({int row, int column, String value})>[];
 
     for (int pastedRow = 0;
         pastedRow < pastedRows.length;
@@ -882,6 +1193,7 @@ class SpreadsheetController extends ChangeNotifier {
             column: targetColumn,
           ),
         );
+        pastedEdits.add((row: targetRow, column: targetColumn, value: pastedValue));
       }
 
       newRows[targetRow] = RowModel(
@@ -897,6 +1209,7 @@ class SpreadsheetController extends ChangeNotifier {
     final newSheet = SheetModel(
       name: currentSheet.name,
       rows: newRows,
+      headers: currentSheet.headers,
     );
 
     // ----------------------------------------------------------
@@ -917,6 +1230,7 @@ class SpreadsheetController extends ChangeNotifier {
     final updatedSpreadsheet = SpreadsheetModel(
       sheets: newSheets,
       activeSheetIndex: activeSheetIndex,
+      availableSheetNames: currentSpreadsheet.availableSheetNames,
     );
 
     _spreadsheet = _recalculateDependents(
@@ -925,6 +1239,8 @@ class SpreadsheetController extends ChangeNotifier {
     );
 
     notifyListeners();
+
+    _persistCellEdits(pastedEdits);
   }
 
   void clearSelection(SelectionModel selection) {
@@ -986,6 +1302,7 @@ class SpreadsheetController extends ChangeNotifier {
     final newRows =
         List<RowModel>.from(currentSheet.rows);
     final changedCells = <String>{};
+    final clearedEdits = <({int row, int column, String value})>[];
 
     for (int row = startRow; row <= endRow; row++) {
       if (row >= currentSheet.rows.length) {
@@ -1023,6 +1340,7 @@ class SpreadsheetController extends ChangeNotifier {
             column: column,
           ),
         );
+        clearedEdits.add((row: row, column: column, value: ""));
       }
 
       newRows[row] = RowModel(
@@ -1038,6 +1356,7 @@ class SpreadsheetController extends ChangeNotifier {
     final newSheet = SheetModel(
       name: currentSheet.name,
       rows: newRows,
+      headers: currentSheet.headers,
     );
 
     // ----------------------------------------------------------
@@ -1058,6 +1377,7 @@ class SpreadsheetController extends ChangeNotifier {
     final updatedSpreadsheet = SpreadsheetModel(
       sheets: newSheets,
       activeSheetIndex: activeSheetIndex,
+      availableSheetNames: currentSpreadsheet.availableSheetNames,
     );
 
     _spreadsheet = _recalculateDependents(
@@ -1066,6 +1386,8 @@ class SpreadsheetController extends ChangeNotifier {
     );
 
     notifyListeners();
+
+    _persistCellEdits(clearedEdits);
   }
 
 }

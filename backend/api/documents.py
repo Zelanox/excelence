@@ -26,6 +26,64 @@ def list_documents(
     )
 
 
+@router.get(
+    "/browse",
+    response_model=BrowseFolderResponse
+)
+def browse_folder(
+    path: str = "",
+    controller: Controller = Depends(get_controller)
+):
+    """List the subfolders and workbooks directly inside a folder, for
+    file-browser navigation. `path` is relative to the documents root;
+    omit it (or pass an empty string) to browse the root itself."""
+
+    entries = controller.list_folder_entries(path)
+
+    if entries is None:
+        return BrowseFolderResponse(
+            success=False,
+            message="Invalid or inaccessible folder.",
+            folder=path,
+        )
+
+    return BrowseFolderResponse(
+
+        success=True,
+
+        folder=path,
+
+        folders=entries["folders"],
+
+        documents=entries["documents"],
+    )
+
+
+@router.post(
+    "/create",
+    response_model=CreateDocumentResponse
+)
+def create_document(
+    request: CreateDocumentRequest,
+    controller: Controller = Depends(get_controller)
+):
+
+    success = controller.create_document(
+        request.filename
+    )
+
+    return CreateDocumentResponse(
+
+        success=success,
+
+        filename=controller.filename(),
+
+        rows=controller.row_count(),
+
+        columns=controller.column_count()
+    )
+
+
 @router.post(
     "/open",
     response_model=OpenDocumentResponse

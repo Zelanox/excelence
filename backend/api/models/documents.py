@@ -17,6 +17,15 @@ class OpenDocumentRequest(BaseModel):
     )
 
 
+class CreateDocumentRequest(BaseModel):
+
+    filename: str = Field(
+        ...,
+        description="Workbook path or filename to create.",
+        json_schema_extra={"example": "new.xlsx"}
+    )
+
+
 
 # ==========================================================
 # Responses
@@ -29,6 +38,19 @@ class DocumentListResponse(ApiResponse):
 
 class OpenDocumentResponse(DocumentResponse):
     pass
+
+
+class CreateDocumentResponse(DocumentResponse):
+    pass
+
+
+class BrowseFolderResponse(ApiResponse):
+
+    folder: str = Field(default="", description="Folder that was browsed, relative to the documents root.")
+
+    folders: list[str] = Field(default_factory=list, description="Subfolder names directly inside this folder.")
+
+    documents: list[str] = Field(default_factory=list, description="Workbook filenames directly inside this folder.")
 
 
 class SaveDocumentResponse(DocumentResponse):
