@@ -1185,3 +1185,541 @@ AttributeError: 'Spreadsheet' object has no attribute 'rename_column'. Did you m
 2026-09-21 12:41:14,784 - WARNING - document - Failed to open workbook: test.xlsx
 2026-09-21 13:07:17,166 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
 2026-09-21 13:10:19,669 - INFO - document - Opened document test.xlsx
+2026-09-21 19:16:01,552 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-21 19:18:16,999 - INFO - document - Opened document test.xlsx
+2026-09-21 19:21:29,032 - INFO - document - Opened document test.xlsx
+2026-09-21 19:21:40,778 - ERROR - main - Unhandled API error for /documents/save
+Traceback (most recent call last):
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\cors.py", line 96, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\cors.py", line 154, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\routing.py", line 670, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 2734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1780, in handle
+    await self.original_router.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 2789, in handle
+    await included_router._handle_selected(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1800, in _handle_selected
+    await original_route.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1279, in handle
+    await app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 158, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 144, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 706, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 354, in run_endpoint_function
+    return await run_in_threadpool(dependant.call, **values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\concurrency.py", line 34, in run_in_threadpool
+    return await anyio.to_thread.run_sync(func)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\to_thread.py", line 65, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        func, args, abandon_on_cancel=abandon_on_cancel, limiter=limiter
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\_backends\_asyncio.py", line 2706, in run_sync_in_worker_thread
+    return await future
+           ^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\_backends\_asyncio.py", line 1100, in run
+    result = context.run(func, *args)
+  File "E:\Projects\excelence\backend\api\documents.py", line 146, in save_document
+    success = controller.save_document()
+  File "E:\Projects\excelence\backend\controller\controller.py", line 59, in save_document
+    return self.document.save_local()
+           ~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "E:\Projects\excelence\backend\document\document.py", line 240, in save_local
+    saved = self.storage.save(self.workbook, resolved)
+  File "E:\Projects\excelence\backend\storage\excel_storage.py", line 71, in save
+    os.replace(
+    ~~~~~~~~~~^
+        temp,
+        ^^^^^
+        filename
+        ^^^^^^^^
+    )
+    ^
+OSError: [WinError 17] The system cannot move the file to a different disk drive: 'C:\\Users\\ELSALA~1\\AppData\\Local\\Temp\\tmpl8blac0t.xlsx' -> 'E:\\Projects\\excelence\\backend\\utils\\data\\documents\\test.xlsx'
+2026-09-22 09:27:35,709 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-22 09:30:56,234 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-22 09:33:05,110 - INFO - document - Opened document test.xlsx
+2026-09-22 09:59:59,594 - INFO - document - Opened document test.xlsx
+2026-09-22 10:11:55,392 - ERROR - main - Unhandled API error for /documents/upload
+Traceback (most recent call last):
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\cors.py", line 96, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\cors.py", line 154, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\routing.py", line 670, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 2734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1780, in handle
+    await self.original_router.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 2789, in handle
+    await included_router._handle_selected(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1800, in _handle_selected
+    await original_route.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1279, in handle
+    await app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 158, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 144, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 706, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 352, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\Projects\excelence\backend\api\documents.py", line 103, in upload_document
+    success = controller.upload_document(
+        file.filename or "",
+        data,
+    )
+  File "E:\Projects\excelence\backend\controller\controller.py", line 63, in upload_document
+    return self.document.upload(filename, data)
+           ^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'Document' object has no attribute 'upload'. Did you mean: 'reload'?
+2026-09-22 10:17:44,939 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-22 10:19:38,371 - INFO - document - Opened document test.xlsx
+2026-09-22 10:20:22,656 - ERROR - main - Unhandled API error for /documents/upload
+Traceback (most recent call last):
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\cors.py", line 96, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\cors.py", line 154, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\routing.py", line 670, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 2734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1780, in handle
+    await self.original_router.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 2789, in handle
+    await included_router._handle_selected(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1800, in _handle_selected
+    await original_route.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1279, in handle
+    await app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 158, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 144, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 706, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 352, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\Projects\excelence\backend\api\documents.py", line 103, in upload_document
+    success = controller.upload_document(
+        file.filename or "",
+        data,
+    )
+  File "E:\Projects\excelence\backend\controller\controller.py", line 63, in upload_document
+    return self.document.upload(filename, data)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "E:\Projects\excelence\backend\document\document.py", line 162, in upload
+    written = self.storage.write_bytes(data, resolved)
+              ^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ExcelStorage' object has no attribute 'write_bytes'. Did you mean: 'write_sheet'?
+2026-09-22 10:21:55,115 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-22 10:22:22,779 - WARNING - document - Failed to write uploaded document نسخ احتياطي للفهرس - Copy.xlsx
+2026-09-22 10:22:48,924 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-22 10:24:45,545 - INFO - document - Opened document test.xlsx
+2026-09-22 10:24:56,324 - WARNING - document - Failed to write uploaded document نسخ احتياطي للفهرس - Copy.xlsx
+2026-09-22 10:27:45,830 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-22 10:28:40,917 - INFO - document - Uploaded document نسخ احتياطي للفهرس - Copy.xlsx
+2026-09-22 10:28:46,478 - INFO - document - Opened document نسخ احتياطي للفهرس - Copy.xlsx
+2026-09-22 10:37:14,047 - INFO - document - Opened document test.xlsx
+2026-09-22 15:14:10,940 - INFO - document - Opened document test.xlsx
+2026-09-22 15:16:21,033 - INFO - document - Opened document نسخ احتياطي للفهرس - Copy.xlsx
+2026-09-22 18:34:21,581 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-22 18:40:51,614 - INFO - document - Opened document test.xlsx
+2026-09-22 18:41:14,877 - INFO - document - Opened document نسخ احتياطي للفهرس - Copy.xlsx
+2026-09-22 18:41:49,298 - ERROR - main - Unhandled API error for /spreadsheet/sort
+Traceback (most recent call last):
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\cors.py", line 96, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\cors.py", line 154, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\routing.py", line 670, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 2734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1780, in handle
+    await self.original_router.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 2789, in handle
+    await included_router._handle_selected(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1800, in _handle_selected
+    await original_route.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1279, in handle
+    await app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 158, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 144, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 706, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 354, in run_endpoint_function
+    return await run_in_threadpool(dependant.call, **values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\concurrency.py", line 34, in run_in_threadpool
+    return await anyio.to_thread.run_sync(func)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\to_thread.py", line 65, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        func, args, abandon_on_cancel=abandon_on_cancel, limiter=limiter
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\_backends\_asyncio.py", line 2706, in run_sync_in_worker_thread
+    return await future
+           ^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\_backends\_asyncio.py", line 1100, in run
+    result = context.run(func, *args)
+  File "E:\Projects\excelence\backend\api\spreadsheet.py", line 167, in sort
+    success = controller.sort(rules)
+  File "E:\Projects\excelence\backend\controller\controller.py", line 181, in sort
+    return self.spreadsheet_service.sort(sort_rules)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "E:\Projects\excelence\backend\services\spreadsheet_service.py", line 112, in sort
+    return self._execute(command)
+           ~~~~~~~~~~~~~^^^^^^^^^
+  File "E:\Projects\excelence\backend\services\spreadsheet_service.py", line 33, in _execute
+    return self.command_manager.execute(command)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "E:\Projects\excelence\backend\commands\manager.py", line 9, in execute
+    result = command.execute()
+  File "E:\Projects\excelence\backend\commands\spreadsheet\sort.py", line 20, in execute
+    return self.document.sort(
+           ~~~~~~~~~~~~~~~~~~^
+        self.rules
+        ^^^^^^^^^^
+    )
+    ^
+  File "E:\Projects\excelence\backend\document\document.py", line 359, in sort
+    success = self.spreadsheet.sort(self.sort_rules, reapply=reapply)
+  File "E:\Projects\excelence\backend\models\spreadsheet.py", line 133, in sort
+    return sheet.sort(rules, reapply=reapply)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\Projects\excelence\backend\models\sheet.py", line 124, in sort
+    self.active_view = self.sort_service.sort(self.active_view, self.sort_rules)
+                       ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\Projects\excelence\backend\services\sort_service.py", line 38, in sort
+    return dataframe.sort_values(
+           ~~~~~~~~~~~~~~~~~~~~~^
+        by=columns,
+        ^^^^^^^^^^^
+        ascending=ascending,
+        ^^^^^^^^^^^^^^^^^^^^
+        kind="stable"
+        ^^^^^^^^^^^^^
+    ).reset_index(drop=True)
+    ^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\pandas\core\frame.py", line 8372, in sort_values
+    indexer = nargsort(
+        k, kind=kind, ascending=ascending, na_position=na_position, key=key
+    )
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\pandas\core\sorting.py", line 442, in nargsort
+    indexer = non_nan_idx[non_nans.argsort(kind=kind)]
+                          ~~~~~~~~~~~~~~~~^^^^^^^^^^^
+TypeError: '<' not supported between instances of 'str' and 'int'
+2026-09-22 18:41:53,247 - ERROR - main - Unhandled API error for /spreadsheet/sort
+Traceback (most recent call last):
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\cors.py", line 96, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\cors.py", line 154, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\routing.py", line 670, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 2734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1780, in handle
+    await self.original_router.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 2789, in handle
+    await included_router._handle_selected(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1800, in _handle_selected
+    await original_route.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1279, in handle
+    await app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 158, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 144, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 706, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 354, in run_endpoint_function
+    return await run_in_threadpool(dependant.call, **values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\concurrency.py", line 34, in run_in_threadpool
+    return await anyio.to_thread.run_sync(func)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\to_thread.py", line 65, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        func, args, abandon_on_cancel=abandon_on_cancel, limiter=limiter
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\_backends\_asyncio.py", line 2706, in run_sync_in_worker_thread
+    return await future
+           ^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\_backends\_asyncio.py", line 1100, in run
+    result = context.run(func, *args)
+  File "E:\Projects\excelence\backend\api\spreadsheet.py", line 167, in sort
+    success = controller.sort(rules)
+  File "E:\Projects\excelence\backend\controller\controller.py", line 181, in sort
+    return self.spreadsheet_service.sort(sort_rules)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "E:\Projects\excelence\backend\services\spreadsheet_service.py", line 112, in sort
+    return self._execute(command)
+           ~~~~~~~~~~~~~^^^^^^^^^
+  File "E:\Projects\excelence\backend\services\spreadsheet_service.py", line 33, in _execute
+    return self.command_manager.execute(command)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "E:\Projects\excelence\backend\commands\manager.py", line 9, in execute
+    result = command.execute()
+  File "E:\Projects\excelence\backend\commands\spreadsheet\sort.py", line 20, in execute
+    return self.document.sort(
+           ~~~~~~~~~~~~~~~~~~^
+        self.rules
+        ^^^^^^^^^^
+    )
+    ^
+  File "E:\Projects\excelence\backend\document\document.py", line 359, in sort
+    success = self.spreadsheet.sort(self.sort_rules, reapply=reapply)
+  File "E:\Projects\excelence\backend\models\spreadsheet.py", line 133, in sort
+    return sheet.sort(rules, reapply=reapply)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\Projects\excelence\backend\models\sheet.py", line 124, in sort
+    self.active_view = self.sort_service.sort(self.active_view, self.sort_rules)
+                       ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\Projects\excelence\backend\services\sort_service.py", line 38, in sort
+    return dataframe.sort_values(
+           ~~~~~~~~~~~~~~~~~~~~~^
+        by=columns,
+        ^^^^^^^^^^^
+        ascending=ascending,
+        ^^^^^^^^^^^^^^^^^^^^
+        kind="stable"
+        ^^^^^^^^^^^^^
+    ).reset_index(drop=True)
+    ^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\pandas\core\frame.py", line 8372, in sort_values
+    indexer = nargsort(
+        k, kind=kind, ascending=ascending, na_position=na_position, key=key
+    )
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\pandas\core\sorting.py", line 442, in nargsort
+    indexer = non_nan_idx[non_nans.argsort(kind=kind)]
+                          ~~~~~~~~~~~~~~~~^^^^^^^^^^^
+TypeError: '<' not supported between instances of 'str' and 'int'
+2026-09-22 18:42:16,836 - ERROR - main - Unhandled API error for /spreadsheet/sort
+Traceback (most recent call last):
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\cors.py", line 96, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\cors.py", line 154, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\routing.py", line 670, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 2734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1780, in handle
+    await self.original_router.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 2789, in handle
+    await included_router._handle_selected(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1800, in _handle_selected
+    await original_route.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1279, in handle
+    await app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 158, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 144, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 706, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 354, in run_endpoint_function
+    return await run_in_threadpool(dependant.call, **values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\concurrency.py", line 34, in run_in_threadpool
+    return await anyio.to_thread.run_sync(func)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\to_thread.py", line 65, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        func, args, abandon_on_cancel=abandon_on_cancel, limiter=limiter
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\_backends\_asyncio.py", line 2706, in run_sync_in_worker_thread
+    return await future
+           ^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\_backends\_asyncio.py", line 1100, in run
+    result = context.run(func, *args)
+  File "E:\Projects\excelence\backend\api\spreadsheet.py", line 167, in sort
+    success = controller.sort(rules)
+  File "E:\Projects\excelence\backend\controller\controller.py", line 181, in sort
+    return self.spreadsheet_service.sort(sort_rules)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "E:\Projects\excelence\backend\services\spreadsheet_service.py", line 112, in sort
+    return self._execute(command)
+           ~~~~~~~~~~~~~^^^^^^^^^
+  File "E:\Projects\excelence\backend\services\spreadsheet_service.py", line 33, in _execute
+    return self.command_manager.execute(command)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "E:\Projects\excelence\backend\commands\manager.py", line 9, in execute
+    result = command.execute()
+  File "E:\Projects\excelence\backend\commands\spreadsheet\sort.py", line 20, in execute
+    return self.document.sort(
+           ~~~~~~~~~~~~~~~~~~^
+        self.rules
+        ^^^^^^^^^^
+    )
+    ^
+  File "E:\Projects\excelence\backend\document\document.py", line 359, in sort
+    success = self.spreadsheet.sort(self.sort_rules, reapply=reapply)
+  File "E:\Projects\excelence\backend\models\spreadsheet.py", line 133, in sort
+    return sheet.sort(rules, reapply=reapply)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\Projects\excelence\backend\models\sheet.py", line 124, in sort
+    self.active_view = self.sort_service.sort(self.active_view, self.sort_rules)
+                       ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\Projects\excelence\backend\services\sort_service.py", line 38, in sort
+    return dataframe.sort_values(
+           ~~~~~~~~~~~~~~~~~~~~~^
+        by=columns,
+        ^^^^^^^^^^^
+        ascending=ascending,
+        ^^^^^^^^^^^^^^^^^^^^
+        kind="stable"
+        ^^^^^^^^^^^^^
+    ).reset_index(drop=True)
+    ^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\pandas\core\frame.py", line 8372, in sort_values
+    indexer = nargsort(
+        k, kind=kind, ascending=ascending, na_position=na_position, key=key
+    )
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\pandas\core\sorting.py", line 442, in nargsort
+    indexer = non_nan_idx[non_nans.argsort(kind=kind)]
+                          ~~~~~~~~~~~~~~~~^^^^^^^^^^^
+TypeError: '<' not supported between instances of 'str' and 'int'

@@ -140,6 +140,37 @@ class SpreadsheetService {
     }
   }
 
+  /// Uploads [bytes] (an already-complete .xlsx file's raw content,
+  /// e.g. from a device file picker) to the backend's documents root
+  /// under [filename]'s own name - matches POST /documents/upload,
+  /// which always saves to the root and overwrites any existing file
+  /// with the same name. Doesn't open the file as the active document;
+  /// call loadDocument(filename) afterward if the caller wants that.
+  Future<void> uploadDocument(String filename, List<int> bytes) async {
+    final response = await _api.uploadFile(
+      '/documents/upload',
+      bytes: bytes,
+      filename: filename,
+    );
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(
+        'Failed to upload document: '
+        '${response.statusCode} ${response.body}',
+      );
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+
+    if (json['success'] != true) {
+      throw Exception(
+        json['message']?.toString().isNotEmpty == true
+            ? json['message'].toString()
+            : 'Failed to upload document.',
+      );
+    }
+  }
+
   /// Lists the subfolders and .xlsx files directly inside [folder] (a
   /// path relative to the backend's documents root; empty string means
   /// the root itself) - powers the file-explorer dialog's navigation.

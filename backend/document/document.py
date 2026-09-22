@@ -122,6 +122,52 @@ class Document:
         logger.info("Created document %s", filename)
         return True
 
+    def upload(self, filename: str, data: bytes) -> bool:
+        """
+        Save uploaded file bytes directly to documents_folder, without
+        opening them as the active document. Always lands at the
+        documents root (filename is the plain name the client sent, e.g.
+        "budget.xlsx" - not a path with folders); an existing file with
+        the same name is overwritten.
+
+        Args:
+            filename: The uploaded file's original name.
+            data: The file's raw bytes.
+
+        Returns:
+            True if the file was accepted and written, otherwise False
+            (invalid filename, wrong extension, or a write failure).
+        """
+        if not self._is_valid_filename(filename):
+            logger.warning("Upload rejected for invalid filename: %s", filename)
+            return False
+
+        # Uploads always land at the root, regardless of what path the
+        # client sent - strip any directory components from a filename
+        # like "folder/budget.xlsx" or "../../budget.xlsx" down to just
+        # "budget.xlsx" before resolving, so this can't be used to write
+        # outside documents_folder or into a subfolder.
+        safe_name = os.path.basename(filename)
+
+        if not self.storage.is_excel_file(safe_name):
+            logger.warning("Upload rejected for non-Excel filename: %s", filename)
+            return False
+
+        resolved = self._resolve_path(safe_name)
+
+        if resolved is None:
+            logger.warning("Upload rejected for invalid filename: %s", filename)
+            return False
+
+        written = self.storage.write_bytes(data, resolved)
+
+        if written:
+            logger.info("Uploaded document %s", safe_name)
+        else:
+            logger.warning("Failed to write uploaded document %s", safe_name)
+
+        return written
+
     def close(self) -> bool:
         """
         Close the active document and clear its state.

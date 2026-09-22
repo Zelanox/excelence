@@ -482,6 +482,15 @@ class _GridCellState extends State<GridCell> {
               } else {
                 widget.viewportController
                     .selectCell(widget.row, widget.column);
+                // Explicitly reclaim grid focus here rather than relying
+                // on this tap bubbling up to SpreadsheetGrid's outer
+                // GestureDetector - a GestureDetector wrapping a
+                // scrollable (as the grid now is, via TableView) isn't
+                // guaranteed to receive taps that a child's own
+                // GestureDetector already claimed, so a plain
+                // select-a-different-cell click could otherwise leave
+                // focus stranded on whatever had it before.
+                widget.gridFocusNode.requestFocus();
               }
             },
             onPanStart: widget.isFormulaReferencePickingActive

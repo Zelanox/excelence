@@ -44,6 +44,11 @@ class CreateDocumentResponse(DocumentResponse):
     pass
 
 
+class UploadDocumentResponse(ApiResponse):
+
+    filename: str = Field(default="", description="The uploaded file's name, as stored at the documents root.")
+
+
 class BrowseFolderResponse(ApiResponse):
 
     folder: str = Field(default="", description="Folder that was browsed, relative to the documents root.")

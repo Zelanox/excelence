@@ -49,6 +49,19 @@ class Controller:
         """
         return self.document.create(filename)
 
+    def upload_document(self, filename: str, data: bytes) -> bool:
+        """
+        Save an uploaded file's raw bytes to the documents root.
+
+        Args:
+            filename: The uploaded file's original name.
+            data: The file's raw bytes.
+
+        Returns:
+            True if the file was accepted and written, otherwise False.
+        """
+        return self.document.upload(filename, data)
+
     def save_document(self) -> bool:
         """
         Save the active document to disk.

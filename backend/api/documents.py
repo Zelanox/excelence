@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, File, UploadFile
 
 from backend.dependencies import get_controller
 from backend.controller.controller import Controller
@@ -81,6 +81,37 @@ def create_document(
         rows=controller.row_count(),
 
         columns=controller.column_count()
+    )
+
+
+@router.post(
+    "/upload",
+    response_model=UploadDocumentResponse
+)
+async def upload_document(
+    file: UploadFile = File(...),
+    controller: Controller = Depends(get_controller)
+):
+    """Upload a workbook's raw bytes, saved directly to the documents
+    root under the uploaded file's own name (any path components in
+    the filename are stripped - uploads never land in a subfolder).
+    Doesn't open the file as the active document; open it separately
+    via POST /documents/open once it's uploaded."""
+
+    data = await file.read()
+
+    success = controller.upload_document(
+        file.filename or "",
+        data,
+    )
+
+    return UploadDocumentResponse(
+
+        success=success,
+
+        message="" if success else "Upload rejected: invalid filename or not an Excel file.",
+
+        filename=file.filename or "",
     )
 
 

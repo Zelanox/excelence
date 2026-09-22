@@ -375,14 +375,21 @@ class ViewportController extends ChangeNotifier {
     }
   }
 
+  /// Adjusts scroll offset (if needed) so the given cell is fully within
+  /// the viewport - called after keyboard navigation moves the
+  /// selection, since with a virtualized grid the newly-selected cell
+  /// may not currently be rendered/visible at all. cellWidth/cellHeight
+  /// are passed in by the caller (SpreadsheetGrid.columnWidth/rowHeight)
+  /// rather than hardcoded here, so this stays correct if those layout
+  /// constants ever change without this controller needing to know
+  /// about the widget that owns them.
   void ensureVisible({
     required int row,
     required int column,
     required Size viewportSize,
+    required double cellWidth,
+    required double cellHeight,
   }) {
-    const cellWidth = 80.0;
-    const cellHeight = 28.0;
-
     double newScrollX = viewport.scrollX;
     double newScrollY = viewport.scrollY;
 

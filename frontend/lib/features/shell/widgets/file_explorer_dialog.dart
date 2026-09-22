@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../spreadsheet/controllers/spreadsheet_controller.dart';
@@ -58,6 +59,9 @@ class _FileExplorerDialogState extends State<FileExplorerDialog> {
   final TextEditingController _newFilenameController =
       TextEditingController();
 
+  bool _uploading = false;
+  String? _uploadError;
+
   @override
   void initState() {
     super.initState();
@@ -73,9 +77,59 @@ class _FileExplorerDialogState extends State<FileExplorerDialog> {
   void _load() {
     setState(() {
       _selectedDocument = null;
+      _uploadError = null;
       _entriesFuture =
           widget.spreadsheetController.browseFolder(_currentFolder);
     });
+  }
+
+  /// Opens the device's native file picker, uploads the chosen .xlsx to
+  /// the backend's documents root, then re-browses the current folder
+  /// so a newly uploaded file shows up immediately if the dialog
+  /// happens to already be looking at the root (uploads always land at
+  /// the root server-side, regardless of which folder is open here).
+  Future<void> _pickAndUpload() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['xlsx', 'xlsm', 'xltx', 'xltm'],
+      withData: true,
+    );
+
+    if (result == null || result.files.isEmpty) return;
+
+    final picked = result.files.first;
+    final bytes = picked.bytes;
+
+    if (bytes == null) {
+      setState(() {
+        _uploadError = 'Could not read the selected file.';
+      });
+      return;
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _uploading = true;
+      _uploadError = null;
+    });
+
+    try {
+      await widget.spreadsheetController.uploadDocument(picked.name, bytes);
+      if (!mounted) return;
+      _load();
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _uploadError = 'Upload failed: $error';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _uploading = false;
+        });
+      }
+    }
   }
 
   void _openFolder(String name) {
@@ -144,6 +198,23 @@ class _FileExplorerDialogState extends State<FileExplorerDialog> {
                     ),
                   ),
                   const Spacer(),
+                  if (widget.mode == FileExplorerMode.open)
+                    _uploading
+                        ? const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 12),
+                            child: SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                              ),
+                            ),
+                          )
+                        : IconButton(
+                            icon: const Icon(Icons.upload_file),
+                            onPressed: _pickAndUpload,
+                            tooltip: 'Upload from this device',
+                          ),
                   IconButton(
                     icon: const Icon(Icons.close),
                     onPressed: () => Navigator.of(context).pop(),
@@ -152,6 +223,14 @@ class _FileExplorerDialogState extends State<FileExplorerDialog> {
                 ],
               ),
             ),
+            if (_uploadError != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  _uploadError!,
+                  style: TextStyle(color: Colors.red.shade700, fontSize: 12),
+                ),
+              ),
             _buildBreadcrumbs(breadcrumbSegments),
             const Divider(height: 1),
             Expanded(child: _buildEntryList()),

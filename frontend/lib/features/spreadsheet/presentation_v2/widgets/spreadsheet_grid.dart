@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:two_dimensional_scrollables/two_dimensional_scrollables.dart';
 
 import '../../controllers/spreadsheet_controller.dart';
 import '../../controllers/viewport_controller.dart';
@@ -11,13 +12,17 @@ import 'grid_row_header.dart';
 
 /// The scrollable grid of column headers, row headers, and cells.
 ///
-/// Built as a single [Table] so that column widths line up between the
-/// header row and every data row automatically (a real spreadsheet-like
-/// guarantee that's easy to get wrong with independently-positioned
-/// widgets). The whole table scrolls both directions together inside a
-/// two-axis scroll view - this is the simplest correct approach for a
-/// first version; a virtualized/windowed approach can replace this later
-/// once real sheets are larger than a screenful.
+/// Built on [TableView.builder] (from the two_dimensional_scrollables
+/// package), which builds and lays out only the cells actually visible
+/// in the viewport - a real spreadsheet can have thousands of rows, and
+/// the previous plain-[Table] implementation built every single cell
+/// widget on every rebuild regardless of what was on screen, which is
+/// what actually caused the lag on larger sheets (a full-table rebuild
+/// on every keystroke while searching, for instance). pinnedRowCount/
+/// pinnedColumnCount keep the header row and row-number column fixed in
+/// place while the body scrolls underneath, matching the old dual-
+/// [SingleChildScrollView] behavior but without hand-syncing two scroll
+/// positions.
 ///
 /// This widget holds NO state describing what's selected, being edited,
 /// or what any cell contains - all of that lives in the controllers and
@@ -52,6 +57,16 @@ class SpreadsheetGrid extends StatefulWidget {
 
 class _SpreadsheetGridState extends State<SpreadsheetGrid> {
   final FocusNode _gridFocusNode = FocusNode(debugLabel: 'SpreadsheetGrid');
+
+  // TableView's own scroll controllers - kept here (rather than inside
+  // ViewportController, which has no Flutter widget lifecycle of its
+  // own) so they can be properly disposed. Their listeners mirror
+  // real scroll position INTO viewportController.viewport.scrollX/Y,
+  // which is what getVisibleRange/ensureVisible read - keeping
+  // TableView as the single source of truth for "what's actually
+  // scrolled to" rather than letting two representations drift apart.
+  final ScrollController _verticalController = ScrollController();
+  final ScrollController _horizontalController = ScrollController();
 
   // Whether a column header is currently mid-rename (its own inline
   // TextField is showing and owns keyboard input). Column-header renaming
@@ -114,6 +129,8 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
 
   @override
   void dispose() {
+    _verticalController.dispose();
+    _horizontalController.dispose();
     _gridFocusNode.dispose();
     _formulaReferenceToInsert.dispose();
     _referenceRangeDrag.dispose();
@@ -321,6 +338,74 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
     );
   }
 
+  /// After keyboard navigation moves the selection, scrolls TableView
+  /// (if needed) so the newly-selected cell is fully visible. With the
+  /// old non-virtualized Table this was unnecessary - every cell always
+  /// existed on screen somewhere. With TableView.builder, a cell outside
+  /// the current viewport isn't built at all, so navigating to it
+  /// without this would move the selection "off-screen" invisibly.
+  void _ensureSelectionVisible() {
+    if (!_verticalController.hasClients ||
+        !_horizontalController.hasClients) {
+      return;
+    }
+
+    final selection = widget.viewportController.selection;
+
+    // Sync the controller's notion of current scroll position from the
+    // real ScrollControllers right before computing anything - this is
+    // the one place that needs it, rather than keeping it continuously
+    // live via a scroll listener (which would notifyListeners() on
+    // every scroll frame and rebuild every visible GridCell for no
+    // reason, since nothing else reads scrollX/scrollY continuously).
+    widget.viewportController.setScroll(
+      x: _horizontalController.offset,
+      y: _verticalController.offset,
+    );
+
+    final viewportSize = (context.findRenderObject() as RenderBox?)?.size;
+    if (viewportSize == null) return;
+
+    // Subtract the pinned header row/row-number column from the
+    // available body size, since ensureVisible's math is in terms of
+    // the scrollable body area only (row 0 / column 0 are always
+    // visible regardless of scroll position).
+    final bodySize = Size(
+      (viewportSize.width - SpreadsheetGrid.headerSize)
+          .clamp(0, viewportSize.width),
+      (viewportSize.height - SpreadsheetGrid.headerSize)
+          .clamp(0, viewportSize.height),
+    );
+
+    widget.viewportController.ensureVisible(
+      row: selection.endRow,
+      column: selection.endColumn,
+      viewportSize: bodySize,
+      cellWidth: SpreadsheetGrid.columnWidth,
+      cellHeight: SpreadsheetGrid.rowHeight,
+    );
+
+    final target = widget.viewportController.viewport;
+
+    if (target.scrollX != _horizontalController.offset) {
+      _horizontalController.jumpTo(
+        target.scrollX.clamp(
+          0,
+          _horizontalController.position.maxScrollExtent,
+        ),
+      );
+    }
+
+    if (target.scrollY != _verticalController.offset) {
+      _verticalController.jumpTo(
+        target.scrollY.clamp(
+          0,
+          _verticalController.position.maxScrollExtent,
+        ),
+      );
+    }
+  }
+
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent) {
       return KeyEventResult.ignored;
@@ -367,21 +452,27 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
     switch (event.logicalKey) {
       case LogicalKeyboardKey.arrowLeft:
         widget.viewportController.moveLeft();
+        _ensureSelectionVisible();
         return KeyEventResult.handled;
       case LogicalKeyboardKey.arrowRight:
         widget.viewportController.moveRight();
+        _ensureSelectionVisible();
         return KeyEventResult.handled;
       case LogicalKeyboardKey.arrowUp:
         widget.viewportController.moveUp();
+        _ensureSelectionVisible();
         return KeyEventResult.handled;
       case LogicalKeyboardKey.arrowDown:
         widget.viewportController.moveDown();
+        _ensureSelectionVisible();
         return KeyEventResult.handled;
       case LogicalKeyboardKey.tab:
         widget.viewportController.moveNext();
+        _ensureSelectionVisible();
         return KeyEventResult.handled;
       case LogicalKeyboardKey.enter:
         widget.viewportController.moveDown();
+        _ensureSelectionVisible();
         return KeyEventResult.handled;
       case LogicalKeyboardKey.delete:
       case LogicalKeyboardKey.backspace:
@@ -445,144 +536,149 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
               return const SizedBox.shrink();
             }
 
-            // An extra trailing column/row hosts the hover "+" append
-            // affordance (Obsidian/Word-table style) - a slim handle past
-            // the last real column and below the last real row, only
-            // visible/active on hover, that appends a new column/row.
+            // Table-index layout: row/column 0 is the pinned header
+            // (column headers / row numbers); rows 1..rowCount and
+            // columns 1..columnCount are real data, offset by one from
+            // their sheet indices; the final row/column hosts the hover
+            // "+" append affordance. pinnedRowCount/pinnedColumnCount
+            // keep row 0 and column 0 fixed in place while the body
+            // scrolls beneath them - TableView's built-in equivalent of
+            // the old dual-SingleChildScrollView sync.
             const addHandleSize = 20.0;
 
-            final columnWidths = <int, TableColumnWidth>{
-              0: const FixedColumnWidth(SpreadsheetGrid.headerSize),
-              for (var c = 0; c < columnCount; c++)
-                c + 1: const FixedColumnWidth(SpreadsheetGrid.columnWidth),
-              columnCount + 1: const FixedColumnWidth(addHandleSize),
-            };
-
-            return SingleChildScrollView(
-              scrollDirection: Axis.vertical,
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Table(
-                  columnWidths: columnWidths,
-                  defaultVerticalAlignment:
-                      TableCellVerticalAlignment.middle,
-                  children: [
-                    // ------------------------------------------------
-                    // Header row: blank corner + column headers + "+"
-                    // ------------------------------------------------
-                    TableRow(
-                      children: [
-                        const SizedBox(
-                          width: SpreadsheetGrid.headerSize,
-                          height: SpreadsheetGrid.headerSize,
-                        ),
-                        for (var c = 0; c < columnCount; c++)
-                          SizedBox(
-                            height: SpreadsheetGrid.headerSize,
-                            child: GridColumnHeader(
-                              columnIndex: c,
-                              spreadsheetController:
-                                  widget.spreadsheetController,
-                              onRenamingChanged: _setRenamingHeader,
-                            ),
-                          ),
-                        SizedBox(
-                          width: addHandleSize,
-                          height: SpreadsheetGrid.headerSize,
-                          child: _HoverAddHandle(
-                            axis: Axis.horizontal,
-                            tooltip: 'Add column to the right',
-                            onTap: _appendColumn,
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    // ------------------------------------------------
-                    // Data rows: row number + cells + blank "+" filler
-                    // ------------------------------------------------
-                    for (var r = 0; r < rowCount; r++)
-                      TableRow(
-                        children: [
-                          SizedBox(
-                            height: SpreadsheetGrid.rowHeight,
-                            child: GridRowHeader(
-                              rowIndex: r,
-                              spreadsheetController:
-                                  widget.spreadsheetController,
-                            ),
-                          ),
-                          for (var c = 0; c < columnCount; c++)
-                            SizedBox(
-                              height: SpreadsheetGrid.rowHeight,
-                              child: GridCell(
-                                row: r,
-                                column: c,
-                                spreadsheetController:
-                                    widget.spreadsheetController,
-                                viewportController:
-                                    widget.viewportController,
-                                gridFocusNode: _gridFocusNode,
-                                onDragStart: _handleDragStart,
-                                onDragEnter: _handleDragEnter,
-                                onDragEnd: _handleDragEnd,
-                                isFormulaReferencePickingActive:
-                                    _isEditingFormula,
-                                onCellTapDuringFormulaEdit:
-                                    _handleCellTapDuringFormulaEdit,
-                                onFormulaEditingChanged:
-                                    _handleFormulaEditingChanged,
-                                formulaReferenceToInsert:
-                                    _formulaReferenceToInsert,
-                                onReferenceRangeDragStart:
-                                    _handleReferenceRangeDragStart,
-                                onReferenceRangeDragEnter:
-                                    _handleReferenceRangeDragEnter,
-                                onReferenceRangeDragEnd:
-                                    _handleReferenceRangeDragEnd,
-                                referenceRangeDrag: _referenceRangeDrag,
-                              ),
-                            ),
-                          const SizedBox(
-                            width: addHandleSize,
-                            height: SpreadsheetGrid.rowHeight,
-                          ),
-                        ],
-                      ),
-
-                    // ------------------------------------------------
-                    // Trailing row: row-header-width filler + "+" spans
-                    // the data columns + blank corner
-                    // ------------------------------------------------
-                    TableRow(
-                      children: [
-                        const SizedBox(
-                          width: SpreadsheetGrid.headerSize,
-                          height: addHandleSize,
-                        ),
-                        for (var c = 0; c < columnCount; c++)
-                          SizedBox(
-                            width: SpreadsheetGrid.columnWidth,
-                            height: addHandleSize,
-                            child: c == 0
-                                ? _HoverAddHandle(
-                                    axis: Axis.vertical,
-                                    tooltip: 'Add row below',
-                                    onTap: _appendRow,
-                                    spanWidth: SpreadsheetGrid.columnWidth *
-                                        columnCount,
-                                  )
-                                : const SizedBox.shrink(),
-                          ),
-                        const SizedBox(
-                          width: addHandleSize,
-                          height: addHandleSize,
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+            return TableView.builder(
+              pinnedRowCount: 1,
+              pinnedColumnCount: 1,
+              verticalDetails: ScrollableDetails.vertical(
+                controller: _verticalController,
               ),
+              horizontalDetails: ScrollableDetails.horizontal(
+                controller: _horizontalController,
+              ),
+              rowCount: rowCount + 2,
+              columnCount: columnCount + 2,
+              rowBuilder: (int index) {
+                final extent = index == 0
+                    ? SpreadsheetGrid.headerSize
+                    : index == rowCount + 1
+                        ? addHandleSize
+                        : SpreadsheetGrid.rowHeight;
+                return TableSpan(extent: FixedTableSpanExtent(extent));
+              },
+              columnBuilder: (int index) {
+                final extent = index == 0
+                    ? SpreadsheetGrid.headerSize
+                    : index == columnCount + 1
+                        ? addHandleSize
+                        : SpreadsheetGrid.columnWidth;
+                return TableSpan(extent: FixedTableSpanExtent(extent));
+              },
+              cellBuilder: (context, vicinity) {
+                final isHeaderRow = vicinity.row == 0;
+                final isHeaderColumn = vicinity.column == 0;
+                final isAppendRow = vicinity.row == rowCount + 1;
+                final isAppendColumn = vicinity.column == columnCount + 1;
+
+                // Corner cell: blank above the row-number column.
+                if (isHeaderRow && isHeaderColumn) {
+                  return const TableViewCell(child: SizedBox.shrink());
+                }
+
+                // Top-right corner: "+" to append a column.
+                if (isHeaderRow && isAppendColumn) {
+                  return TableViewCell(
+                    child: _HoverAddHandle(
+                      axis: Axis.horizontal,
+                      tooltip: 'Add column to the right',
+                      onTap: _appendColumn,
+                    ),
+                  );
+                }
+
+                // Column header row.
+                if (isHeaderRow) {
+                  final column = vicinity.column - 1;
+                  return TableViewCell(
+                    child: GridColumnHeader(
+                      columnIndex: column,
+                      spreadsheetController: widget.spreadsheetController,
+                      onRenamingChanged: _setRenamingHeader,
+                    ),
+                  );
+                }
+
+                // Bottom-left corner (below row numbers): blank filler.
+                if (isAppendRow && isHeaderColumn) {
+                  return const TableViewCell(child: SizedBox.shrink());
+                }
+
+                // Bottom-right corner: blank filler.
+                if (isAppendRow && isAppendColumn) {
+                  return const TableViewCell(child: SizedBox.shrink());
+                }
+
+                // Append-row bar: only the first data column actually
+                // renders the (visually full-width, via OverflowBox)
+                // handle - matches the old Table's approach exactly.
+                if (isAppendRow) {
+                  final column = vicinity.column - 1;
+                  return TableViewCell(
+                    child: column == 0
+                        ? _HoverAddHandle(
+                            axis: Axis.vertical,
+                            tooltip: 'Add row below',
+                            onTap: _appendRow,
+                            spanWidth:
+                                SpreadsheetGrid.columnWidth * columnCount,
+                          )
+                        : const SizedBox.shrink(),
+                  );
+                }
+
+                // Row-number header column.
+                if (isHeaderColumn) {
+                  final row = vicinity.row - 1;
+                  return TableViewCell(
+                    child: GridRowHeader(
+                      rowIndex: row,
+                      spreadsheetController: widget.spreadsheetController,
+                    ),
+                  );
+                }
+
+                // Append-column bar (to the right of real data, any
+                // row): blank filler, matching the old trailing column.
+                if (isAppendColumn) {
+                  return const TableViewCell(child: SizedBox.shrink());
+                }
+
+                // A real data cell.
+                final row = vicinity.row - 1;
+                final column = vicinity.column - 1;
+                return TableViewCell(
+                  child: GridCell(
+                    row: row,
+                    column: column,
+                    spreadsheetController: widget.spreadsheetController,
+                    viewportController: widget.viewportController,
+                    gridFocusNode: _gridFocusNode,
+                    onDragStart: _handleDragStart,
+                    onDragEnter: _handleDragEnter,
+                    onDragEnd: _handleDragEnd,
+                    isFormulaReferencePickingActive: _isEditingFormula,
+                    onCellTapDuringFormulaEdit:
+                        _handleCellTapDuringFormulaEdit,
+                    onFormulaEditingChanged: _handleFormulaEditingChanged,
+                    formulaReferenceToInsert: _formulaReferenceToInsert,
+                    onReferenceRangeDragStart:
+                        _handleReferenceRangeDragStart,
+                    onReferenceRangeDragEnter:
+                        _handleReferenceRangeDragEnter,
+                    onReferenceRangeDragEnd: _handleReferenceRangeDragEnd,
+                    referenceRangeDrag: _referenceRangeDrag,
+                  ),
+                );
+              },
             );
           },
         ),

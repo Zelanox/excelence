@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/preferences/app_preferences.dart';
 import '../models/cell_model.dart';
 import '../models/row_model.dart';
 import '../models/sheet_model.dart';
@@ -12,9 +15,13 @@ import '../services/formula_engine.dart';
 import '../services/formula_dependency_graph.dart';
 
 class SpreadsheetController extends ChangeNotifier {
-  SpreadsheetController(this._service);
+  SpreadsheetController(
+    this._service, {
+    AppPreferences preferences = const AppPreferences(),
+  }) : _preferences = preferences;
 
   final SpreadsheetService _service;
+  final AppPreferences _preferences;
   final FormulaEngine _formulaEngine = const FormulaEngine();
 
   SpreadsheetModel? _spreadsheet;
@@ -91,6 +98,12 @@ class SpreadsheetController extends ChangeNotifier {
       _undoStack.clear();
       _redoStack.clear();
 
+      // Remember this as the document to reopen automatically next
+      // launch. Fire-and-forget: a failure to persist this shouldn't
+      // block the document that DID successfully load from displaying,
+      // and there's nothing actionable for the user to do about it.
+      unawaited(_preferences.setLastOpenedDocument(filename));
+
       notifyListeners();
     } catch (error, stackTrace) {
       debugPrint(
@@ -135,6 +148,27 @@ class SpreadsheetController extends ChangeNotifier {
     } catch (error, stackTrace) {
       debugPrint(
         '[SpreadsheetController.saveDocument] Error: $error',
+      );
+      debugPrintStack(stackTrace: stackTrace);
+
+      rethrow;
+    }
+  }
+
+  /// Uploads [bytes] (an already-complete .xlsx picked from the user's
+  /// device) to the backend's documents root under [filename]. Doesn't
+  /// open it as the active document or touch _spreadsheet/notify
+  /// listeners - the file explorer dialog calls this purely to get the
+  /// bytes onto the server, then re-browses its current folder to show
+  /// the newly uploaded file (which always lands at the root, so a
+  /// re-browse only shows it immediately if the dialog is already
+  /// looking at the root).
+  Future<void> uploadDocument(String filename, List<int> bytes) async {
+    try {
+      await _service.uploadDocument(filename, bytes);
+    } catch (error, stackTrace) {
+      debugPrint(
+        '[SpreadsheetController.uploadDocument] Error: $error',
       );
       debugPrintStack(stackTrace: stackTrace);
 

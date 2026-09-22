@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/api/api_client.dart';
+import '../../../core/preferences/app_preferences.dart';
 import '../../spreadsheet/controllers/spreadsheet_controller.dart';
 import '../../spreadsheet/controllers/viewport_controller.dart';
 import '../../spreadsheet/services/spreadsheet_service.dart';
@@ -10,6 +11,11 @@ import '../widgets/status_bar.dart';
 import '../widgets/toolbar.dart';
 import '../widgets/search_bar.dart';
 import '../widgets/sheet_tabs.dart';
+
+/// The document opened automatically on first launch, before any
+/// document has ever been successfully opened/created and recorded via
+/// AppPreferences.setLastOpenedDocument.
+const _defaultDocument = 'test.xlsx';
 
 /// Owns the SpreadsheetController and ViewportController for the whole
 /// shell. These used to be created privately inside SpreadsheetFeatureV2,
@@ -50,9 +56,43 @@ class _ShellPageState extends State<ShellPage> {
     // redundant call here is harmless.
     spreadsheetController.addListener(_syncViewportBounds);
 
-    spreadsheetController.loadDocument('test.xlsx').then((_) {
+    _loadInitialDocument();
+  }
+
+  /// Opens the last document the user had open (recorded whenever
+  /// loadDocument succeeds), or falls back to _defaultDocument if none
+  /// is recorded yet (first run) or the remembered one can no longer be
+  /// opened (e.g. it was deleted/moved since). The fallback itself is
+  /// still surfaced to the user via loadDocument's normal error path if
+  /// IT also fails - this only guards the one retry, not indefinitely.
+  Future<void> _loadInitialDocument() async {
+    final lastOpened = await const AppPreferences().getLastOpenedDocument();
+
+    if (!mounted) return;
+
+    final target = lastOpened ?? _defaultDocument;
+
+    try {
+      await spreadsheetController.loadDocument(target);
+    } catch (_) {
+      // The remembered document may no longer exist. Only retry with
+      // the default if we weren't already trying it - otherwise this
+      // would silently mask a real failure to open the default itself.
+      if (target != _defaultDocument) {
+        try {
+          await spreadsheetController.loadDocument(_defaultDocument);
+        } catch (_) {
+          // Swallow here too - there's genuinely no document available
+          // to show, and loadDocument already logs its own failures.
+          // The grid's own "no document loaded" empty state (a loading
+          // spinner, per SpreadsheetGrid.build) covers the UI.
+        }
+      }
+    }
+
+    if (mounted) {
       _syncViewportBounds();
-    });
+    }
   }
 
   void _syncViewportBounds() {

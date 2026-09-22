@@ -9,6 +9,10 @@ from openpyxl import Workbook
 from openpyxl import load_workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
 
+from backend.utils.logger import get_logger
+
+logger = get_logger("excel_storage")
+
 # ==========================================================
 # Initialization
 # ==========================================================
@@ -61,7 +65,13 @@ class ExcelStorage:
         if folder:
             os.makedirs(folder, exist_ok=True)
 
-        fd, temp = tempfile.mkstemp(suffix=".xlsx")
+        # dir=folder keeps the temp file on the same filesystem/drive as
+        # the destination - os.replace() below requires that on Windows
+        # (it raises WinError 17 "cannot move to a different disk
+        # drive" otherwise, e.g. when Python's default temp dir is on
+        # C: but the documents folder is on a different drive like E:).
+        # The system temp dir was silently unsafe here.
+        fd, temp = tempfile.mkstemp(suffix=".xlsx", dir=folder or None)
         os.close(fd)
 
         try:
@@ -72,6 +82,60 @@ class ExcelStorage:
                 temp,
                 filename
             )
+
+        finally:
+
+            if os.path.exists(temp):
+
+                try:
+                    os.remove(temp)
+                except Exception:
+                    pass
+
+        return True
+
+    def write_bytes(self, data, filename):
+        """
+        Write raw file bytes directly to disk, atomically (write to a
+        temp file, then replace) - the same safety pattern as save(),
+        but for an already-complete file (e.g. an uploaded .xlsx) rather
+        than an in-memory Workbook that needs openpyxl to serialize it.
+        Deliberately doesn't round-trip the bytes through openpyxl, so
+        an uploaded workbook that Excel can open but openpyxl can't
+        fully parse still gets stored correctly - only is_excel_file's
+        extension check gates what's accepted, not a full parse.
+
+        Args:
+            data: Raw file content.
+            filename: Absolute destination path.
+
+        Returns:
+            True if the file was written successfully, otherwise False.
+        """
+
+        folder = os.path.dirname(filename)
+
+        if folder:
+            os.makedirs(folder, exist_ok=True)
+
+        # dir=folder - see the comment in save() above; same-filesystem
+        # requirement for os.replace() applies here too.
+        fd, temp = tempfile.mkstemp(suffix=".xlsx", dir=folder or None)
+
+        try:
+
+            with os.fdopen(fd, "wb") as handle:
+                handle.write(data)
+
+            os.replace(
+                temp,
+                filename
+            )
+
+        except Exception:
+
+            logger.exception("Failed writing uploaded bytes to %s", filename)
+            return False
 
         finally:
 
