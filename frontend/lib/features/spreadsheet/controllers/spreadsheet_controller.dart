@@ -17,8 +17,8 @@ import '../services/formula_dependency_graph.dart';
 class SpreadsheetController extends ChangeNotifier {
   SpreadsheetController(
     this._service, {
-    AppPreferences preferences = const AppPreferences(),
-  }) : _preferences = preferences;
+    this._preferences = const AppPreferences(),
+  });
 
   final SpreadsheetService _service;
   final AppPreferences _preferences;
@@ -66,6 +66,14 @@ class SpreadsheetController extends ChangeNotifier {
 
   bool get canUndo => _undoStack.isNotEmpty;
   bool get canRedo => _redoStack.isNotEmpty;
+
+  /// Whether a background save (any fire-and-forget persist added to
+  /// _pendingSaves - column width, RTL, cell edits, etc.) is currently
+  /// in flight. Exposed for the status bar's "Saving..." / "Ready"
+  /// indicator; _pendingSaves itself stays private since callers should
+  /// only ever need to know THAT something is pending, never the
+  /// individual futures in it.
+  bool get isSaving => _pendingSaves.isNotEmpty;
 
   // ============================================================
   // Backend data
@@ -229,6 +237,8 @@ class SpreadsheetController extends ChangeNotifier {
       name: name,
       rows: rows,
       headers: data.headers,
+      columnWidths: data.columnWidths,
+      isRtl: data.isRtl,
     );
   }
 
@@ -363,6 +373,8 @@ class SpreadsheetController extends ChangeNotifier {
               name: sheetsData.currentSheet,
               rows: activeSheet.rows,
               headers: activeSheet.headers,
+              columnWidths: activeSheet.columnWidths,
+              isRtl: activeSheet.isRtl,
             )
           : activeSheet;
 
@@ -415,6 +427,37 @@ class SpreadsheetController extends ChangeNotifier {
       }
       rethrow;
     }
+  }
+
+  /// Appends a new row at the end of the active sheet and sets its
+  /// first column's value to [value] in one composite action - the
+  /// status bar's quick-add field uses this rather than the grid's own
+  /// separate "+" row-add handle (SpreadsheetGrid._appendRow), since
+  /// that only inserts a blank row with no way to pass an initial
+  /// value inline.
+  ///
+  /// Deliberately two sequential calls, not a single combined backend
+  /// request: insertRow first (awaited, so the backend's actual
+  /// response - including the real row count it landed at - is known
+  /// before editCell targets it), then editCell on the row insertRow
+  /// just confirmed exists. editCell requires an already-existing row
+  /// (see its own row-bounds check) and can't create one itself, so
+  /// this ordering isn't optional. If [value] is empty, only the row is
+  /// inserted - there's nothing meaningful to write to the first cell.
+  Future<void> appendRowWithFirstColumnValue(String value) async {
+    final currentSpreadsheet = _spreadsheet;
+    if (currentSpreadsheet == null) {
+      return;
+    }
+
+    final newRowIndex = currentSpreadsheet.activeSheet.rows.length;
+    await insertRow(index: newRowIndex);
+
+    if (value.isEmpty) {
+      return;
+    }
+
+    editCell(row: newRowIndex, column: 0, value: value);
   }
 
   /// Deletes the row at [index] (zero-based).
@@ -522,6 +565,140 @@ class SpreadsheetController extends ChangeNotifier {
       }
       rethrow;
     }
+  }
+
+  /// Applies width [width] to column [name] in local state only, with no
+  /// backend call - used while a resize drag is in progress so the
+  /// column visibly follows the pointer every frame without firing a
+  /// network request per frame. Call [setColumnWidth] once, from the
+  /// drag's end, to actually persist the final width.
+  void setColumnWidthLocal({required String name, required double width}) {
+    final currentSpreadsheet = _spreadsheet;
+    if (currentSpreadsheet == null) {
+      return;
+    }
+
+    final activeSheetIndex = currentSpreadsheet.activeSheetIndex;
+    final activeSheet = currentSpreadsheet.sheets[activeSheetIndex];
+
+    if (!activeSheet.headers.contains(name)) {
+      return;
+    }
+
+    final updatedWidths = Map<String, double>.from(activeSheet.columnWidths);
+    updatedWidths[name] = width;
+
+    final updatedSheet = SheetModel(
+      name: activeSheet.name,
+      rows: activeSheet.rows,
+      headers: activeSheet.headers,
+      columnWidths: updatedWidths,
+      isRtl: activeSheet.isRtl,
+    );
+
+    final updatedSheets = List<SheetModel>.from(currentSpreadsheet.sheets);
+    updatedSheets[activeSheetIndex] = updatedSheet;
+
+    _spreadsheet = SpreadsheetModel(
+      activeSheetIndex: activeSheetIndex,
+      sheets: updatedSheets,
+      availableSheetNames: currentSpreadsheet.availableSheetNames,
+    );
+
+    notifyListeners();
+  }
+
+  /// Sets column [name]'s display width to [width] and persists it to
+  /// the backend in the background - call once, when a resize gesture
+  /// ends (not on every drag-move frame; use [setColumnWidthLocal] for
+  /// that). Applies the same local update setColumnWidthLocal does, so
+  /// it's also safe to call directly for a non-drag resize (e.g. a
+  /// future "fit to content" action) without calling both.
+  ///
+  /// Deliberately fire-and-forget like [_persistCellEdits], unlike
+  /// renameColumn/deleteColumn/etc: a resize is a drag gesture the user
+  /// expects to feel instant, and unlike those structural edits there's
+  /// no local reconstruction risk here - the width map is the only thing
+  /// changing, nothing about row/cell data is derived from it. Also
+  /// unlike those edits, this does NOT call _recordHistoryPoint - a
+  /// column width is view/layout state, not a document edit the user
+  /// should be able to Ctrl+Z, the same reasoning [search]/[sort] use.
+  /// On a persistence failure, the local width is left as-is (reverting
+  /// it would undo a gesture the user already completed and moved on
+  /// from) and the failure is surfaced the same way [_persistCellEdits]
+  /// does, via [lastSaveError].
+  void setColumnWidth({required String name, required double width}) {
+    final currentSpreadsheet = _spreadsheet;
+    if (currentSpreadsheet == null) {
+      return;
+    }
+
+    if (!currentSpreadsheet.activeSheet.headers.contains(name)) {
+      return;
+    }
+
+    setColumnWidthLocal(name: name, width: width);
+
+    late final Future<void> save;
+    save = _service
+        .setColumnWidth(name: name, width: width)
+        .then((_) {}, onError: (Object error) {
+      debugPrint('[SpreadsheetController.setColumnWidth] Save failed: $error');
+      _lastSaveError = 'Failed to save column width: $error';
+      notifyListeners();
+    }).whenComplete(() {
+      _pendingSaves.remove(save);
+    });
+
+    _pendingSaves.add(save);
+  }
+
+  /// Sets the active sheet's right-to-left direction, applied locally
+  /// immediately and persisted to the backend in the background - same
+  /// shape as [setColumnWidth]: optimistic, fire-and-forget, no
+  /// [_recordHistoryPoint] entry (a direction toggle is view/layout
+  /// state, not a document edit the user should be able to Ctrl+Z, the
+  /// same reasoning search/sort/setColumnWidth use). On a persistence
+  /// failure the local flag is left as-is and the failure surfaces via
+  /// [lastSaveError], same as setColumnWidth.
+  void setRtl(bool rtl) {
+    final currentSpreadsheet = _spreadsheet;
+    if (currentSpreadsheet == null) {
+      return;
+    }
+
+    final activeSheetIndex = currentSpreadsheet.activeSheetIndex;
+    final activeSheet = currentSpreadsheet.sheets[activeSheetIndex];
+
+    final updatedSheet = SheetModel(
+      name: activeSheet.name,
+      rows: activeSheet.rows,
+      headers: activeSheet.headers,
+      columnWidths: activeSheet.columnWidths,
+      isRtl: rtl,
+    );
+
+    final updatedSheets = List<SheetModel>.from(currentSpreadsheet.sheets);
+    updatedSheets[activeSheetIndex] = updatedSheet;
+
+    _spreadsheet = SpreadsheetModel(
+      activeSheetIndex: activeSheetIndex,
+      sheets: updatedSheets,
+      availableSheetNames: currentSpreadsheet.availableSheetNames,
+    );
+
+    notifyListeners();
+
+    late final Future<void> save;
+    save = _service.setRtl(rtl: rtl).then((_) {}, onError: (Object error) {
+      debugPrint('[SpreadsheetController.setRtl] Save failed: $error');
+      _lastSaveError = 'Failed to save sheet direction: $error';
+      notifyListeners();
+    }).whenComplete(() {
+      _pendingSaves.remove(save);
+    });
+
+    _pendingSaves.add(save);
   }
 
   /// Filters the active sheet's visible rows to those matching [query].
@@ -799,6 +976,8 @@ class SpreadsheetController extends ChangeNotifier {
       name: sheet.name,
       rows: rows,
       headers: sheet.headers,
+      columnWidths: sheet.columnWidths,
+      isRtl: sheet.isRtl,
     );
 
     return SpreadsheetModel(
@@ -960,6 +1139,8 @@ class SpreadsheetController extends ChangeNotifier {
       name: currentSheet.name,
       rows: newRows,
       headers: currentSheet.headers,
+      columnWidths: currentSheet.columnWidths,
+      isRtl: currentSheet.isRtl,
     );
 
     // ----------------------------------------------------------
@@ -1244,6 +1425,8 @@ class SpreadsheetController extends ChangeNotifier {
       name: currentSheet.name,
       rows: newRows,
       headers: currentSheet.headers,
+      columnWidths: currentSheet.columnWidths,
+      isRtl: currentSheet.isRtl,
     );
 
     // ----------------------------------------------------------
@@ -1391,6 +1574,8 @@ class SpreadsheetController extends ChangeNotifier {
       name: currentSheet.name,
       rows: newRows,
       headers: currentSheet.headers,
+      columnWidths: currentSheet.columnWidths,
+      isRtl: currentSheet.isRtl,
     );
 
     // ----------------------------------------------------------

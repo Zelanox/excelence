@@ -49,8 +49,6 @@ class SpreadsheetResponse(ApiResponse):
 
     column_widths: dict[str, float] = Field(default_factory=dict, description="Column name to display width, for columns with an explicitly set width.")
 
-    rtl: bool = Field(default=False, description="Whether the active worksheet is right-to-left.")
-
 
 class StatusResponse(ApiResponse):
 

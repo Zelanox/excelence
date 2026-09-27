@@ -43,6 +43,18 @@ class RenameColumnRequest(BaseModel):
     new_name: str = Field(..., description="New column name.", json_schema_extra={"example": "Age"})
 
 
+class ColumnWidthRequest(BaseModel):
+
+    name: str = Field(..., description="Column name to resize.", json_schema_extra={"example": "age"})
+
+    width: float = Field(..., gt=0, description="New column width, in Excel character-width units.", json_schema_extra={"example": 18.5})
+
+
+class RtlRequest(BaseModel):
+
+    rtl: bool = Field(..., description="True for right-to-left, False for left-to-right.", json_schema_extra={"example": True})
+
+
 class RenameSheetRequest(BaseModel):
 
     old_name: str = Field(..., description="Current worksheet name.", json_schema_extra={"example": "Sheet1"})

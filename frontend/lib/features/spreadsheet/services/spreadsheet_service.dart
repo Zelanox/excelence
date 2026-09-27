@@ -8,16 +8,21 @@ class SpreadsheetData {
     required this.rows,
     required this.rowCount,
     required this.columnCount,
+    this.columnWidths = const {},
+    this.isRtl = false,
   });
 
   final List<String> headers;
   final List<Map<String, dynamic>> rows;
   final int rowCount;
   final int columnCount;
+  final Map<String, double> columnWidths;
+  final bool isRtl;
 
   factory SpreadsheetData.fromJson(Map<String, dynamic> json) {
     final rawHeaders = json['headers'] as List<dynamic>? ?? [];
     final rawRows = json['rows'] as List<dynamic>? ?? [];
+    final rawWidths = json['column_widths'] as Map<String, dynamic>? ?? {};
 
     return SpreadsheetData(
       headers: rawHeaders.map((header) => header.toString()).toList(),
@@ -26,6 +31,10 @@ class SpreadsheetData {
           .toList(),
       rowCount: json['row_count'] as int? ?? 0,
       columnCount: json['column_count'] as int? ?? 0,
+      columnWidths: rawWidths.map(
+        (key, value) => MapEntry(key, (value as num).toDouble()),
+      ),
+      isRtl: json['rtl'] as bool? ?? false,
     );
   }
 }
@@ -461,6 +470,29 @@ class SpreadsheetService {
       '/spreadsheet/columns/rename',
       body: {'old_name': oldName, 'new_name': newName},
       failureMessage: 'Failed to rename column',
+    );
+  }
+
+  /// Sets the column named [name]'s display width. The backend rejects
+  /// this (success: false) if [name] doesn't exist or [width] is out of
+  /// its sane bounds (see backend Sheet.set_column_width).
+  Future<SpreadsheetData> setColumnWidth({
+    required String name,
+    required double width,
+  }) {
+    return _postEdit(
+      '/spreadsheet/columns/width',
+      body: {'name': name, 'width': width},
+      failureMessage: 'Failed to update column width',
+    );
+  }
+
+  /// Sets the active worksheet's right-to-left direction.
+  Future<SpreadsheetData> setRtl({required bool rtl}) {
+    return _postEdit(
+      '/spreadsheet/rtl',
+      body: {'rtl': rtl},
+      failureMessage: 'Failed to update sheet direction',
     );
   }
 

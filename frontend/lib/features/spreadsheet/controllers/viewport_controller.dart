@@ -378,23 +378,30 @@ class ViewportController extends ChangeNotifier {
   /// Adjusts scroll offset (if needed) so the given cell is fully within
   /// the viewport - called after keyboard navigation moves the
   /// selection, since with a virtualized grid the newly-selected cell
-  /// may not currently be rendered/visible at all. cellWidth/cellHeight
-  /// are passed in by the caller (SpreadsheetGrid.columnWidth/rowHeight)
-  /// rather than hardcoded here, so this stays correct if those layout
-  /// constants ever change without this controller needing to know
-  /// about the widget that owns them.
+  /// may not currently be rendered/visible at all.
+  ///
+  /// [columnLeft]/[columnWidth] are callbacks rather than a single flat
+  /// cellWidth, since columns can have individually resized widths - the
+  /// caller (SpreadsheetGrid) is the one place that knows every column's
+  /// current width, so scroll-offset math is computed here from whatever
+  /// it reports rather than this controller needing its own copy of the
+  /// width map. columnLeft(column) must return the x-offset of that
+  /// column's left edge (the sum of every preceding column's width),
+  /// not just its own width - required for the "scroll to a column past
+  /// several resized ones" case to land at the right offset.
   void ensureVisible({
     required int row,
     required int column,
     required Size viewportSize,
-    required double cellWidth,
+    required double Function(int column) columnLeft,
+    required double Function(int column) columnWidth,
     required double cellHeight,
   }) {
     double newScrollX = viewport.scrollX;
     double newScrollY = viewport.scrollY;
 
-    final left = column * cellWidth;
-    final right = left + cellWidth;
+    final left = columnLeft(column);
+    final right = left + columnWidth(column);
 
     final top = row * cellHeight;
     final bottom = top + cellHeight;

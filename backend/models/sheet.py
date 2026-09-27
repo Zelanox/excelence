@@ -20,6 +20,23 @@ class Sheet:
     active_view: pd.DataFrame | None = None
     search_text: str = ""
     sort_rules: list[dict[str, Any]] = field(default_factory=list)
+    # Keyed by column name (not index/letter) so a resize survives an
+    # unrelated insert/delete elsewhere in the sheet, consistent with how
+    # every other per-column operation here (rename/delete) identifies
+    # columns. Populated from the workbook's own column_dimensions on
+    # load and written back the same way on save - see Document.
+    column_widths: dict[str, float] = field(default_factory=dict)
+    # Mirrors the worksheet's native sheet_view.rightToLeft (a real
+    # Excel/openpyxl property, not invented here) - round-trips through
+    # save/load the same way column_widths does. Deliberately does NOT
+    # reorder dataframe/active_view columns: every index-based backend
+    # operation (insert/delete-by-index, column_widths' position-based
+    # letter mapping, search, sort) stays correct against the sheet's
+    # true logical column order regardless of this flag. Only the
+    # frontend's rendering reverses visual column order and flips the
+    # row-number column side when this is true - see SheetModel.isRtl /
+    # SpreadsheetGrid on the frontend.
+    rtl: bool = False
     search_service: SearchService = field(default_factory=SearchService, repr=False, compare=False)
     sort_service: SortService = field(default_factory=SortService, repr=False, compare=False)
 
@@ -36,7 +53,13 @@ class Sheet:
     def column_count(self) -> int:
         view = self.active_view if self.active_view is not None else self.dataframe
 
-        if view.empty:
+        # Deliberately checking column count, not view.empty: pandas
+        # treats a dataframe as "empty" when EITHER axis is zero-length,
+        # so a sheet with real columns but zero rows (e.g. every row's
+        # cells were blank and openpyxl silently drops all-empty rows
+        # on save - see read_sheet) would otherwise have its headers
+        # discarded here even though the columns are genuinely present.
+        if len(view.columns) == 0:
             return 0
 
         return len(view.columns)
@@ -45,7 +68,7 @@ class Sheet:
     def headers(self) -> list[str]:
         view = self.active_view if self.active_view is not None else self.dataframe
 
-        if view.empty:
+        if len(view.columns) == 0:
             return []
 
         return list(view.columns)
@@ -61,6 +84,8 @@ class Sheet:
             rows=view.fillna("").to_dict("records"),
             row_count=len(view),
             column_count=self.column_count,
+            column_widths=dict(self.column_widths),
+            rtl=self.rtl,
         )
 
     def filtered_row_count(self) -> int:
@@ -204,6 +229,7 @@ class Sheet:
 
         self.dataframe.drop(columns=[name], inplace=True)
         self.active_view = self.dataframe.copy()
+        self.column_widths.pop(name, None)
         return True
 
     def rename_column(self, old_name: str, new_name: str) -> bool:
@@ -218,6 +244,41 @@ class Sheet:
 
         self.dataframe.rename(columns={old_name: new_name}, inplace=True)
         self.active_view = self.dataframe.copy()
+
+        if new_name != old_name and old_name in self.column_widths:
+            self.column_widths[new_name] = self.column_widths.pop(old_name)
+
+        return True
+
+    def set_column_width(self, name: str, width: float) -> bool:
+        if name not in self.dataframe.columns:
+            return False
+
+        if not isinstance(width, (int, float)) or isinstance(width, bool):
+            return False
+
+        # Sanity bounds rather than a hard spec limit - keeps a stray
+        # client value (0, negative, absurdly large) from corrupting the
+        # saved workbook's column_dimensions. Excel's own UI caps width
+        # similarly; this just mirrors that rather than inventing a limit.
+        if width <= 0 or width > 1000:
+            return False
+
+        self.column_widths[name] = float(width)
+        return True
+
+    def set_rtl(self, rtl: bool) -> bool:
+        """
+        Set this sheet's right-to-left flag.
+
+        Deliberately always succeeds (no validation branch that can
+        return False) - unlike set_column_width, there's no invalid
+        value to reject; any bool is a valid state for this flag.
+        Kept returning bool anyway, matching every other Sheet mutator's
+        shape, so Document/callers don't need a special case for this
+        one operation.
+        """
+        self.rtl = bool(rtl)
         return True
 
     def _reapply_sort(self) -> bool:

@@ -5,6 +5,8 @@ class SheetModel {
     required this.name,
     required this.rows,
     this.headers = const [],
+    this.columnWidths = const {},
+    this.isRtl = false,
   });
 
   final String name;
@@ -16,4 +18,23 @@ class SheetModel {
   /// identify columns by this name, not by letter/index, so it needs to
   /// be tracked here rather than only derived from column position.
   final List<String> headers;
+
+  /// Column name to display width, for any column with an explicitly
+  /// set width. Keyed by name (like [headers], not by position) for the
+  /// same reason - a column's width should survive an unrelated
+  /// insert/delete elsewhere in the sheet, and letter/index positions
+  /// shift while names don't. A column absent from this map has no
+  /// explicitly set width and falls back to SpreadsheetGrid.columnWidth.
+  final Map<String, double> columnWidths;
+
+  /// Whether this sheet is right-to-left (mirrors the backend's
+  /// Sheet.rtl, itself backed by the worksheet's native sheet_view.
+  /// rightToLeft). Deliberately does NOT change [headers]' order - the
+  /// backend always returns columns in true logical order regardless of
+  /// direction, so column 0 is always the real first column. Only the
+  /// grid's rendering (via an ambient Directionality wrapping the
+  /// TableView - see SpreadsheetGrid) flips which physical edge that
+  /// logical order renders at. Reordering headers here on top of that
+  /// would double-flip the layout.
+  final bool isRtl;
 }

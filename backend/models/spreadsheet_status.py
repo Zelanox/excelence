@@ -29,6 +29,10 @@ class SpreadsheetData:
 
     column_count: int = 0
 
+    column_widths: dict[str, float] = field(default_factory=dict)
+
+    rtl: bool = False
+
 
 @dataclass(slots=True)
 class SpreadsheetSheet:

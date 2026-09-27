@@ -9,6 +9,8 @@ from backend.commands.spreadsheet.delete_row import DeleteRowCommand
 from backend.commands.spreadsheet.insert_column import InsertColumnCommand
 from backend.commands.spreadsheet.delete_column import DeleteColumnCommand
 from backend.commands.spreadsheet.rename_column import RenameColumnCommand
+from backend.commands.spreadsheet.set_column_width import SetColumnWidthCommand
+from backend.commands.spreadsheet.set_rtl import SetRtlCommand
 from backend.commands.spreadsheet.search import SearchCommand
 from backend.commands.spreadsheet.clear_search import ClearSearchCommand
 from backend.commands.spreadsheet.sort import SortCommand
@@ -84,6 +86,23 @@ class SpreadsheetService:
             self.document,
             old_name,
             new_name,
+        )
+
+        return self._execute(command)
+
+    def set_column_width(self, name: str, width: float) -> bool:
+        command = SetColumnWidthCommand(
+            self.document,
+            name,
+            width,
+        )
+
+        return self._execute(command)
+
+    def set_rtl(self, rtl: bool) -> bool:
+        command = SetRtlCommand(
+            self.document,
+            rtl,
         )
 
         return self._execute(command)

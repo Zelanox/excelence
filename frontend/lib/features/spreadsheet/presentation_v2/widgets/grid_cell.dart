@@ -545,7 +545,7 @@ class _GridCellState extends State<GridCell> {
                           )
                         : _cellBorder(edges: selectionEdges),
                   ),
-                  alignment: Alignment.centerLeft,
+                  alignment: AlignmentDirectional.centerStart,
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   child: Text(
                     cell.value,

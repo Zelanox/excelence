@@ -399,6 +399,53 @@ class Controller:
             new_name,
         )
 
+    def set_column_width(self, name: str, width: float) -> bool:
+        """
+        Set a column's display width in the active document.
+
+        Args:
+            name: Column name to resize.
+            width: New width, in openpyxl's column_dimensions units.
+
+        Returns:
+            True if the width was set successfully, otherwise False.
+        """
+        return self.spreadsheet_service.set_column_width(
+            name,
+            width,
+        )
+
+    def column_widths(self) -> dict[str, float]:
+        """
+        Return the current column widths for the active worksheet.
+
+        Returns:
+            A dict of column name to width, for any column with an
+            explicitly set width.
+        """
+        return self.document.data().column_widths
+
+    def set_rtl(self, rtl: bool) -> bool:
+        """
+        Set the active worksheet's right-to-left direction.
+
+        Args:
+            rtl: True for right-to-left, False for left-to-right.
+
+        Returns:
+            True if the flag was set successfully, otherwise False.
+        """
+        return self.spreadsheet_service.set_rtl(rtl)
+
+    def rtl(self) -> bool:
+        """
+        Return whether the active worksheet is right-to-left.
+
+        Returns:
+            True if the active worksheet is right-to-left.
+        """
+        return self.document.data().rtl
+
     def rename_sheet(self, old_name: str, new_name: str) -> bool:
         """
         Rename a worksheet in the active document.

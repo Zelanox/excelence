@@ -1723,3 +1723,110 @@ Traceback (most recent call last):
     indexer = non_nan_idx[non_nans.argsort(kind=kind)]
                           ~~~~~~~~~~~~~~~~^^^^^^^^^^^
 TypeError: '<' not supported between instances of 'str' and 'int'
+2026-09-22 20:05:44,550 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-22 20:08:08,052 - INFO - document - Opened document test.xlsx
+2026-09-22 20:08:33,751 - INFO - document - Opened document نسخ احتياطي للفهرس - Copy.xlsx
+2026-09-23 09:55:42,041 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-23 09:57:50,718 - INFO - document - Opened document test.xlsx
+2026-09-23 09:58:33,973 - INFO - document - Opened document نسخ احتياطي للفهرس - Copy.xlsx
+2026-09-23 10:49:48,881 - INFO - document - Opened document test.xlsx
+2026-09-23 07:56:47,051 - INFO - config - Using config file /home/claude/excelence/backend/utils/config.json
+2026-09-23 07:56:47,061 - INFO - document - Created document test.xlsx
+2026-09-23 07:56:47,067 - INFO - document - Saved document test.xlsx
+2026-09-23 07:56:47,072 - INFO - document - Opened document test.xlsx
+2026-09-23 07:56:47,079 - INFO - document - Saved document test.xlsx
+2026-09-23 07:56:47,083 - INFO - document - Opened document test.xlsx
+2026-09-23 07:56:55,746 - INFO - config - Using config file /home/claude/excelence/backend/utils/config.json
+2026-09-23 07:56:55,753 - INFO - document - Created document t2.xlsx
+2026-09-23 07:56:55,758 - INFO - document - Saved document t2.xlsx
+2026-09-23 07:56:55,763 - INFO - document - Opened document t2.xlsx
+2026-09-23 07:57:17,165 - INFO - config - Using config file /home/claude/excelence/backend/utils/config.json
+2026-09-23 07:57:17,171 - INFO - document - Created document test.xlsx
+2026-09-23 07:57:17,176 - INFO - document - Saved document test.xlsx
+2026-09-23 07:57:17,181 - INFO - document - Opened document test.xlsx
+2026-09-23 07:57:17,186 - INFO - document - Saved document test.xlsx
+2026-09-23 07:57:17,190 - INFO - document - Opened document test.xlsx
+2026-09-23 07:57:23,736 - INFO - config - Using config file /home/claude/excelence/backend/utils/config.json
+2026-09-23 07:57:23,742 - INFO - document - Created document t3.xlsx
+2026-09-23 07:57:23,749 - INFO - document - Saved document t3.xlsx
+2026-09-23 07:58:04,864 - INFO - config - Using config file /home/claude/excelence/backend/utils/config.json
+2026-09-23 07:58:04,871 - INFO - document - Created document t4.xlsx
+2026-09-23 07:58:04,878 - INFO - document - Saved document t4.xlsx
+2026-09-23 07:58:04,883 - INFO - document - Opened document t4.xlsx
+2026-09-23 07:58:11,377 - INFO - config - Using config file /home/claude/excelence/backend/utils/config.json
+2026-09-23 07:58:11,384 - INFO - document - Created document test.xlsx
+2026-09-23 07:58:11,389 - INFO - document - Saved document test.xlsx
+2026-09-23 07:58:11,394 - INFO - document - Opened document test.xlsx
+2026-09-23 07:58:11,402 - INFO - document - Saved document test.xlsx
+2026-09-23 11:31:46,996 - INFO - config - Using config file /home/claude/excelence/backend/utils/config.json
+2026-09-23 11:31:47,051 - INFO - document - Created document test.xlsx
+2026-09-23 11:31:47,057 - INFO - document - Saved document test.xlsx
+2026-09-23 11:31:47,062 - INFO - document - Opened document test.xlsx
+2026-09-23 11:32:04,354 - INFO - config - Using config file /home/claude/excelence/backend/utils/config.json
+2026-09-23 11:32:04,363 - INFO - document - Created document plain.xlsx
+2026-09-23 11:32:04,371 - INFO - document - Saved document plain.xlsx
+2026-09-23 11:32:04,377 - INFO - document - Opened document plain.xlsx
+2026-09-23 11:32:04,383 - INFO - document - Saved document plain.xlsx
+2026-09-23 11:32:04,389 - INFO - document - Opened document plain.xlsx
+2026-09-23 11:32:52,319 - INFO - config - Using config file /home/claude/excelence/backend/utils/config.json
+2026-09-23 11:32:52,329 - INFO - document - Created document plain.xlsx
+2026-09-23 11:32:52,334 - INFO - document - Saved document plain.xlsx
+2026-09-23 11:32:52,339 - INFO - document - Opened document plain.xlsx
+2026-09-23 11:32:52,343 - INFO - document - Saved document plain.xlsx
+2026-09-23 11:32:52,347 - INFO - document - Opened document plain.xlsx
+2026-09-23 11:32:52,348 - INFO - document - Created document test.xlsx
+2026-09-23 11:32:52,352 - INFO - document - Saved document test.xlsx
+2026-09-23 11:32:52,356 - INFO - document - Opened document test.xlsx
+2026-09-23 11:32:52,361 - INFO - document - Saved document test.xlsx
+2026-09-23 11:32:52,365 - INFO - document - Opened document test.xlsx
+2026-09-23 11:33:00,003 - INFO - config - Using config file /home/claude/excelence/backend/utils/config.json
+2026-09-23 11:33:00,010 - INFO - document - Created document normal.xlsx
+2026-09-23 11:33:07,780 - INFO - config - Using config file /home/claude/excelence/backend/utils/config.json
+2026-09-23 11:33:07,787 - INFO - document - Created document normal.xlsx
+2026-09-23 11:33:07,798 - INFO - document - Saved document normal.xlsx
+2026-09-23 11:33:07,802 - INFO - document - Opened document normal.xlsx
+2026-09-24 06:20:47,774 - INFO - config - Using config file /home/claude/excelence/backend/utils/config.json
+2026-09-24 06:20:47,784 - INFO - document - Created document rtl.xlsx
+2026-09-24 06:20:47,791 - INFO - document - Saved document rtl.xlsx
+2026-09-24 06:20:47,796 - INFO - document - Opened document rtl.xlsx
+2026-09-24 06:20:47,799 - INFO - document - Saved document rtl.xlsx
+2026-09-24 06:20:47,803 - INFO - document - Opened document rtl.xlsx
+2026-09-24 06:20:47,811 - INFO - document - Saved document rtl.xlsx
+2026-09-24 06:20:47,814 - INFO - document - Opened document rtl.xlsx
+2026-09-24 06:20:53,924 - INFO - config - Using config file /home/claude/excelence/backend/utils/config.json
+2026-09-24 06:20:53,931 - INFO - document - Created document multi.xlsx
+2026-09-24 06:21:02,385 - INFO - config - Using config file /home/claude/excelence/backend/utils/config.json
+2026-09-24 06:21:02,391 - INFO - document - Created document multi.xlsx
+2026-09-24 06:21:16,914 - INFO - config - Using config file /home/claude/excelence/backend/utils/config.json
+2026-09-24 06:21:16,920 - INFO - document - Created document widthleak.xlsx
+2026-09-24 06:21:39,873 - INFO - config - Using config file /home/claude/excelence/backend/utils/config.json
+2026-09-24 06:21:39,878 - INFO - document - Created document multi.xlsx
+2026-09-24 06:21:52,174 - INFO - config - Using config file /home/claude/excelence/backend/utils/config.json
+2026-09-24 06:21:52,180 - INFO - document - Created document multi.xlsx
+2026-09-24 06:22:02,032 - INFO - config - Using config file /home/claude/excelence/backend/utils/config.json
+2026-09-24 06:22:02,039 - INFO - document - Created document t.xlsx
+2026-09-24 06:23:10,670 - INFO - config - Using config file /home/claude/excelence/backend/utils/config.json
+2026-09-24 06:23:10,676 - INFO - document - Created document t1.xlsx
+2026-09-24 06:23:10,680 - INFO - document - Saved document t1.xlsx
+2026-09-24 06:23:10,684 - INFO - document - Opened document t1.xlsx
+2026-09-24 06:23:10,686 - INFO - document - Created document t2.xlsx
+2026-09-24 06:23:10,693 - INFO - document - Saved document t2.xlsx
+2026-09-24 06:23:10,697 - INFO - document - Opened document t2.xlsx
+2026-09-24 06:23:10,700 - INFO - document - Created document t3.xlsx
+2026-09-24 06:23:10,705 - INFO - document - Saved document t3.xlsx
+2026-09-24 06:23:10,709 - INFO - document - Opened document t3.xlsx
+2026-09-24 11:07:38,873 - INFO - config - Using config file /home/claude/excelence/backend/utils/config.json
+2026-09-24 11:07:38,882 - INFO - document - Created document normal.xlsx
+2026-09-24 11:07:38,892 - INFO - document - Saved document normal.xlsx
+2026-09-24 11:07:38,897 - INFO - document - Opened document normal.xlsx
+2026-09-24 14:10:27,037 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-24 14:33:24,252 - INFO - document - Opened document test.xlsx
+2026-09-26 15:01:11,222 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-26 15:03:08,920 - INFO - document - Opened document test.xlsx
+2026-09-26 15:22:10,485 - INFO - document - Opened document test.xlsx
+2026-09-26 15:22:43,951 - INFO - document - Opened document نسخ احتياطي للفهرس - Copy.xlsx
+2026-09-27 09:53:46,166 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-27 09:55:45,549 - INFO - document - Opened document test.xlsx
+2026-09-27 10:04:34,719 - INFO - document - Opened document نسخ احتياطي للفهرس - Copy.xlsx
+2026-09-27 19:36:09,620 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-27 19:38:48,390 - INFO - document - Opened document test.xlsx

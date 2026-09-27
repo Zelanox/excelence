@@ -134,7 +134,10 @@ class _ShellPageState extends State<ShellPage> {
               viewportController: viewportController,
             ),
             SheetTabs(spreadsheetController: spreadsheetController),
-            const StatusBar(),
+            StatusBar(
+              spreadsheetController: spreadsheetController,
+              viewportController: viewportController,
+            ),
           ],
         ),
       ),

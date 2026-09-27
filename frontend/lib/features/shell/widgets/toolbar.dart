@@ -2,18 +2,23 @@ import 'package:flutter/material.dart';
 
 import '../../spreadsheet/controllers/spreadsheet_controller.dart';
 import '../../spreadsheet/controllers/viewport_controller.dart';
+import 'settings_dialog.dart';
 
-/// The top toolbar: File/Save/Undo/Redo.
+/// The top toolbar: currently just Settings.
 ///
-/// Row/column insert and delete used to live here as dedicated buttons,
-/// but that's now handled directly on the grid itself - the hover "+"
-/// handles past the last row/column (SpreadsheetGrid) for insert, and a
-/// right-click context menu on GridColumnHeader/GridRowHeader for
-/// delete/rename - which better matches where a user's attention already
-/// is when they want to add or remove a row/column. spreadsheetController
-/// and viewportController are still accepted here (rather than dropped
-/// from the constructor) since Undo/Redo will wire up to
-/// spreadsheetController next.
+/// File open/save/undo/redo icons used to sit here but were removed -
+/// they were bare Icon widgets with no onTap/IconButton wrapping them at
+/// all, not wired to anything. Row/column insert and delete are handled
+/// directly on the grid itself (the hover "+" handles past the last
+/// row/column in SpreadsheetGrid for insert, a right-click context menu
+/// on GridColumnHeader/GridRowHeader for delete/rename), so those were
+/// never toolbar candidates to begin with. spreadsheetController and
+/// viewportController are both still accepted here even though only the
+/// former is currently used (by the settings gear, to open
+/// SettingsDialog) - kept rather than dropped from the constructor,
+/// since real toolbar actions (a working Save button, Undo/Redo) are
+/// the natural next thing to add here and viewportController will be
+/// needed for at least some of those.
 class Toolbar extends StatelessWidget {
   const Toolbar({
     super.key,
@@ -40,13 +45,15 @@ class Toolbar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.folder_open),
-          const SizedBox(width: 10),
-          const Icon(Icons.save),
-          const SizedBox(width: 10),
-          const Icon(Icons.undo),
-          const SizedBox(width: 10),
-          const Icon(Icons.redo),
+          const Spacer(),
+          IconButton(
+            icon: const Icon(Icons.settings),
+            tooltip: 'Settings',
+            onPressed: () => SettingsDialog.show(
+              context,
+              spreadsheetController: spreadsheetController,
+            ),
+          ),
         ],
       ),
     );

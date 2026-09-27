@@ -3,6 +3,7 @@ from typing import Any
 import os
 import pandas as pd
 from openpyxl import Workbook
+from openpyxl.utils import get_column_letter
 
 
 from backend.models.spreadsheet_status import DocumentInfo, SpreadsheetData, SpreadsheetSheet
@@ -115,6 +116,18 @@ class Document:
 
         self._clear_view_data()
         self._seed_blank_worksheet(self.sheet)
+
+        # Read the header/blank-row content _seed_blank_worksheet just
+        # wrote back into self.df, mirroring what open()/set_sheet() do
+        # after reading a worksheet. Without this, self.df stays the
+        # empty (zero-column) DataFrame _clear_view_data() set it to,
+        # even though the worksheet and the Sheet domain model (built
+        # next, by dataframe_to_spreadsheet()) both correctly have the
+        # seeded header - operations that read column names from
+        # self.df.columns directly (e.g. set_column_width's worksheet
+        # write) would then silently do nothing on a freshly created
+        # document, despite the in-memory Sheet model looking correct.
+        self._set_view_data(self.storage.read_sheet(self.sheet))
         self.dataframe_to_spreadsheet()
 
         self.loaded = True
@@ -219,6 +232,8 @@ class Document:
                 sheet_model = Sheet(name=worksheet_name)
 
             sheet_model.bind(worksheet, dataframe.copy())
+            sheet_model.column_widths = self._read_column_widths(worksheet, dataframe.columns)
+            sheet_model.rtl = bool(worksheet.sheet_view.rightToLeft)
 
             if worksheet_name == current_sheet_name:
                 sheet_model.set_dataframe(self.df.copy() if not self.df.empty else dataframe.copy())
@@ -283,6 +298,13 @@ class Document:
             return False
 
         self.storage.write_sheet(self.sheet, self.df)
+
+        active_sheet = self._active_sheet_model()
+
+        if active_sheet is not None:
+            self._write_column_widths(self.sheet, self.df.columns, active_sheet.column_widths)
+            self.sheet.sheet_view.rightToLeft = active_sheet.rtl
+
         saved = self.storage.save(self.workbook, resolved)
         self.modified = False
 
@@ -392,6 +414,22 @@ class Document:
             return
 
         self.storage.write_sheet(self.sheet, self.df)
+
+        active_sheet = self._active_sheet_model()
+
+        # Guard against active_sheet belonging to a DIFFERENT worksheet
+        # than self.sheet currently points at - this genuinely happens
+        # mid-add_sheet: self.sheet is reassigned to the brand-new
+        # worksheet before self.spreadsheet (and so _active_sheet_model())
+        # is rebuilt via dataframe_to_spreadsheet(), so without this check
+        # the PREVIOUS active sheet's column_widths/rtl would get written
+        # onto the NEW worksheet. column_widths happens to dodge this by
+        # accident (self.df is cleared to empty first, so its write loop
+        # has nothing to iterate), but rtl's write is unconditional and
+        # was actually leaking across sheets before this check existed.
+        if active_sheet is not None and active_sheet.worksheet is self.sheet:
+            self._write_column_widths(self.sheet, self.df.columns, active_sheet.column_widths)
+            self.sheet.sheet_view.rightToLeft = active_sheet.rtl
 
     def _refresh_view(self) -> None:
         """Reload the active worksheet and reapply the current search/sort state."""
@@ -555,6 +593,73 @@ class Document:
         self.search(self.search_text)
         return True
 
+    def set_column_width(self, name: str, width: float) -> bool:
+        """
+        Set a column's display width on the active document.
+
+        Args:
+            name: Column name to resize.
+            width: New width, in the same units openpyxl uses for
+                column_dimensions (Excel's "character width" unit).
+
+        Returns:
+            True if the width was set successfully, otherwise False.
+        """
+        if self.workbook is None:
+            return False
+
+        success = self.spreadsheet.set_column_width(name, width)
+
+        if not success:
+            return False
+
+        # Unlike edit_cell/insert/delete, a width change doesn't touch
+        # row visibility or the dataframe shape, so there's no need to
+        # resync view state, reapply search, or (unlike
+        # _sync_active_sheet's use elsewhere) rebuild the worksheet's
+        # rows via write_sheet - that would be wasted work for a change
+        # that's purely a column_dimensions update. Write the new width
+        # onto the live worksheet directly so a save right after a
+        # resize, with no other edit in between, still persists it.
+        if self.sheet is not None:
+            active_sheet = self._active_sheet_model()
+
+            if active_sheet is not None:
+                self._write_column_widths(self.sheet, self.df.columns, active_sheet.column_widths)
+
+        self.modified = True
+        return True
+
+    def set_rtl(self, rtl: bool) -> bool:
+        """
+        Set the active worksheet's right-to-left direction.
+
+        Args:
+            rtl: True for right-to-left, False for left-to-right.
+
+        Returns:
+            True if the flag was set successfully, otherwise False.
+        """
+        if self.workbook is None:
+            return False
+
+        success = self.spreadsheet.set_rtl(rtl)
+
+        if not success:
+            return False
+
+        # Same reasoning as set_column_width: sheet_view.rightToLeft is
+        # independent of row data (like column_dimensions), so there's
+        # no need to rebuild the worksheet's rows via write_sheet for
+        # what's purely a sheet_view flag flip. Written directly onto
+        # the live worksheet so a save right after toggling RTL, with no
+        # other edit in between, still persists it.
+        if self.sheet is not None:
+            self.sheet.sheet_view.rightToLeft = rtl
+
+        self.modified = True
+        return True
+
     def rename_sheet(self, old_name: str, new_name: str) -> bool:
         """
         Rename a worksheet in the active document.
@@ -611,6 +716,11 @@ class Document:
         self._clear_view_data()
         self._sync_active_sheet()
         self._seed_blank_worksheet(self.sheet)
+
+        # See create() for why this is needed - without it, self.df
+        # stays empty (zero columns) after adding a sheet, even though
+        # the worksheet and Sheet model both have the seeded header.
+        self._set_view_data(self.storage.read_sheet(self.sheet))
         self.dataframe_to_spreadsheet()
         self.modified = True
         self.search(self.search_text)
@@ -1040,6 +1150,66 @@ class Document:
 
         for _ in range(row_count):
             worksheet.append(["" for _ in headers])
+
+    def _read_column_widths(self, worksheet: Any, headers: Any) -> dict[str, float]:
+        """
+        Translate a worksheet's native column_dimensions (keyed by
+        letter, e.g. "A", "B") into a dict keyed by the current header
+        name at that position, matching how Sheet.column_widths is
+        keyed everywhere else.
+
+        Args:
+            worksheet: The openpyxl worksheet to read widths from.
+            headers: The dataframe's columns, in position order - letter
+                position N corresponds to headers[N - 1].
+
+        Returns:
+            A dict of header name to width, omitting any column with no
+            explicitly set width (openpyxl only stores dimensions that
+            were actually set, not every column up to max_column).
+        """
+        widths: dict[str, float] = {}
+
+        for position, name in enumerate(headers, start=1):
+            letter = get_column_letter(position)
+            dimension = worksheet.column_dimensions.get(letter)
+
+            if dimension is not None and dimension.width is not None:
+                widths[str(name)] = dimension.width
+
+        return widths
+
+    def _write_column_widths(self, worksheet: Any, headers: Any, widths: dict[str, float]) -> None:
+        """
+        Write a Sheet's name-keyed column_widths back onto the worksheet
+        as native openpyxl column_dimensions (letter-keyed), the inverse
+        of _read_column_widths. Called after write_sheet() rebuilds the
+        worksheet's rows, since column_dimensions lives independently of
+        row data and isn't touched by that rebuild - this just keeps the
+        two in sync with the current header order.
+
+        Authoritative, not additive: every letter position up to the
+        current header count is either set to its current width or
+        explicitly cleared. Without the clear, a width set before a
+        column was deleted or reordered would linger on the worksheet
+        under its old letter and silently reattach itself to whatever
+        column shifts into that position later (column_dimensions is
+        letter-keyed and outlives the dataframe reshape that
+        write_sheet/delete_column/insert_column perform).
+
+        Args:
+            worksheet: The openpyxl worksheet to write widths onto.
+            headers: The dataframe's columns, in position order.
+            widths: Header name to width, as stored on the Sheet model.
+        """
+        for position, name in enumerate(headers, start=1):
+            letter = get_column_letter(position)
+            width = widths.get(str(name))
+
+            if width is not None:
+                worksheet.column_dimensions[letter].width = width
+            elif letter in worksheet.column_dimensions:
+                del worksheet.column_dimensions[letter]
 
     def _clear_view_data(self) -> None:
         """Reset the in-memory DataFrame view state."""

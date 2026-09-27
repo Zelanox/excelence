@@ -47,7 +47,9 @@ def data(
         headers=controller.headers(),
         rows=controller.data(),
         row_count=controller.row_count(),
-        column_count=controller.column_count()
+        column_count=controller.column_count(),
+        column_widths=controller.column_widths(),
+        rtl=controller.rtl()
     )
 
 
@@ -327,6 +329,53 @@ def rename_column(
         rows=controller.data(),
         row_count=controller.row_count(),
         column_count=controller.column_count()
+    )
+
+
+@router.post(
+    "/columns/width",
+    response_model=SpreadsheetEditResponse
+)
+def set_column_width(
+    request: ColumnWidthRequest,
+    controller: Controller = Depends(get_controller)
+):
+    """Set a column's display width in the active worksheet."""
+    success = controller.set_column_width(request.name, request.width)
+
+    message = "Column width updated." if success else "Unable to update column width."
+    return SpreadsheetEditResponse(
+        success=success,
+        message=message,
+        headers=controller.headers(),
+        rows=controller.data(),
+        row_count=controller.row_count(),
+        column_count=controller.column_count(),
+        column_widths=controller.column_widths()
+    )
+
+
+@router.post(
+    "/rtl",
+    response_model=SpreadsheetEditResponse
+)
+def set_rtl(
+    request: RtlRequest,
+    controller: Controller = Depends(get_controller)
+):
+    """Set the active worksheet's right-to-left direction."""
+    success = controller.set_rtl(request.rtl)
+
+    message = "Sheet direction updated." if success else "Unable to update sheet direction."
+    return SpreadsheetEditResponse(
+        success=success,
+        message=message,
+        headers=controller.headers(),
+        rows=controller.data(),
+        row_count=controller.row_count(),
+        column_count=controller.column_count(),
+        column_widths=controller.column_widths(),
+        rtl=controller.rtl()
     )
 
 

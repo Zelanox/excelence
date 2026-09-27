@@ -217,3 +217,28 @@ class Spreadsheet:
             return False
 
         return sheet.rename_column(old_name, new_name)
+
+    def set_column_width(
+        self,
+        name,
+        width
+    ):
+
+        sheet = self.current_sheet()
+
+        if sheet is None:
+            return False
+
+        return sheet.set_column_width(name, width)
+
+    def set_rtl(
+        self,
+        rtl
+    ):
+
+        sheet = self.current_sheet()
+
+        if sheet is None:
+            return False
+
+        return sheet.set_rtl(rtl)
