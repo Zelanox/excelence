@@ -17,8 +17,8 @@ import '../services/formula_dependency_graph.dart';
 class SpreadsheetController extends ChangeNotifier {
   SpreadsheetController(
     this._service, {
-    this._preferences = const AppPreferences(),
-  });
+    AppPreferences preferences = const AppPreferences(),
+  }) : _preferences = preferences;
 
   final SpreadsheetService _service;
   final AppPreferences _preferences;

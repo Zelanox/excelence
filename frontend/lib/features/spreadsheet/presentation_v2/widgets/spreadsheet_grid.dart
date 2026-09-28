@@ -50,6 +50,7 @@ class SpreadsheetGrid extends StatefulWidget {
   static const double columnWidth = 100;
   static const double rowHeight = 28;
   static const double headerSize = 40;
+  static const double addHandleSize = 20.0;
 
   @override
   State<SpreadsheetGrid> createState() => _SpreadsheetGridState();
@@ -142,27 +143,46 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
 
   /// Jumps horizontal scroll to the edge where column 0 now renders,
   /// following a direction change - RTL puts column 0 at the LAST table
-  /// index (maxScrollExtent), LTR puts it right after the row-number
-  /// gutter (offset 0). Without this, toggling direction reverses which
-  /// column is at which table index (the actual fix) but leaves the
-  /// scroll position exactly where it was, so the sheet's true first
-  /// column - the one a user opening/toggling a sheet most wants to see
-  /// immediately - can end up scrolled off-screen on the opposite side.
+  /// index (the far physical right, since pinnedColumnCount/scroll axis
+  /// direction do NOT auto-flip from ambient Directionality - confirmed
+  /// against the framework's own ScrollableDetails.horizontal, which
+  /// takes an explicit AxisDirection unrelated to Directionality; this
+  /// grid's horizontalDetails passes no direction/reverse at all, so
+  /// offset=0 is always physically left, full stop, in every sheet).
+  /// LTR puts column 0 right after the row-number gutter (offset 0).
   ///
-  /// Deliberately run via addPostFrameCallback rather than inline during
-  /// build: TableView needs to finish laying out with the NEW
-  /// columnBuilder extents first (the row-number/data-column widths
-  /// haven't changed, but which data column sits at which table index
-  /// has - jumpTo needs a settled maxScrollExtent to clamp against, which
-  /// only exists after this frame's layout completes).
+  /// Deliberately computes the target from known content width
+  /// (_totalDataColumnsWidth) and the viewport's own render size, NOT
+  /// from _horizontalController.position.maxScrollExtent - reading
+  /// maxScrollExtent depends on TableView's RenderObject having already
+  /// completed layout with the NEW columnBuilder outputs for this frame,
+  /// and a single addPostFrameCallback proved unreliable for that.
+  /// Computing the target directly sidesteps needing that timing to
+  /// line up at all: total content width minus the viewport's visible
+  /// width (clamped to >= 0) is the same quantity maxScrollExtent would
+  /// report once settled, without waiting on it.
   void _snapScrollToDirectionStart(bool isRtl) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_horizontalController.hasClients) {
         return;
       }
-      final target = isRtl
-          ? _horizontalController.position.maxScrollExtent
-          : 0.0;
+
+      double target = 0;
+      if (isRtl) {
+        final viewportWidth =
+            (context.findRenderObject() as RenderBox?)?.size.width ?? 0;
+        // Scrollable content width is the row-number gutter PLUS every
+        // data column PLUS the append-column handle - matching exactly
+        // what columnBuilder assigns extents for (see build() below).
+        final totalContentWidth = SpreadsheetGrid.headerSize +
+            _totalDataColumnsWidth() +
+            SpreadsheetGrid.addHandleSize;
+        target = (totalContentWidth - viewportWidth).clamp(
+          0,
+          double.infinity,
+        );
+      }
+
       _horizontalController.jumpTo(target);
       widget.viewportController.setScroll(
         x: target,
@@ -763,8 +783,9 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
             // "+" append affordance. pinnedRowCount/pinnedColumnCount
             // keep row 0 and column 0 fixed in place while the body
             // scrolls beneath them - TableView's built-in equivalent of
-            // the old dual-SingleChildScrollView sync.
-            const addHandleSize = 20.0;
+            // the old dual-SingleChildScrollView sync. addHandleSize is
+            // a class-level static (see top of class) rather than local
+            // here, since _snapScrollToDirectionStart also needs it.
 
             // Ambient Directionality does NOT reorder TableView's column
             // indices or move which side pinnedColumnCount pins to -
@@ -804,7 +825,7 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
                   final extent = index == 0
                       ? SpreadsheetGrid.headerSize
                       : index == rowCount + 1
-                          ? addHandleSize
+                          ? SpreadsheetGrid.addHandleSize
                           : SpreadsheetGrid.rowHeight;
                   return TableSpan(extent: FixedTableSpanExtent(extent));
                 },
@@ -812,7 +833,7 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
                   final extent = index == 0
                       ? SpreadsheetGrid.headerSize
                       : index == columnCount + 1
-                          ? addHandleSize
+                          ? SpreadsheetGrid.addHandleSize
                           : _columnWidth(
                               _dataColumnForTableColumn(
                                 index,
