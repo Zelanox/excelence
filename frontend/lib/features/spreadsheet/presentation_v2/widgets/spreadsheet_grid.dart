@@ -141,53 +141,33 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
   // only reacting to the flag actually changing does.
   bool? _lastKnownRtl;
 
-  /// Jumps horizontal scroll to the edge where column 0 now renders,
-  /// following a direction change - RTL puts column 0 at the LAST table
-  /// index (the far physical right, since pinnedColumnCount/scroll axis
-  /// direction do NOT auto-flip from ambient Directionality - confirmed
-  /// against the framework's own ScrollableDetails.horizontal, which
-  /// takes an explicit AxisDirection unrelated to Directionality; this
-  /// grid's horizontalDetails passes no direction/reverse at all, so
-  /// offset=0 is always physically left, full stop, in every sheet).
-  /// LTR puts column 0 right after the row-number gutter (offset 0).
+  /// Snaps horizontal scroll to the edge where the sheet "starts" after a
+  /// direction change (or on first build): offset 0 for LTR, and the far
+  /// end (maxScrollExtent) for RTL, where the row-number column and column
+  /// 0 live at the last table indices.
   ///
-  /// Deliberately computes the target from known content width
-  /// (_totalDataColumnsWidth) and the viewport's own render size, NOT
-  /// from _horizontalController.position.maxScrollExtent - reading
-  /// maxScrollExtent depends on TableView's RenderObject having already
-  /// completed layout with the NEW columnBuilder outputs for this frame,
-  /// and a single addPostFrameCallback proved unreliable for that.
-  /// Computing the target directly sidesteps needing that timing to
-  /// line up at all: total content width minus the viewport's visible
-  /// width (clamped to >= 0) is the same quantity maxScrollExtent would
-  /// report once settled, without waiting on it.
+  /// Only matters when the sheet is WIDER than the viewport. When it is
+  /// narrower, maxScrollExtent is 0 and this is a harmless no-op - the
+  /// right-anchoring in that case is done by layout (see the Align +
+  /// SizedBox wrapper in build()), not by scrolling.
+  ///
+  /// Two nested post-frame callbacks: the RTL wrapper's width can itself
+  /// change in the frame that toggles direction, so the scroll extent
+  /// needs one full frame to settle before maxScrollExtent is trustworthy.
   void _snapScrollToDirectionStart(bool isRtl) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_horizontalController.hasClients) {
-        return;
-      }
-
-      double target = 0;
-      if (isRtl) {
-        final viewportWidth =
-            (context.findRenderObject() as RenderBox?)?.size.width ?? 0;
-        // Scrollable content width is the row-number gutter PLUS every
-        // data column PLUS the append-column handle - matching exactly
-        // what columnBuilder assigns extents for (see build() below).
-        final totalContentWidth = SpreadsheetGrid.headerSize +
-            _totalDataColumnsWidth() +
-            SpreadsheetGrid.addHandleSize;
-        target = (totalContentWidth - viewportWidth).clamp(
-          0,
-          double.infinity,
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_horizontalController.hasClients) {
+          return;
+        }
+        final target =
+            isRtl ? _horizontalController.position.maxScrollExtent : 0.0;
+        _horizontalController.jumpTo(target);
+        widget.viewportController.setScroll(
+          x: target,
+          y: widget.viewportController.viewport.scrollY,
         );
-      }
-
-      _horizontalController.jumpTo(target);
-      widget.viewportController.setScroll(
-        x: target,
-        y: widget.viewportController.viewport.scrollY,
-      );
+      });
     });
   }
 
@@ -360,32 +340,37 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
     return sheet.columnWidths[name] ?? SpreadsheetGrid.columnWidth;
   }
 
-  /// Maps a TableView column index (as columnBuilder/cellBuilder receive
-  /// it, 0-based over the WHOLE table including the row-number and
-  /// append-column slots) to the actual sheet/data column index (0-based
-  /// over just the real columns, matching SheetModel.headers order).
+  /// Table-index of the row-number column: 0 (far left) in LTR, and the
+  /// LAST index (far right) in RTL.
+  int _rowNumberTableColumn({required bool isRtl}) =>
+      isRtl ? _currentColumnCount() + 1 : 0;
+
+  /// Table-index of the append-column "+" slot: the last index (far
+  /// right) in LTR, and index 0 (far left) in RTL. It always sits past
+  /// the LOGICAL end of the sheet, which is on the left in RTL.
+  int _appendTableColumn({required bool isRtl}) =>
+      isRtl ? 0 : _currentColumnCount() + 1;
+
+  /// Total width of every table column: row-number gutter + all data
+  /// columns + append handle. Direction-independent.
+  double _totalTableWidth() =>
+      SpreadsheetGrid.headerSize +
+      _totalDataColumnsWidth() +
+      SpreadsheetGrid.addHandleSize;
+
+  /// Maps a TableView column index (0-based over the WHOLE table,
+  /// including the row-number and append slots) to the sheet/data column
+  /// index (0-based over just the real columns).
   ///
-  /// This is the ONE place RTL's column reordering happens. TableView's
-  /// pinnedColumnCount always pins table-index 0 to the physical left
-  /// edge regardless of ambient Directionality - Directionality only
-  /// affects content alignment inside cells (text, AlignmentDirectional),
-  /// NOT which column index renders where (confirmed against the
-  /// package's own docs/PRs; there is no auto-reversal to rely on here).
+  /// TableView never auto-reverses from ambient Directionality, so RTL is
+  /// done by explicit index mapping. Physical layout, left to right:
+  ///   LTR: [rowNumber] [col0 .. colN-1] [append]
+  ///   RTL: [append] [colN-1 .. col0] [rowNumber]
+  /// The data slots are always table indices 1..columnCount; only their
+  /// contents reverse, and the row-number/append slots swap ends (see
+  /// _rowNumberTableColumn / _appendTableColumn).
   ///
-  /// The row-number column (table index 0) and the append-column "+"
-  /// button (table index columnCount+1) stay at their normal physical
-  /// position - left and right respectively - in EVERY sheet, regardless
-  /// of direction. Only the DATA columns between them (table indices
-  /// 1..columnCount) reverse which sheet column renders where when the
-  /// sheet is RTL, so table index 1 (physically leftmost data column)
-  /// shows the sheet's LAST column, and table index columnCount (physically
-  /// rightmost data column) shows sheet column 0 - matching how the
-  /// columns should read right-to-left while the row-number gutter and
-  /// append affordance keep a predictable, unchanging position.
-  ///
-  /// Returns null for a table index that isn't a real data column (the
-  /// row-number or append-column slots, or out of range) - callers check
-  /// for null rather than getting a nonsensical index.
+  /// Returns null for a table index that isn't a real data column.
   int? _dataColumnForTableColumn(int tableColumn, {required bool isRtl}) {
     final columnCount = _currentColumnCount();
 
@@ -438,7 +423,10 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
   /// so this is the seam that converts to screen space.
   double _visualColumnLeft(int dataColumn, {required bool isRtl}) {
     final tableColumn = _tableColumnForDataColumn(dataColumn, isRtl: isRtl);
-    double left = 0;
+    // LTR: the row-number column is pinned, so scroll-space starts right
+    // after it (0). RTL: nothing is pinned horizontally, so scroll-space
+    // includes the leading append slot on the far left.
+    double left = isRtl ? SpreadsheetGrid.addHandleSize : 0;
     for (int t = 1; t < tableColumn; t++) {
       final data = _dataColumnForTableColumn(t, isRtl: isRtl);
       if (data != null) {
@@ -567,9 +555,21 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
     // available body size, since ensureVisible's math is in terms of
     // the scrollable body area only (row 0 / column 0 are always
     // visible regardless of scroll position).
+    final isRtlForBody =
+        widget.spreadsheetController.spreadsheet?.activeSheet.isRtl ?? false;
+    // LTR: the pinned row-number column covers headerSize of the width.
+    // RTL: no horizontal pinning, and a sheet narrower than the window is
+    // capped to its own width (see build()), so the scrollable viewport
+    // is min(window, total table width).
+    final availableWidth = isRtlForBody
+        ? (viewportSize.width < _totalTableWidth()
+            ? viewportSize.width
+            : _totalTableWidth())
+        : (viewportSize.width - SpreadsheetGrid.headerSize)
+            .clamp(0, viewportSize.width)
+            .toDouble();
     final bodySize = Size(
-      (viewportSize.width - SpreadsheetGrid.headerSize)
-          .clamp(0, viewportSize.width),
+      availableWidth,
       (viewportSize.height - SpreadsheetGrid.headerSize)
           .clamp(0, viewportSize.height),
     );
@@ -788,31 +788,48 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
             // here, since _snapScrollToDirectionStart also needs it.
 
             // Ambient Directionality does NOT reorder TableView's column
-            // indices or move which side pinnedColumnCount pins to -
-            // confirmed this doesn't auto-reverse (the package's RTL
-            // support is limited to content alignment inside cells, e.g.
-            // AlignmentDirectional/PositionedDirectional, and does not
-            // extend to which vicinity.column renders where). So the
-            // actual RTL column reordering happens explicitly, in
-            // _dataColumnForTableColumn below: the row-number column
-            // (table index 0) and the append-column "+" button (table
-            // index columnCount+1) stay at their normal physical
-            // position - left and right respectively - in EVERY sheet;
-            // only the DATA columns between them (indices 1..columnCount)
-            // reverse which sheet column renders where when RTL. This
-            // Directionality wrapper still matters for what it genuinely
-            // does affect: RTL text alignment in GridCell/
-            // GridColumnHeader (AlignmentDirectional.centerStart) and the
-            // resize handle's edge (PositionedDirectional in
-            // GridColumnHeader) - see _ResizeHandle's own direction-aware
-            // drag-delta handling for why the handle's physical edge
-            // flipping isn't enough on its own.
+            // indices or move which side pinnedColumnCount pins to, so RTL
+            // is done by explicit index mapping (see
+            // _dataColumnForTableColumn / _rowNumberTableColumn /
+            // _appendTableColumn). The Directionality wrapper still
+            // matters for text alignment in cells/headers and the resize
+            // handle's edge.
+
+            final rowNumberColumn =
+                _rowNumberTableColumn(isRtl: sheet.isRtl);
+            final appendColumn = _appendTableColumn(isRtl: sheet.isRtl);
+
+            // RTL: real Excel-style right-anchoring. The row-number
+            // column sits at the LAST table index (far right) and is NOT
+            // pinned (TableView can only pin leading columns), so it
+            // scrolls with the data. When the sheet is narrower than the
+            // window, the table is capped to its own width and aligned to
+            // the RIGHT edge; when wider, it fills the window and scrolls
+            // normally (snapped to the right end, see
+            // _snapScrollToDirectionStart). LTR: full width, pinned
+            // row-number column, aligned left - same as before.
             return Directionality(
               textDirection:
                   sheet.isRtl ? TextDirection.rtl : TextDirection.ltr,
-              child: TableView.builder(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final maxWidth = constraints.maxWidth;
+                  final totalWidth = _totalTableWidth();
+                  final tableWidth = sheet.isRtl && totalWidth < maxWidth
+                      ? totalWidth
+                      : maxWidth;
+                  return Align(
+                    alignment: sheet.isRtl
+                        ? Alignment.topRight
+                        : Alignment.topLeft,
+                    child: SizedBox(
+                      width: tableWidth,
+                      height: constraints.hasBoundedHeight
+                          ? constraints.maxHeight
+                          : null,
+                      child: TableView.builder(
                 pinnedRowCount: 1,
-                pinnedColumnCount: 1,
+                pinnedColumnCount: sheet.isRtl ? 0 : 1,
                 verticalDetails: ScrollableDetails.vertical(
                   controller: _verticalController,
                 ),
@@ -830,9 +847,9 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
                   return TableSpan(extent: FixedTableSpanExtent(extent));
                 },
                 columnBuilder: (int index) {
-                  final extent = index == 0
+                  final extent = index == rowNumberColumn
                       ? SpreadsheetGrid.headerSize
-                      : index == columnCount + 1
+                      : index == appendColumn
                           ? SpreadsheetGrid.addHandleSize
                           : _columnWidth(
                               _dataColumnForTableColumn(
@@ -844,9 +861,9 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
                 },
                 cellBuilder: (context, vicinity) {
                   final isHeaderRow = vicinity.row == 0;
-                  final isHeaderColumn = vicinity.column == 0;
+                  final isHeaderColumn = vicinity.column == rowNumberColumn;
                   final isAppendRow = vicinity.row == rowCount + 1;
-                  final isAppendColumn = vicinity.column == columnCount + 1;
+                  final isAppendColumn = vicinity.column == appendColumn;
 
                   // Corner cell: blank above the row-number column.
                   if (isHeaderRow && isHeaderColumn) {
@@ -858,7 +875,9 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
                     return TableViewCell(
                       child: _HoverAddHandle(
                         axis: Axis.horizontal,
-                        tooltip: 'Add column to the right',
+                        tooltip: sheet.isRtl
+                            ? 'Add column to the left'
+                            : 'Add column to the right',
                         onTap: _appendColumn,
                       ),
                     );
@@ -958,6 +977,10 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
                           _handleReferenceRangeDragEnter,
                       onReferenceRangeDragEnd: _handleReferenceRangeDragEnd,
                       referenceRangeDrag: _referenceRangeDrag,
+                    ),
+                  );
+                },
+                      ),
                     ),
                   );
                 },

@@ -269,7 +269,7 @@ class _GridCellState extends State<GridCell> {
   /// anchor does not mean it sits on the range's boundary (e.g. it can be
   /// the top-left corner of a range dragged down-and-right, in which case
   /// only its top and left sides are actually on the boundary).
-  Border _cellBorder({
+  BoxBorder _cellBorder({
     required _SelectionEdges? edges,
     Color rangeColor = Colors.blue,
     double rangeWidth = 2,
@@ -281,11 +281,17 @@ class _GridCellState extends State<GridCell> {
       return Border.fromBorderSide(gridline);
     }
 
-    return Border(
+    // edges.left/right are LOGICAL: "left" means the side toward the
+    // range's first (lowest-index) column, "right" the side toward its
+    // last. In RTL, column 0 renders on the physical right, so these must
+    // resolve as start/end against the ambient Directionality rather than
+    // physical left/right - otherwise the range's outer vertical edges
+    // land on the wrong sides of the boundary cells.
+    return BorderDirectional(
       top: edges.top ? rangeLine : gridline,
       bottom: edges.bottom ? rangeLine : gridline,
-      left: edges.left ? rangeLine : gridline,
-      right: edges.right ? rangeLine : gridline,
+      start: edges.left ? rangeLine : gridline,
+      end: edges.right ? rangeLine : gridline,
     );
   }
 
