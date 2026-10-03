@@ -159,6 +159,15 @@ class Spreadsheet:
             value
         )
 
+    def edit_cells(self, edits):
+
+        sheet = self.current_sheet()
+
+        if sheet is None:
+            return False
+
+        return sheet.edit_cells(edits)
+
     def insert_row(self, index=None):
 
         sheet = self.current_sheet()

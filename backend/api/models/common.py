@@ -55,6 +55,10 @@ class SpreadsheetResponse(ApiResponse):
 
     text_defaults: dict[str, Any] = Field(default_factory=dict, description="The active worksheet's default text style (only the fields that are set).")
 
+    undo_depth: int = Field(default=0, description="Undo steps the backend currently holds.")
+
+    redo_depth: int = Field(default=0, description="Redo steps the backend currently holds.")
+
 
 class StatusResponse(ApiResponse):
 

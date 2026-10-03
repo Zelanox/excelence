@@ -520,6 +520,42 @@ class SpreadsheetService {
     );
   }
 
+  /// Updates several cells in ONE request (applied as a single undoable
+  /// step on the backend). Rows are rows of the grid as currently shown.
+  Future<SpreadsheetData> editCells(
+    List<({int row, int column, String value})> edits,
+  ) {
+    return _postEdit(
+      '/spreadsheet/edit-cells',
+      body: {
+        'edits': [
+          for (final edit in edits)
+            {'row': edit.row, 'column': edit.column, 'value': edit.value},
+        ],
+      },
+      failureMessage: 'Failed to update cells',
+    );
+  }
+
+  /// Undoes the backend's most recent content change. Fails (throws) if
+  /// the backend has nothing to undo.
+  Future<SpreadsheetData> undo() {
+    return _postEdit(
+      '/spreadsheet/undo',
+      body: const {},
+      failureMessage: 'Failed to undo',
+    );
+  }
+
+  /// Redoes the backend's most recently undone change.
+  Future<SpreadsheetData> redo() {
+    return _postEdit(
+      '/spreadsheet/redo',
+      body: const {},
+      failureMessage: 'Failed to redo',
+    );
+  }
+
   /// Sets or clears text-style fields on a rectangle of cells (inclusive,
   /// in the visible grid's coordinates). [style] holds the fields to set
   /// (backend snake_case names); [reset] names fields to return to

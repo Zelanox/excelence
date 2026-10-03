@@ -706,10 +706,14 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
         _ensureSelectionVisible();
         return KeyEventResult.handled;
       case LogicalKeyboardKey.tab:
-        // Tab follows reading order, which runs toward LOWER column
-        // indices in RTL (column 0 is the visual start/right edge) -
-        // same reasoning as arrowLeft/arrowRight above.
-        if (isRtl) {
+        // Tab follows LOGICAL order - next column, wrapping to the first
+        // column of the next row - in both directions. In RTL, column 0
+        // is the right-most column, so "next column" is the one to its
+        // LEFT and a wrap lands back on the right edge of the row below:
+        // exactly right-to-left, top-to-bottom, with no RTL special
+        // case needed. (Only the ARROW keys need flipping, because they
+        // are physical directions.) Shift+Tab walks it backwards.
+        if (HardwareKeyboard.instance.isShiftPressed) {
           widget.viewportController.movePrevious();
         } else {
           widget.viewportController.moveNext();

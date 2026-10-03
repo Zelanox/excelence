@@ -12,6 +12,9 @@ from backend.commands.spreadsheet.rename_column import RenameColumnCommand
 from backend.commands.spreadsheet.set_column_width import SetColumnWidthCommand
 from backend.commands.spreadsheet.set_rtl import SetRtlCommand
 from backend.commands.spreadsheet.set_cell_style import SetCellStyleCommand
+from backend.commands.spreadsheet.edit_cells import EditCellsCommand
+from backend.commands.spreadsheet.undo import UndoCommand
+from backend.commands.spreadsheet.redo import RedoCommand
 from backend.commands.spreadsheet.set_text_defaults import SetTextDefaultsCommand
 from backend.commands.spreadsheet.search import SearchCommand
 from backend.commands.spreadsheet.clear_search import ClearSearchCommand
@@ -49,6 +52,15 @@ class SpreadsheetService:
         )
 
         return self._execute(command)
+
+    def edit_cells(self, edits: list[tuple[int, int, Any]]) -> bool:
+        return self._execute(EditCellsCommand(self.document, edits))
+
+    def undo(self) -> bool:
+        return self._execute(UndoCommand(self.document))
+
+    def redo(self) -> bool:
+        return self._execute(RedoCommand(self.document))
 
     def insert_row(self, index: int | None = None) -> bool:
         command = InsertRowCommand(

@@ -161,7 +161,7 @@ class _GridCellState extends State<GridCell> {
       // Returning "handled" here stops that built-in behavior from
       // running at all - we fully own Tab's meaning inside an editing
       // cell.
-      _commitAndMoveRight();
+      _commitAndMoveByTab();
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -326,9 +326,18 @@ class _GridCellState extends State<GridCell> {
     widget.viewportController.moveDown();
   }
 
-  void _commitAndMoveRight() {
+  /// Tab / Shift+Tab while editing: commit, then move to the next /
+  /// previous cell in LOGICAL order (wrapping to the next / previous row).
+  /// Same rule as Tab outside edit mode, and direction-independent - in
+  /// RTL logical "next" is already the cell to the left.
+  void _commitAndMoveByTab() {
     _commit();
-    widget.viewportController.moveRight();
+
+    if (HardwareKeyboard.instance.isShiftPressed) {
+      widget.viewportController.movePrevious();
+    } else {
+      widget.viewportController.moveNext();
+    }
   }
 
   void _cancel() {

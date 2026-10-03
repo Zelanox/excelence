@@ -49,7 +49,14 @@ class StatusBar extends StatelessWidget {
           return Row(
             children: [
               Text(
-                spreadsheetController.isSaving ? 'Saving...' : 'Ready',
+                // Autosave runs a moment after the last change, so there's
+                // a short "Unsaved changes" window between editing and
+                // "Saving...".
+                spreadsheetController.isSaving
+                    ? 'Saving...'
+                    : spreadsheetController.hasUnsavedChanges
+                        ? 'Unsaved changes'
+                        : 'All changes saved',
                 style: TextStyle(color: Colors.grey.shade600),
               ),
               const SizedBox(width: 16),

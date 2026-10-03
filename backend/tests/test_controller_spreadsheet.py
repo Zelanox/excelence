@@ -23,8 +23,11 @@ def test_controller_data_and_sheet_switching():
         workbook.save(workbook_path)
 
         controller = Controller()
+        # The app only opens files inside its documents folder, so point
+        # that at the temp directory and open by name.
+        controller.document.documents_folder = tmp_dir
 
-        assert controller.open_document(workbook_path) is True
+        assert controller.open_document(os.path.basename(workbook_path)) is True
         assert controller.headers() == ["name"]
         assert controller.data() == [{"name": "Alice"}]
         assert controller.sheets() == ["Sheet1", "Sheet2"]
@@ -48,8 +51,11 @@ def test_controller_search_and_clear_search_return_success_values():
         workbook.save(workbook_path)
 
         controller = Controller()
+        # The app only opens files inside its documents folder, so point
+        # that at the temp directory and open by name.
+        controller.document.documents_folder = tmp_dir
 
-        assert controller.open_document(workbook_path) is True
+        assert controller.open_document(os.path.basename(workbook_path)) is True
         assert controller.search("Alice") is True
         assert controller.data() == [{"name": "Alice"}]
         assert controller.clear_search() is True
@@ -69,8 +75,11 @@ def test_controller_editing_operations_update_dataframe_and_workbook():
         workbook.save(workbook_path)
 
         controller = Controller()
+        # The app only opens files inside its documents folder, so point
+        # that at the temp directory and open by name.
+        controller.document.documents_folder = tmp_dir
 
-        assert controller.open_document(workbook_path) is True
+        assert controller.open_document(os.path.basename(workbook_path)) is True
 
         assert controller.edit_cell(0, 0, "Updated") is True
         assert controller.data() == [{"name": "Updated"}, {"name": "Bob"}]
@@ -114,8 +123,11 @@ def test_controller_failure_cases_return_false():
         workbook.save(workbook_path)
 
         controller = Controller()
+        # The app only opens files inside its documents folder, so point
+        # that at the temp directory and open by name.
+        controller.document.documents_folder = tmp_dir
 
-        assert controller.open_document(workbook_path) is True
+        assert controller.open_document(os.path.basename(workbook_path)) is True
         assert controller.edit_cell(1, 0, "X") is False
         assert controller.edit_cell(0, 3, "X") is False
         assert controller.insert_row(-1) is False

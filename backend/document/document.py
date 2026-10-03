@@ -15,7 +15,7 @@ from backend.utils.logger import get_logger
 
 from backend.models.cell_style import CellStyle
 from backend.models.spreadsheet import Spreadsheet
-from backend.models.sheet import Sheet
+from backend.models.sheet import Sheet, SheetSnapshot
 from backend.models.spreadsheet_row import SpreadsheetRow
 
 from backend.services.search_service import SearchService
@@ -30,6 +30,10 @@ logger = get_logger("document")
 # travels with the worksheet (survives a sheet rename) and Excel ignores
 # it. Per-cell overrides, by contrast, are stored as ordinary cell fonts.
 _TEXT_DEFAULTS_NAME = "_excelence_text_defaults"
+
+# How many undo steps the backend keeps per document. Each step is a full
+# copy of the active sheet's cells, so this bounds memory on big sheets.
+MAX_HISTORY = 50
 
 # What an unstyled cell is in an Excel/openpyxl workbook.
 _BASE_FONT_FAMILY = "Calibri"
@@ -77,8 +81,13 @@ class Document:
         self.loaded = False
         self.modified = False
 
-        self.undo_stack: list[dict[str, Any]] = []
-        self.redo_stack: list[dict[str, Any]] = []
+        # Undo/redo. Each entry is (sheet name, exact snapshot of that
+        # sheet taken BEFORE a content change). History is exact because
+        # it holds copies of the real data (so column types survive), and
+        # it belongs to one sheet at a time - anything that changes which
+        # sheet/document/view is in play clears it (see clear_history).
+        self.undo_stack: list[tuple[str, SheetSnapshot]] = []
+        self.redo_stack: list[tuple[str, SheetSnapshot]] = []
 
     # ==========================================================
     # Document
@@ -131,6 +140,7 @@ class Document:
         self.spreadsheet = Spreadsheet()
         self.search_text = ""
         self.sort_rules = []
+        self.clear_history()
 
         self.filename = filename
         self.sheet_name = self.sheet.title
@@ -312,6 +322,7 @@ class Document:
         self.spreadsheet = Spreadsheet()
         self.search_text = ""
         self.sort_rules = []
+        self.clear_history()
 
         self._set_view_data(self.storage.read_sheet(self.sheet))
         self.dataframe_to_spreadsheet()
@@ -497,10 +508,118 @@ class Document:
         if row < 0 or column < 0:
             return False
 
+        history_entry = self._capture_history()
         success = self.spreadsheet.edit_cell(row, column, value)
 
         if not success:
             return False
+
+        self._commit_history(history_entry)
+
+        self._sync_from_active_sheet()
+        self._sync_active_sheet()
+
+        self.modified = True
+
+        self.search(self.search_text)
+
+        return True
+
+    def edit_cells(self, edits: list[tuple[int, int, Any]]) -> bool:
+        """
+        Update several cells as ONE undoable change.
+
+        Args:
+            edits: ``(row, column, value)`` tuples; rows are view rows
+                (see Sheet.edit_cells). All-or-nothing.
+
+        Returns:
+            True if every edit was applied, otherwise False (and nothing
+            was changed).
+        """
+        if self.workbook is None:
+            return False
+
+        history_entry = self._capture_history()
+        success = self.spreadsheet.edit_cells(edits)
+
+        if not success:
+            return False
+
+        self._commit_history(history_entry)
+
+        # One rebuild of the worksheet for the whole batch - rewriting it
+        # once per cell is what made large pastes slow.
+        self._sync_from_active_sheet()
+        self._sync_active_sheet()
+
+        self.modified = True
+
+        self.search(self.search_text)
+
+        return True
+
+    # ==========================================================
+    # Undo / redo
+    # ==========================================================
+
+    def _capture_history(self) -> tuple[str, SheetSnapshot] | None:
+        """Snapshot the active sheet BEFORE a change (committed only if it succeeds)."""
+        sheet = self._active_sheet_model()
+
+        if sheet is None:
+            return None
+
+        return sheet.name, sheet.snapshot()
+
+    def _commit_history(self, entry: tuple[str, SheetSnapshot] | None) -> None:
+        """Record a captured snapshot now that its change succeeded."""
+        if entry is None:
+            return
+
+        self.undo_stack.append(entry)
+        del self.undo_stack[:-MAX_HISTORY]
+        self.redo_stack.clear()
+
+    def clear_history(self) -> None:
+        """Forget all undo/redo steps."""
+        self.undo_stack.clear()
+        self.redo_stack.clear()
+
+    def undo(self) -> bool:
+        """Undo the most recent content change on the active sheet."""
+        return self._step_history(self.undo_stack, self.redo_stack)
+
+    def redo(self) -> bool:
+        """Redo the most recently undone change on the active sheet."""
+        return self._step_history(self.redo_stack, self.undo_stack)
+
+    def _step_history(
+        self,
+        source: list[tuple[str, SheetSnapshot]],
+        target: list[tuple[str, SheetSnapshot]],
+    ) -> bool:
+        """Swap the sheet with the newest snapshot in ``source``."""
+        if self.workbook is None or not source:
+            return False
+
+        sheet = self._active_sheet_model()
+
+        if sheet is None:
+            return False
+
+        name, snapshot = source[-1]
+
+        # History belongs to one sheet. Switching sheets clears it, so
+        # this only guards against a stale entry ever being applied to
+        # the wrong sheet.
+        if name != sheet.name:
+            return False
+
+        target.append((sheet.name, sheet.snapshot()))
+        source.pop()
+
+        sheet.restore(snapshot)
 
         self._sync_from_active_sheet()
         self._sync_active_sheet()
@@ -524,10 +643,13 @@ class Document:
         if self.workbook is None:
             return False
 
+        history_entry = self._capture_history()
         success = self.spreadsheet.insert_row(index)
 
         if not success:
             return False
+
+        self._commit_history(history_entry)
 
         self._sync_from_active_sheet()
         self._sync_active_sheet()
@@ -548,10 +670,13 @@ class Document:
         if self.workbook is None:
             return False
 
+        history_entry = self._capture_history()
         success = self.spreadsheet.delete_row(index)
 
         if not success:
             return False
+
+        self._commit_history(history_entry)
 
         self._sync_from_active_sheet()
         self._sync_active_sheet()
@@ -573,10 +698,13 @@ class Document:
         if self.workbook is None:
             return False
 
+        history_entry = self._capture_history()
         success = self.spreadsheet.insert_column(name, index)
 
         if not success:
             return False
+
+        self._commit_history(history_entry)
 
         self._sync_from_active_sheet()
         self._sync_active_sheet()
@@ -597,10 +725,13 @@ class Document:
         if self.workbook is None:
             return False
 
+        history_entry = self._capture_history()
         success = self.spreadsheet.delete_column(name)
 
         if not success:
             return False
+
+        self._commit_history(history_entry)
 
         self._sync_from_active_sheet()
         self._sync_active_sheet()
@@ -622,10 +753,13 @@ class Document:
         if self.workbook is None:
             return False
 
+        history_entry = self._capture_history()
         success = self.spreadsheet.rename_column(old_name, new_name)
 
         if not success:
             return False
+
+        self._commit_history(history_entry)
 
         self._sync_from_active_sheet()
         self._sync_active_sheet()
@@ -726,6 +860,7 @@ class Document:
         if self.workbook is None:
             return False
 
+        history_entry = self._capture_history()
         success = self.spreadsheet.set_cell_style(
             start_row,
             start_column,
@@ -737,6 +872,8 @@ class Document:
 
         if not success:
             return False
+
+        self._commit_history(history_entry)
 
         # Unlike a width or RTL flip, a style change can also REMOVE a
         # font from a cell, so the worksheet is rebuilt via
@@ -800,6 +937,7 @@ class Document:
         self.sheet = self.workbook[new_name]
         self._sync_active_sheet()
         self.dataframe_to_spreadsheet()
+        self.clear_history()
         self.modified = True
         return True
 
@@ -834,6 +972,7 @@ class Document:
         # the worksheet and Sheet model both have the seeded header.
         self._set_view_data(self.storage.read_sheet(self.sheet))
         self.dataframe_to_spreadsheet()
+        self.clear_history()
         self.modified = True
         self.search(self.search_text)
         return True
@@ -871,6 +1010,7 @@ class Document:
             self.sheet_name = remaining_sheet
             self._refresh_view()
             self.dataframe_to_spreadsheet()
+            self.clear_history()
             return True
 
         if self.sheet_name in self.workbook.sheetnames:
@@ -881,6 +1021,7 @@ class Document:
 
         self._refresh_view()
         self.dataframe_to_spreadsheet()
+        self.clear_history()
         return True
 
     # ==========================================================
@@ -924,6 +1065,7 @@ class Document:
         dataframe = self.storage.read_sheet(self.sheet)
         self._set_view_data(dataframe, apply_search=False)
         self.dataframe_to_spreadsheet()
+        self.clear_history()
         self.search(self.search_text)
         return True
 
@@ -1077,7 +1219,10 @@ class Document:
         if active_sheet is None:
             return SpreadsheetData()
 
-        return active_sheet.data()
+        data = active_sheet.data()
+        data.undo_depth = len(self.undo_stack)
+        data.redo_depth = len(self.redo_stack)
+        return data
 
     def original_table(self) -> pd.DataFrame:
         """
@@ -1165,6 +1310,7 @@ class Document:
         self._clear_view_data()
         self.search_text = ""
         self.sort_rules = []
+        self.clear_history()
         self.loaded = False
         self.modified = False
 

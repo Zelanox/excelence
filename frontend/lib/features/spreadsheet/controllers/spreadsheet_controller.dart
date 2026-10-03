@@ -77,11 +77,155 @@ class SpreadsheetController extends ChangeNotifier {
   bool get isSaving => _pendingSaves.isNotEmpty;
 
   // ============================================================
+  // Ordered backend writes + autosave
+  // ============================================================
+
+  // Every backend write that changes the document (cell edits, formatting,
+  // undo/redo, autosave itself) runs through ONE queue, strictly in the
+  // order the user made them. Without it the requests race: a quick
+  // "edit, then Ctrl+Z" could reach the server undo-first, and an
+  // autosave could be written before the edits it was meant to include.
+  Future<void> _writeQueueTail = Future<void>.value();
+
+  Timer? _autosaveTimer;
+  bool _hasUnsavedChanges = false;
+
+  /// True while the open document has changes that haven't been written
+  /// to disk yet (they're about to be, by autosave).
+  bool get hasUnsavedChanges => _hasUnsavedChanges;
+
+  /// How long after the last change autosave waits - long enough that a
+  /// burst of typing becomes one save, short enough to lose almost
+  /// nothing if the tab is closed.
+  static const Duration _autosaveDelay = Duration(milliseconds: 1500);
+
+  /// How long to wait before retrying after an autosave fails (e.g. the
+  /// backend was briefly unreachable).
+  static const Duration _autosaveRetryDelay = Duration(seconds: 10);
+
+  /// Runs [job] after every earlier queued write has finished.
+  ///
+  /// A failure is reported through [lastSaveError]. For a write that
+  /// changes the document ([resyncOnFailure], the default) the local grid
+  /// and the backend may now disagree - the backend rejected something
+  /// the grid already shows - so the grid is reloaded from the backend
+  /// and local undo history is dropped, rather than leaving the user
+  /// looking at changes that were never saved.
+  void _enqueueBackendWrite({
+    required String errorPrefix,
+    required Future<void> Function() job,
+    bool markDirty = true,
+    bool resyncOnFailure = true,
+    VoidCallback? onFailure,
+  }) {
+    late final Future<void> save;
+    save = _writeQueueTail.then((_) => job()).then((_) {}, onError: (Object error) {
+      debugPrint('[SpreadsheetController] $errorPrefix: $error');
+      _lastSaveError = '$errorPrefix: $error';
+      notifyListeners();
+      onFailure?.call();
+
+      if (resyncOnFailure) {
+        unawaited(_resyncFromBackend());
+      }
+    }).whenComplete(() {
+      _pendingSaves.remove(save);
+    });
+
+    _writeQueueTail = save;
+    _pendingSaves.add(save);
+
+    if (markDirty) {
+      _markDirty();
+    }
+  }
+
+  /// Notes that the document changed and (re)starts the autosave timer.
+  void _markDirty() {
+    _hasUnsavedChanges = true;
+    _scheduleAutosave(_autosaveDelay);
+  }
+
+  void _scheduleAutosave(Duration delay) {
+    _autosaveTimer?.cancel();
+    _autosaveTimer = Timer(delay, _runAutosave);
+  }
+
+  /// Writes the document to disk now, queued behind every pending edit.
+  void _runAutosave() {
+    _autosaveTimer?.cancel();
+    _autosaveTimer = null;
+
+    if (!_hasUnsavedChanges || _spreadsheet == null) {
+      return;
+    }
+
+    // Cleared BEFORE the save so a change made while it's in flight sets
+    // the flag again and gets its own save afterwards.
+    _hasUnsavedChanges = false;
+    notifyListeners();
+
+    _enqueueBackendWrite(
+      errorPrefix: 'Autosave failed',
+      markDirty: false,
+      resyncOnFailure: false,
+      onFailure: () {
+        _hasUnsavedChanges = true;
+        _scheduleAutosave(_autosaveRetryDelay);
+      },
+      job: () async {
+        await _service.saveDocument();
+      },
+    );
+  }
+
+  /// Saves any unsaved changes immediately instead of waiting for the
+  /// autosave timer, and waits for every pending write to finish. Called
+  /// when the app loses focus / is being hidden, and before another
+  /// document is opened (which would otherwise discard the changes).
+  Future<void> flushPendingChanges() async {
+    _runAutosave();
+    await _flushPendingSaves();
+  }
+
+  /// Reloads the active sheet from the backend after a write failed, so
+  /// the grid shows what is really saved. Best effort: if the backend
+  /// can't be reached the grid is left as it is.
+  Future<void> _resyncFromBackend() async {
+    if (_spreadsheet == null) {
+      return;
+    }
+
+    try {
+      // Let everything already queued settle first - it may be about to
+      // change what the backend holds.
+      await _flushPendingSaves();
+      final data = await _service.loadData();
+      _replaceActiveSheet(data);
+      _undoStack.clear();
+      _redoStack.clear();
+      notifyListeners();
+    } catch (error) {
+      debugPrint('[SpreadsheetController] Resync failed: $error');
+    }
+  }
+
+  @override
+  void dispose() {
+    _autosaveTimer?.cancel();
+    super.dispose();
+  }
+
+  // ============================================================
   // Backend data
   // ============================================================
 
   Future<void> loadDocument(String filename) async {
     try {
+      // Opening replaces the backend's current document, so anything not
+      // yet written to disk would be lost - save it first.
+      await flushPendingChanges();
+
       // 1. Ask the backend to open the workbook.
       await _service.openDocument(filename);
 
@@ -103,9 +247,12 @@ class SpreadsheetController extends ChangeNotifier {
         availableSheetNames: sheetsData.sheetNames,
       );
 
-      // A newly loaded workbook has no local undo/redo history.
+      // A newly loaded workbook has no local undo/redo history, and
+      // nothing unsaved.
       _undoStack.clear();
       _redoStack.clear();
+      _autosaveTimer?.cancel();
+      _hasUnsavedChanges = false;
 
       // Remember this as the document to reopen automatically next
       // launch. Fire-and-forget: a failure to persist this shouldn't
@@ -131,6 +278,10 @@ class SpreadsheetController extends ChangeNotifier {
   /// inline by the create call itself.
   Future<void> newDocument(String filename) async {
     try {
+      // Creating replaces the backend's current document - save any
+      // unsaved changes in it first (loadDocument's own flush would come
+      // too late, after the create).
+      await flushPendingChanges();
       await _service.createDocument(filename);
       await loadDocument(filename);
     } catch (error, stackTrace) {
@@ -153,7 +304,13 @@ class SpreadsheetController extends ChangeNotifier {
   /// explicit, awaited user action like Save.
   Future<void> saveDocument() async {
     try {
+      // Edits are sent to the backend in the background; make sure they
+      // have all landed before asking it to write the file.
+      await _flushPendingSaves();
+      _autosaveTimer?.cancel();
+      _hasUnsavedChanges = false;
       await _service.saveDocument();
+      notifyListeners();
     } catch (error, stackTrace) {
       debugPrint(
         '[SpreadsheetController.saveDocument] Error: $error',
@@ -299,6 +456,7 @@ class SpreadsheetController extends ChangeNotifier {
     try {
       await _flushPendingSaves();
       final sheetsData = await _service.addSheet(name);
+      _markDirty();
       final data = await _service.loadData();
 
       _spreadsheet = SpreadsheetModel(
@@ -334,6 +492,7 @@ class SpreadsheetController extends ChangeNotifier {
     try {
       await _flushPendingSaves();
       final sheetsData = await _service.deleteSheet(name);
+      _markDirty();
       final data = await _service.loadData();
 
       _spreadsheet = SpreadsheetModel(
@@ -375,6 +534,7 @@ class SpreadsheetController extends ChangeNotifier {
         oldName: oldName,
         newName: newName,
       );
+      _markDirty();
 
       final activeSheetIndex = currentSpreadsheet.activeSheetIndex;
       final activeSheet = currentSpreadsheet.sheets[activeSheetIndex];
@@ -427,6 +587,7 @@ class SpreadsheetController extends ChangeNotifier {
     try {
       await _flushPendingSaves();
       final data = await _service.insertRow(index: index);
+      _markDirty();
       _replaceActiveSheet(data);
       notifyListeners();
     } catch (error, stackTrace) {
@@ -484,6 +645,7 @@ class SpreadsheetController extends ChangeNotifier {
     try {
       await _flushPendingSaves();
       final data = await _service.deleteRow(index: index);
+      _markDirty();
       _replaceActiveSheet(data);
       notifyListeners();
     } catch (error, stackTrace) {
@@ -508,6 +670,7 @@ class SpreadsheetController extends ChangeNotifier {
     try {
       await _flushPendingSaves();
       final data = await _service.insertColumn(name: name, index: index);
+      _markDirty();
       _replaceActiveSheet(data);
       notifyListeners();
     } catch (error, stackTrace) {
@@ -535,6 +698,7 @@ class SpreadsheetController extends ChangeNotifier {
     try {
       await _flushPendingSaves();
       final data = await _service.deleteColumn(name: name);
+      _markDirty();
       _replaceActiveSheet(data);
       notifyListeners();
     } catch (error, stackTrace) {
@@ -567,6 +731,7 @@ class SpreadsheetController extends ChangeNotifier {
         oldName: oldName,
         newName: newName,
       );
+      _markDirty();
       _replaceActiveSheet(data);
       notifyListeners();
     } catch (error, stackTrace) {
@@ -664,6 +829,7 @@ class SpreadsheetController extends ChangeNotifier {
     });
 
     _pendingSaves.add(save);
+    _markDirty();
   }
 
   /// Sets the active sheet's right-to-left direction, applied locally
@@ -713,6 +879,7 @@ class SpreadsheetController extends ChangeNotifier {
     });
 
     _pendingSaves.add(save);
+    _markDirty();
   }
 
   // ============================================================
@@ -808,25 +975,19 @@ class SpreadsheetController extends ChangeNotifier {
 
     notifyListeners();
 
-    late final Future<void> save;
-    save = _service
-        .setCellStyle(
+    _enqueueBackendWrite(
+      errorPrefix: 'Failed to save formatting',
+      job: () async {
+        await _service.setCellStyle(
           startRow: firstRow,
           startColumn: firstColumn,
           endRow: lastRow,
           endColumn: lastColumn,
           style: set.toJson(),
           reset: reset.toList(),
-        )
-        .then((_) {}, onError: (Object error) {
-      debugPrint('[SpreadsheetController.applyTextStyle] Save failed: $error');
-      _lastSaveError = 'Failed to save formatting: $error';
-      notifyListeners();
-    }).whenComplete(() {
-      _pendingSaves.remove(save);
-    });
-
-    _pendingSaves.add(save);
+        );
+      },
+    );
   }
 
   /// Applies [set] / [reset] to the active sheet's DEFAULT text style -
@@ -859,24 +1020,23 @@ class SpreadsheetController extends ChangeNotifier {
 
     notifyListeners();
 
-    late final Future<void> save;
-    save = _service
-        .setTextDefaults(style: set.toJson(), reset: reset.toList())
-        .then((_) {}, onError: (Object error) {
-      debugPrint('[SpreadsheetController.setTextDefaults] Save failed: $error');
-      _lastSaveError = 'Failed to save default text style: $error';
-      notifyListeners();
-    }).whenComplete(() {
-      _pendingSaves.remove(save);
-    });
-
-    _pendingSaves.add(save);
+    _enqueueBackendWrite(
+      errorPrefix: 'Failed to save default text style',
+      job: () async {
+        await _service.setTextDefaults(
+          style: set.toJson(),
+          reset: reset.toList(),
+        );
+      },
+    );
   }
 
   /// Filters the active sheet's visible rows to those matching [query].
   /// Unlike row/column mutations, search does NOT record an undo history
   /// point - filtering which rows are shown isn't a document edit the
-  /// user should be able to Ctrl+Z, any more than scrolling would be.
+  /// user should be able to Ctrl+Z, any more than scrolling would be. It
+  /// does CLEAR existing undo history, since that history describes the
+  /// rows of the previous view.
   Future<void> search(String query) async {
     final currentSpreadsheet = _spreadsheet;
     if (currentSpreadsheet == null) {
@@ -887,6 +1047,10 @@ class SpreadsheetController extends ChangeNotifier {
       await _flushPendingSaves();
       final data = await _service.search(query);
       _replaceActiveSheet(data);
+      // History is tied to the rows being shown; a different view makes
+      // it meaningless (the backend clears its side too).
+      _undoStack.clear();
+      _redoStack.clear();
       notifyListeners();
     } catch (error, stackTrace) {
       debugPrint('[SpreadsheetController.search] Error: $error');
@@ -896,7 +1060,7 @@ class SpreadsheetController extends ChangeNotifier {
   }
 
   /// Clears the active search filter, restoring every row. Like [search],
-  /// this does not touch undo/redo history.
+  /// like [search], this clears undo/redo history.
   Future<void> clearSearch() async {
     final currentSpreadsheet = _spreadsheet;
     if (currentSpreadsheet == null) {
@@ -907,6 +1071,10 @@ class SpreadsheetController extends ChangeNotifier {
       await _flushPendingSaves();
       final data = await _service.clearSearch();
       _replaceActiveSheet(data);
+      // History is tied to the rows being shown; a different view makes
+      // it meaningless (the backend clears its side too).
+      _undoStack.clear();
+      _redoStack.clear();
       notifyListeners();
     } catch (error, stackTrace) {
       debugPrint('[SpreadsheetController.clearSearch] Error: $error');
@@ -915,9 +1083,9 @@ class SpreadsheetController extends ChangeNotifier {
     }
   }
 
-  /// Sorts the active sheet by [column]. Like [search], this does not
-  /// touch undo/redo history - a sort is a view arrangement, not a
-  /// document edit the user should be able to Ctrl+Z.
+  /// Sorts the active sheet by [column]. Like [search], this is a view
+  /// arrangement rather than a document edit, so it isn't undoable - and
+  /// it clears existing undo history, which describes the previous order.
   Future<void> sort({required String column, required bool ascending}) async {
     final currentSpreadsheet = _spreadsheet;
     if (currentSpreadsheet == null) {
@@ -928,6 +1096,10 @@ class SpreadsheetController extends ChangeNotifier {
       await _flushPendingSaves();
       final data = await _service.sort(column: column, ascending: ascending);
       _replaceActiveSheet(data);
+      // History is tied to the rows being shown; a different view makes
+      // it meaningless (the backend clears its side too).
+      _undoStack.clear();
+      _redoStack.clear();
       _sortedColumn = column;
       _sortAscending = ascending;
       notifyListeners();
@@ -968,6 +1140,10 @@ class SpreadsheetController extends ChangeNotifier {
       await _flushPendingSaves();
       final data = await _service.clearSort();
       _replaceActiveSheet(data);
+      // History is tied to the rows being shown; a different view makes
+      // it meaningless (the backend clears its side too).
+      _undoStack.clear();
+      _redoStack.clear();
       _sortedColumn = null;
       _sortAscending = true;
       notifyListeners();
@@ -1049,26 +1225,81 @@ class SpreadsheetController extends ChangeNotifier {
     _redoStack.clear();
   }
 
+  /// Undoes the last document edit: the grid updates instantly from the
+  /// stored snapshot (so formulas and selection stay intact), and the
+  /// backend is told to undo the same step so the saved file agrees.
   void undo() {
-    if (!canUndo || _spreadsheet == null) {
+    final current = _spreadsheet;
+
+    if (!canUndo || current == null) {
       return;
     }
 
-    _redoStack.add(_spreadsheet!);
-    _spreadsheet = _undoStack.removeLast();
+    _redoStack.add(current);
+    _spreadsheet = _withCurrentSettings(_undoStack.removeLast(), current);
 
     notifyListeners();
+    _syncBackendHistory(isUndo: true);
   }
 
   void redo() {
-    if (!canRedo || _spreadsheet == null) {
+    final current = _spreadsheet;
+
+    if (!canRedo || current == null) {
       return;
     }
 
-    _undoStack.add(_spreadsheet!);
-    _spreadsheet = _redoStack.removeLast();
+    _undoStack.add(current);
+    _spreadsheet = _withCurrentSettings(_redoStack.removeLast(), current);
 
     notifyListeners();
+    _syncBackendHistory(isUndo: false);
+  }
+
+  /// Applies [restored] (an old snapshot) but keeps the CURRENT sheet's
+  /// direction and default text style. Those are settings, not edits -
+  /// and the backend leaves them alone on undo - so undoing a cell edit
+  /// must not also flip RTL back or reset the default font.
+  SpreadsheetModel _withCurrentSettings(
+    SpreadsheetModel restored,
+    SpreadsheetModel current,
+  ) {
+    final index = restored.activeSheetIndex;
+
+    if (index < 0 ||
+        index >= restored.sheets.length ||
+        index >= current.sheets.length) {
+      return restored;
+    }
+
+    final sheets = List<SheetModel>.from(restored.sheets);
+    sheets[index] = sheets[index].copyWith(
+      isRtl: current.sheets[index].isRtl,
+      textDefaults: current.sheets[index].textDefaults,
+    );
+
+    return SpreadsheetModel(
+      activeSheetIndex: index,
+      sheets: sheets,
+      availableSheetNames: restored.availableSheetNames,
+    );
+  }
+
+  /// Tells the backend to take the same undo/redo step the grid just took.
+  /// Queued behind earlier writes so it applies to the right state. If
+  /// the backend has no such step (the two histories drifted), the write
+  /// fails and [_enqueueBackendWrite] reloads the grid from the backend.
+  void _syncBackendHistory({required bool isUndo}) {
+    _enqueueBackendWrite(
+      errorPrefix: isUndo ? 'Failed to save undo' : 'Failed to save redo',
+      job: () async {
+        if (isUndo) {
+          await _service.undo();
+        } else {
+          await _service.redo();
+        }
+      },
+    );
   }
 
   // ============================================================
@@ -1394,25 +1625,15 @@ class SpreadsheetController extends ChangeNotifier {
       return;
     }
 
-    var hasReportedError = false;
-
-    for (final edit in edits) {
-      late final Future<void> save;
-      save = _service
-          .editCell(row: edit.row, column: edit.column, value: edit.value)
-          .then((_) {}, onError: (Object error) {
-        debugPrint('[SpreadsheetController] Save failed: $error');
-        if (!hasReportedError) {
-          hasReportedError = true;
-          _lastSaveError = 'Failed to save changes: $error';
-          notifyListeners();
-        }
-      }).whenComplete(() {
-        _pendingSaves.remove(save);
-      });
-
-      _pendingSaves.add(save);
-    }
+    // ONE request for the whole batch (a paste or clear can touch many
+    // cells): the backend applies it as a single undoable step, and
+    // rewrites the worksheet once instead of once per cell.
+    _enqueueBackendWrite(
+      errorPrefix: 'Failed to save changes',
+      job: () async {
+        await _service.editCells(edits);
+      },
+    );
   }
 
   Future<void> copySelection(SelectionModel selection) async {

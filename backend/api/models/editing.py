@@ -50,6 +50,20 @@ class ColumnWidthRequest(BaseModel):
     width: float = Field(..., gt=0, description="New column width, in Excel character-width units.", json_schema_extra={"example": 18.5})
 
 
+class CellEditItem(BaseModel):
+
+    row: int = Field(..., ge=0, description="Row of the grid as currently shown.", json_schema_extra={"example": 0})
+
+    column: int = Field(..., ge=0, description="Zero-based column index.", json_schema_extra={"example": 0})
+
+    value: Any = Field(..., description="New value for the cell.", json_schema_extra={"example": "Alice"})
+
+
+class CellsEditRequest(BaseModel):
+
+    edits: list[CellEditItem] = Field(..., min_length=1, description="Cells to update. Applied together as ONE undoable change; all-or-nothing.")
+
+
 class TextStyleFields(BaseModel):
     """Text-style fields to SET. Omitted/null fields are left unchanged."""
 

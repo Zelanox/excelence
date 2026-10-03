@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../core/api/api_client.dart';
@@ -31,7 +33,7 @@ class ShellPage extends StatefulWidget {
   State<ShellPage> createState() => _ShellPageState();
 }
 
-class _ShellPageState extends State<ShellPage> {
+class _ShellPageState extends State<ShellPage> with WidgetsBindingObserver {
   late final SpreadsheetController spreadsheetController;
   late final ViewportController viewportController;
 
@@ -56,7 +58,18 @@ class _ShellPageState extends State<ShellPage> {
     // redundant call here is harmless.
     spreadsheetController.addListener(_syncViewportBounds);
 
+    // Autosave waits a moment after the last change. If the app loses
+    // focus or its tab is hidden/closed in that moment, save right away.
+    WidgetsBinding.instance.addObserver(this);
+
     _loadInitialDocument();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) {
+      unawaited(spreadsheetController.flushPendingChanges());
+    }
   }
 
   /// Opens the last document the user had open (recorded whenever
@@ -108,6 +121,7 @@ class _ShellPageState extends State<ShellPage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     spreadsheetController.removeListener(_syncViewportBounds);
     spreadsheetController.dispose();
     viewportController.dispose();

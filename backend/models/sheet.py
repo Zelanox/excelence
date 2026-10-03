@@ -1,3 +1,5 @@
+import math
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -8,6 +10,21 @@ from backend.models.spreadsheet_row import SpreadsheetRow
 from backend.models.spreadsheet_status import SpreadsheetData
 from backend.services.search_service import SearchService
 from backend.services.sort_service import SortService
+
+
+@dataclass(slots=True)
+class SheetSnapshot:
+    """An exact copy of the parts of a sheet that undo/redo rewinds.
+
+    Deliberately limited to content: the cells (with their exact pandas
+    types), per-cell styles, and column widths. Direction (RTL) and the
+    sheet's default text style are settings, not edits, so undo leaves
+    them as they are.
+    """
+
+    dataframe: pd.DataFrame
+    cell_styles: dict[int, dict[str, CellStyle]]
+    column_widths: dict[str, float]
 
 
 @dataclass(slots=True)
@@ -223,18 +240,119 @@ class Sheet:
         return True
 
     def edit_cell(self, row: int, column: int, value: Any) -> bool:
-        if row < 0 or column < 0:
+        return self.edit_cells([(row, column, value)])
+
+    def edit_cells(self, edits: list[tuple[int, int, Any]]) -> bool:
+        """
+        Set several cells at once, all-or-nothing.
+
+        ``row`` is a VIEW row - the row as the client sees it in the
+        current filtered/sorted grid - and is translated to the underlying
+        dataframe row (see _view_positions). With no filter or sort the
+        two are the same. ``column`` is a column index (identical in the
+        view and the dataframe).
+
+        Every edit is validated before any is applied, so a bad entry
+        leaves the sheet untouched.
+        """
+        if not isinstance(edits, (list, tuple)) or not edits:
             return False
 
-        if row >= len(self.dataframe):
-            return False
+        view = self.active_view if self.active_view is not None else self.dataframe
+        resolved: list[tuple[int, int, Any]] = []
 
-        if column >= len(self.dataframe.columns):
-            return False
+        for edit in edits:
+            if not isinstance(edit, (list, tuple)) or len(edit) != 3:
+                return False
 
-        self.dataframe.iloc[row, column] = value
+            row, column, value = edit
+
+            if any(isinstance(n, bool) or not isinstance(n, int) for n in (row, column)):
+                return False
+
+            if row < 0 or column < 0:
+                return False
+
+            if row >= len(view) or column >= len(self.dataframe.columns):
+                return False
+
+            positions = self._view_positions(row, row)
+
+            if positions is None:
+                return False
+
+            resolved.append((positions[0], column, value))
+
+        for position, column, value in resolved:
+            self._write_cell(position, column, value)
+
         self.active_view = self.dataframe.copy()
         return True
+
+    _INTEGER_PATTERN = re.compile(r"^[+-]?\d+$")
+
+    def _write_cell(self, position: int, column: int, value: Any) -> None:
+        """
+        Store one value, keeping the column's type sensible.
+
+        Clients send every value as text. Writing text straight into a
+        numeric column either upcasts the whole column to text (older
+        pandas, with a warning) or raises (pandas 3), and either way a
+        number typed into a number column would end up saved as text. So
+        for a numeric column, text that is a valid number is stored as a
+        number; anything else (including blank) turns the column into a
+        general-purpose one first so the value can be stored as typed.
+        Non-numeric columns store the value exactly as given.
+        """
+        series = self.dataframe.iloc[:, column]
+        is_numeric = (
+            pd.api.types.is_numeric_dtype(series)
+            and not pd.api.types.is_bool_dtype(series)
+        )
+
+        if is_numeric and isinstance(value, str):
+            text = value.strip()
+            is_integer_column = pd.api.types.is_integer_dtype(series)
+
+            if self._INTEGER_PATTERN.match(text):
+                value = int(text)
+                if not is_integer_column:
+                    value = float(value)
+            else:
+                try:
+                    number = float(text)
+                except ValueError:
+                    number = None
+
+                if number is not None and math.isfinite(number):
+                    value = number
+                    if is_integer_column:
+                        self.dataframe.isetitem(column, series.astype("float64"))
+                else:
+                    self.dataframe.isetitem(column, series.astype(object))
+
+        self.dataframe.iloc[position, column] = value
+
+    def snapshot(self) -> "SheetSnapshot":
+        """An exact, independent copy of this sheet's undoable state."""
+        return SheetSnapshot(
+            dataframe=self.dataframe.copy(deep=True),
+            cell_styles={
+                position: {name: style.copy() for name, style in styles.items()}
+                for position, styles in self.cell_styles.items()
+            },
+            column_widths=dict(self.column_widths),
+        )
+
+    def restore(self, snapshot: "SheetSnapshot") -> None:
+        """Put this sheet back to ``snapshot`` (kept independent of it)."""
+        self.dataframe = snapshot.dataframe.copy(deep=True)
+        self.active_view = self.dataframe.copy()
+        self.cell_styles = {
+            position: {name: style.copy() for name, style in styles.items()}
+            for position, styles in snapshot.cell_styles.items()
+        }
+        self.column_widths = dict(snapshot.column_widths)
 
     def insert_row(self, index: int | None = None) -> bool:
         if index is None:

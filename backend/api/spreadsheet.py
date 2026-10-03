@@ -39,6 +39,8 @@ def _grid_fields(controller: Controller) -> dict[str, Any]:
         "rtl": data.rtl,
         "cell_styles": data.cell_styles,
         "text_defaults": data.text_defaults,
+        "undo_depth": data.undo_depth,
+        "redo_depth": data.redo_depth,
     }
 
 
@@ -354,6 +356,59 @@ def set_rtl(
     success = controller.set_rtl(request.rtl)
 
     message = "Sheet direction updated." if success else "Unable to update sheet direction."
+    return SpreadsheetEditResponse(
+        success=success,
+        message=message,
+        **_grid_fields(controller)
+    )
+
+
+@router.post(
+    "/edit-cells",
+    response_model=SpreadsheetEditResponse
+)
+def edit_cells(
+    request: CellsEditRequest,
+    controller: Controller = Depends(get_controller)
+):
+    """Update several cells at once as one undoable change."""
+    success = controller.edit_cells(
+        [(edit.row, edit.column, edit.value) for edit in request.edits]
+    )
+
+    message = "Cells updated." if success else "Unable to update cells."
+    return SpreadsheetEditResponse(
+        success=success,
+        message=message,
+        **_grid_fields(controller)
+    )
+
+
+@router.post(
+    "/undo",
+    response_model=SpreadsheetEditResponse
+)
+def undo(controller: Controller = Depends(get_controller)):
+    """Undo the last content change (cell edits, styles, row/column changes)."""
+    success = controller.undo()
+
+    message = "Undone." if success else "Nothing to undo."
+    return SpreadsheetEditResponse(
+        success=success,
+        message=message,
+        **_grid_fields(controller)
+    )
+
+
+@router.post(
+    "/redo",
+    response_model=SpreadsheetEditResponse
+)
+def redo(controller: Controller = Depends(get_controller)):
+    """Redo the last undone change."""
+    success = controller.redo()
+
+    message = "Redone." if success else "Nothing to redo."
     return SpreadsheetEditResponse(
         success=success,
         message=message,

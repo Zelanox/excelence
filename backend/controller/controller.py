@@ -178,7 +178,14 @@ class Controller:
         Returns:
             True if the sort operation completed, otherwise False.
         """
-        return self.spreadsheet_service.sort(sort_rules)
+        success = self.spreadsheet_service.sort(sort_rules)
+
+        if success:
+            # Undo history is tied to the rows the client is looking at;
+            # changing the view invalidates it (clients clear theirs too).
+            self.document.clear_history()
+
+        return success
 
     def clear_sort(self) -> bool:
         """
@@ -187,7 +194,12 @@ class Controller:
         Returns:
             True if sorting was reset successfully, otherwise False.
         """
-        return self.spreadsheet_service.clear_sort()
+        success = self.spreadsheet_service.clear_sort()
+
+        if success:
+            self.document.clear_history()
+
+        return success
 
     # ==========================================================
     # Search
@@ -203,7 +215,12 @@ class Controller:
         Returns:
             True if the search completed successfully, otherwise False.
         """
-        return self.spreadsheet_service.search(text)
+        success = self.spreadsheet_service.search(text)
+
+        if success:
+            self.document.clear_history()
+
+        return success
 
     def clear_search(self) -> bool:
         """
@@ -212,7 +229,12 @@ class Controller:
         Returns:
             True if the search filter was cleared successfully, otherwise False.
         """
-        return self.spreadsheet_service.clear_search()
+        success = self.spreadsheet_service.clear_search()
+
+        if success:
+            self.document.clear_history()
+
+        return success
 
     # ==========================================================
     # Sheets
@@ -445,6 +467,27 @@ class Controller:
             True if the active worksheet is right-to-left.
         """
         return self.document.data().rtl
+
+    def edit_cells(self, edits: list[tuple[int, int, object]]) -> bool:
+        """
+        Update several cells as one undoable change.
+
+        Args:
+            edits: ``(row, column, value)`` tuples (rows are rows of the
+                grid as currently shown). All-or-nothing.
+
+        Returns:
+            True if every edit was applied, otherwise False.
+        """
+        return self.spreadsheet_service.edit_cells(edits)
+
+    def undo(self) -> bool:
+        """Undo the last content change. False if there is nothing to undo."""
+        return self.spreadsheet_service.undo()
+
+    def redo(self) -> bool:
+        """Redo the last undone change. False if there is nothing to redo."""
+        return self.spreadsheet_service.redo()
 
     def set_cell_style(
         self,
