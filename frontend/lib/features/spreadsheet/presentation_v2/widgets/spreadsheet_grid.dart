@@ -5,6 +5,8 @@ import 'package:two_dimensional_scrollables/two_dimensional_scrollables.dart';
 import '../../controllers/spreadsheet_controller.dart';
 import '../../controllers/viewport_controller.dart';
 import '../../models/cell_position.dart';
+import '../../models/text_style_spec.dart';
+import '../actions/text_format_actions.dart';
 import '../column_naming.dart';
 import 'grid_cell.dart';
 import 'grid_column_header.dart';
@@ -646,6 +648,27 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
           return KeyEventResult.handled;
         case LogicalKeyboardKey.keyY:
           widget.spreadsheetController.redo();
+          return KeyEventResult.handled;
+        case LogicalKeyboardKey.keyB:
+          toggleTextFlag(
+            spreadsheetController: widget.spreadsheetController,
+            viewportController: widget.viewportController,
+            field: TextStyleSpec.fieldBold,
+          );
+          return KeyEventResult.handled;
+        case LogicalKeyboardKey.keyI:
+          toggleTextFlag(
+            spreadsheetController: widget.spreadsheetController,
+            viewportController: widget.viewportController,
+            field: TextStyleSpec.fieldItalic,
+          );
+          return KeyEventResult.handled;
+        case LogicalKeyboardKey.keyU:
+          toggleTextFlag(
+            spreadsheetController: widget.spreadsheetController,
+            viewportController: widget.viewportController,
+            field: TextStyleSpec.fieldUnderline,
+          );
           return KeyEventResult.handled;
         default:
           return KeyEventResult.ignored;

@@ -1,4 +1,5 @@
 import 'row_model.dart';
+import 'text_style_spec.dart';
 
 class SheetModel {
   const SheetModel({
@@ -7,6 +8,7 @@ class SheetModel {
     this.headers = const [],
     this.columnWidths = const {},
     this.isRtl = false,
+    this.textDefaults = TextStyleSpec.empty,
   });
 
   final String name;
@@ -37,4 +39,28 @@ class SheetModel {
   /// logical order renders at. Reordering headers here on top of that
   /// would double-flip the layout.
   final bool isRtl;
+
+  /// The sheet-wide default text style. Each cell's own
+  /// [CellModel.style] is merged over this; a field unset in both falls
+  /// through to the grid's built-in style. Backed by the backend's
+  /// Sheet.text_defaults (stored in the .xlsx).
+  final TextStyleSpec textDefaults;
+
+  SheetModel copyWith({
+    String? name,
+    List<RowModel>? rows,
+    List<String>? headers,
+    Map<String, double>? columnWidths,
+    bool? isRtl,
+    TextStyleSpec? textDefaults,
+  }) {
+    return SheetModel(
+      name: name ?? this.name,
+      rows: rows ?? this.rows,
+      headers: headers ?? this.headers,
+      columnWidths: columnWidths ?? this.columnWidths,
+      isRtl: isRtl ?? this.isRtl,
+      textDefaults: textDefaults ?? this.textDefaults,
+    );
+  }
 }

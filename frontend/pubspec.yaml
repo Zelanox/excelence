@@ -39,6 +39,11 @@ dependencies:
 
   shared_preferences: ^2.5.5
 
+  # Text formatting: Flutter web can't use fonts installed on the user's
+  # machine, so the font menu's families are fetched from Google Fonts at
+  # runtime (and fall back to the default font if that fails/offline).
+  google_fonts: ^6.2.1
+
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8

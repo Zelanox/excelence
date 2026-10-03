@@ -33,6 +33,14 @@ class SpreadsheetData:
 
     rtl: bool = False
 
+    # Per-cell text-style overrides, in VIEW coordinates (the row/column a
+    # client sees in the current filtered/sorted grid): a list of
+    # {"row": int, "column": int, "style": {...set fields only...}}.
+    cell_styles: list[dict[str, Any]] = field(default_factory=list)
+
+    # The sheet-wide default text style (set fields only).
+    text_defaults: dict[str, Any] = field(default_factory=dict)
+
 
 @dataclass(slots=True)
 class SpreadsheetSheet:

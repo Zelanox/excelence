@@ -3,6 +3,7 @@ from typing import Any
 
 import pandas as pd
 
+from backend.models.cell_style import CellStyle
 from backend.models.spreadsheet_row import SpreadsheetRow
 from backend.models.spreadsheet_status import SpreadsheetData
 from backend.services.search_service import SearchService
@@ -37,6 +38,17 @@ class Sheet:
     # row-number column side when this is true - see SheetModel.isRtl /
     # SpreadsheetGrid on the frontend.
     rtl: bool = False
+    # Sheet-wide default text style, and per-cell overrides on top of it.
+    # Overrides are keyed [dataframe row position][column NAME] - names
+    # rather than indices for the same reason column_widths is, and row
+    # POSITIONS (not view rows) so they stay attached to the right data
+    # through search/sort. Every structural edit below (insert/delete
+    # row, delete/rename column) keeps this in step with the dataframe -
+    # it is a third parallel representation, same hazard as the
+    # workbook/spreadsheet pair, so any new structural operation must
+    # update it too. Persisted as real cell fonts - see Document.
+    text_defaults: CellStyle = field(default_factory=CellStyle)
+    cell_styles: dict[int, dict[str, CellStyle]] = field(default_factory=dict)
     search_service: SearchService = field(default_factory=SearchService, repr=False, compare=False)
     sort_service: SortService = field(default_factory=SortService, repr=False, compare=False)
 
@@ -86,7 +98,63 @@ class Sheet:
             column_count=self.column_count,
             column_widths=dict(self.column_widths),
             rtl=self.rtl,
+            cell_styles=self._style_entries(view),
+            text_defaults=self.text_defaults.to_dict(),
         )
+
+    def _style_entries(self, view: pd.DataFrame) -> list[dict[str, Any]]:
+        """Per-cell overrides translated into the given view's coordinates."""
+        if not self.cell_styles:
+            return []
+
+        column_index = {name: index for index, name in enumerate(view.columns)}
+        entries: list[dict[str, Any]] = []
+
+        for view_row, label in enumerate(view.index):
+            row_styles = self.cell_styles.get(label)
+
+            if not row_styles:
+                continue
+
+            for name, style in row_styles.items():
+                column = column_index.get(name)
+
+                if column is None:
+                    continue
+
+                entries.append({
+                    "row": view_row,
+                    "column": column,
+                    "style": style.to_dict(),
+                })
+
+        return entries
+
+    def _view_positions(self, first: int, last: int) -> list[int] | None:
+        """Dataframe row positions for view rows ``first..last`` inclusive.
+
+        The visible grid can be filtered and sorted, so a view row is not
+        necessarily the same row of the underlying dataframe. The view
+        keeps each row's original dataframe position as its index label
+        (search preserves it, and SortService no longer resets it), which
+        is what this reads. Returns None if any label isn't a valid
+        dataframe position.
+        """
+        view = self.active_view if self.active_view is not None else self.dataframe
+        positions: list[int] = []
+
+        for label in view.index[first:last + 1]:
+            if not pd.api.types.is_integer(label):
+                return None
+
+            position = int(label)
+
+            if position < 0 or position >= len(self.dataframe):
+                return None
+
+            positions.append(position)
+
+        return positions
 
     def filtered_row_count(self) -> int:
         view = self.active_view if self.active_view is not None else self.dataframe
@@ -184,6 +252,10 @@ class Sheet:
             ignore_index=True
         )
         self.active_view = self.dataframe.copy()
+        self.cell_styles = {
+            (position + 1 if position >= index else position): styles
+            for position, styles in self.cell_styles.items()
+        }
         return True
 
     def delete_row(self, index: int) -> bool:
@@ -193,6 +265,11 @@ class Sheet:
         self.dataframe = self.dataframe.drop(index)
         self.dataframe.reset_index(drop=True, inplace=True)
         self.active_view = self.dataframe.copy()
+        self.cell_styles = {
+            (position - 1 if position > index else position): styles
+            for position, styles in self.cell_styles.items()
+            if position != index
+        }
         return True
 
     def insert_column(self, name: str, index: int | None = None) -> bool:
@@ -230,6 +307,13 @@ class Sheet:
         self.dataframe.drop(columns=[name], inplace=True)
         self.active_view = self.dataframe.copy()
         self.column_widths.pop(name, None)
+
+        for position in list(self.cell_styles):
+            self.cell_styles[position].pop(name, None)
+
+            if not self.cell_styles[position]:
+                del self.cell_styles[position]
+
         return True
 
     def rename_column(self, old_name: str, new_name: str) -> bool:
@@ -247,6 +331,11 @@ class Sheet:
 
         if new_name != old_name and old_name in self.column_widths:
             self.column_widths[new_name] = self.column_widths.pop(old_name)
+
+        if new_name != old_name:
+            for styles in self.cell_styles.values():
+                if old_name in styles:
+                    styles[new_name] = styles.pop(old_name)
 
         return True
 
@@ -279,6 +368,84 @@ class Sheet:
         one operation.
         """
         self.rtl = bool(rtl)
+        return True
+
+    def set_cell_style(
+        self,
+        start_row: int,
+        start_column: int,
+        end_row: int,
+        end_column: int,
+        values: dict[str, Any] | None = None,
+        reset: list[str] | None = None,
+    ) -> bool:
+        """
+        Set or clear text-style fields on a rectangle of cells.
+
+        Coordinates are VIEW coordinates (what the client sees in the
+        current filtered/sorted grid), inclusive on both ends and in any
+        corner order. ``values`` sets fields; ``reset`` returns fields to
+        "inherit from the sheet default". All-or-nothing: an invalid
+        patch or an out-of-range rectangle changes nothing.
+        """
+        coordinates = (start_row, start_column, end_row, end_column)
+
+        if any(isinstance(c, bool) or not isinstance(c, int) for c in coordinates):
+            return False
+
+        view = self.active_view if self.active_view is not None else self.dataframe
+
+        row_low, row_high = sorted((start_row, end_row))
+        column_low, column_high = sorted((start_column, end_column))
+
+        if row_low < 0 or column_low < 0:
+            return False
+
+        if row_high >= len(view) or column_high >= len(view.columns):
+            return False
+
+        # Validate the patch once up front so a bad request can't leave a
+        # half-applied rectangle behind.
+        if CellStyle().apply_patch(values, reset) is None:
+            return False
+
+        positions = self._view_positions(row_low, row_high)
+
+        if positions is None:
+            return False
+
+        names = list(view.columns[column_low:column_high + 1])
+
+        for position in positions:
+            row_styles = self.cell_styles.get(position, {})
+
+            for name in names:
+                updated = row_styles.get(name, CellStyle()).apply_patch(values, reset)
+
+                if updated is None or updated.is_empty():
+                    row_styles.pop(name, None)
+                else:
+                    row_styles[name] = updated
+
+            if row_styles:
+                self.cell_styles[position] = row_styles
+            else:
+                self.cell_styles.pop(position, None)
+
+        return True
+
+    def set_text_defaults(
+        self,
+        values: dict[str, Any] | None = None,
+        reset: list[str] | None = None,
+    ) -> bool:
+        """Set or clear fields of the sheet-wide default text style."""
+        updated = self.text_defaults.apply_patch(values, reset)
+
+        if updated is None:
+            return False
+
+        self.text_defaults = updated
         return True
 
     def _reapply_sort(self) -> bool:

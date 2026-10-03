@@ -1,6 +1,21 @@
 import 'dart:convert';
 
 import '../../../core/api/api_client.dart';
+import '../models/text_style_spec.dart';
+
+/// One cell's own text-style overrides, in the coordinates of the grid as
+/// returned (row/column of the visible, possibly filtered/sorted, view).
+class CellStyleEntry {
+  const CellStyleEntry({
+    required this.row,
+    required this.column,
+    required this.style,
+  });
+
+  final int row;
+  final int column;
+  final TextStyleSpec style;
+}
 
 class SpreadsheetData {
   SpreadsheetData({
@@ -10,6 +25,8 @@ class SpreadsheetData {
     required this.columnCount,
     this.columnWidths = const {},
     this.isRtl = false,
+    this.cellStyles = const [],
+    this.textDefaults = TextStyleSpec.empty,
   });
 
   final List<String> headers;
@@ -18,11 +35,15 @@ class SpreadsheetData {
   final int columnCount;
   final Map<String, double> columnWidths;
   final bool isRtl;
+  final List<CellStyleEntry> cellStyles;
+  final TextStyleSpec textDefaults;
 
   factory SpreadsheetData.fromJson(Map<String, dynamic> json) {
     final rawHeaders = json['headers'] as List<dynamic>? ?? [];
     final rawRows = json['rows'] as List<dynamic>? ?? [];
     final rawWidths = json['column_widths'] as Map<String, dynamic>? ?? {};
+    final rawStyles = json['cell_styles'] as List<dynamic>? ?? [];
+    final rawDefaults = json['text_defaults'] as Map<String, dynamic>? ?? {};
 
     return SpreadsheetData(
       headers: rawHeaders.map((header) => header.toString()).toList(),
@@ -35,6 +56,18 @@ class SpreadsheetData {
         (key, value) => MapEntry(key, (value as num).toDouble()),
       ),
       isRtl: json['rtl'] as bool? ?? false,
+      cellStyles: [
+        for (final entry in rawStyles.whereType<Map<String, dynamic>>())
+          if (entry['row'] is int && entry['column'] is int)
+            CellStyleEntry(
+              row: entry['row'] as int,
+              column: entry['column'] as int,
+              style: TextStyleSpec.fromJson(
+                entry['style'] as Map<String, dynamic>? ?? {},
+              ),
+            ),
+      ],
+      textDefaults: TextStyleSpec.fromJson(rawDefaults),
     );
   }
 }
@@ -484,6 +517,44 @@ class SpreadsheetService {
       '/spreadsheet/columns/width',
       body: {'name': name, 'width': width},
       failureMessage: 'Failed to update column width',
+    );
+  }
+
+  /// Sets or clears text-style fields on a rectangle of cells (inclusive,
+  /// in the visible grid's coordinates). [style] holds the fields to set
+  /// (backend snake_case names); [reset] names fields to return to
+  /// "inherit from the sheet default".
+  Future<SpreadsheetData> setCellStyle({
+    required int startRow,
+    required int startColumn,
+    required int endRow,
+    required int endColumn,
+    required Map<String, dynamic> style,
+    required List<String> reset,
+  }) {
+    return _postEdit(
+      '/spreadsheet/cells/style',
+      body: {
+        'start_row': startRow,
+        'start_column': startColumn,
+        'end_row': endRow,
+        'end_column': endColumn,
+        'style': style,
+        'reset': reset,
+      },
+      failureMessage: 'Failed to update cell formatting',
+    );
+  }
+
+  /// Sets or clears fields of the active worksheet's default text style.
+  Future<SpreadsheetData> setTextDefaults({
+    required Map<String, dynamic> style,
+    required List<String> reset,
+  }) {
+    return _postEdit(
+      '/spreadsheet/text-defaults',
+      body: {'style': style, 'reset': reset},
+      failureMessage: 'Failed to update default text style',
     );
   }
 

@@ -11,6 +11,8 @@ from backend.commands.spreadsheet.delete_column import DeleteColumnCommand
 from backend.commands.spreadsheet.rename_column import RenameColumnCommand
 from backend.commands.spreadsheet.set_column_width import SetColumnWidthCommand
 from backend.commands.spreadsheet.set_rtl import SetRtlCommand
+from backend.commands.spreadsheet.set_cell_style import SetCellStyleCommand
+from backend.commands.spreadsheet.set_text_defaults import SetTextDefaultsCommand
 from backend.commands.spreadsheet.search import SearchCommand
 from backend.commands.spreadsheet.clear_search import ClearSearchCommand
 from backend.commands.spreadsheet.sort import SortCommand
@@ -103,6 +105,40 @@ class SpreadsheetService:
         command = SetRtlCommand(
             self.document,
             rtl,
+        )
+
+        return self._execute(command)
+
+    def set_cell_style(
+        self,
+        start_row: int,
+        start_column: int,
+        end_row: int,
+        end_column: int,
+        values: dict[str, Any] | None,
+        reset: list[str] | None,
+    ) -> bool:
+        command = SetCellStyleCommand(
+            self.document,
+            start_row,
+            start_column,
+            end_row,
+            end_column,
+            values,
+            reset,
+        )
+
+        return self._execute(command)
+
+    def set_text_defaults(
+        self,
+        values: dict[str, Any] | None,
+        reset: list[str] | None,
+    ) -> bool:
+        command = SetTextDefaultsCommand(
+            self.document,
+            values,
+            reset,
         )
 
         return self._execute(command)

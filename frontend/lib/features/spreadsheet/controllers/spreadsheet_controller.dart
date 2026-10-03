@@ -9,6 +9,7 @@ import '../models/row_model.dart';
 import '../models/sheet_model.dart';
 import '../models/spreadsheet_model.dart';
 import '../models/selection_model.dart';
+import '../models/text_style_spec.dart';
 
 import '../services/spreadsheet_service.dart';
 import '../services/formula_engine.dart';
@@ -204,6 +205,13 @@ class SpreadsheetController extends ChangeNotifier {
   }) {
     final rows = <RowModel>[];
 
+    // Per-cell style overrides, looked up by (row, column) as cells are
+    // built below.
+    final stylesByCell = <(int, int), TextStyleSpec>{
+      for (final entry in data.cellStyles)
+        (entry.row, entry.column): entry.style,
+    };
+
     for (int rowIndex = 0; rowIndex < data.rows.length; rowIndex++) {
       final apiRow = data.rows[rowIndex];
 
@@ -221,6 +229,8 @@ class SpreadsheetController extends ChangeNotifier {
             row: rowIndex,
             column: columnIndex,
             value: rawValue?.toString() ?? '',
+            style: stylesByCell[(rowIndex, columnIndex)] ??
+                TextStyleSpec.empty,
           ),
         );
       }
@@ -239,6 +249,7 @@ class SpreadsheetController extends ChangeNotifier {
       headers: data.headers,
       columnWidths: data.columnWidths,
       isRtl: data.isRtl,
+      textDefaults: data.textDefaults,
     );
   }
 
@@ -375,6 +386,7 @@ class SpreadsheetController extends ChangeNotifier {
               headers: activeSheet.headers,
               columnWidths: activeSheet.columnWidths,
               isRtl: activeSheet.isRtl,
+              textDefaults: activeSheet.textDefaults,
             )
           : activeSheet;
 
@@ -594,6 +606,7 @@ class SpreadsheetController extends ChangeNotifier {
       headers: activeSheet.headers,
       columnWidths: updatedWidths,
       isRtl: activeSheet.isRtl,
+      textDefaults: activeSheet.textDefaults,
     );
 
     final updatedSheets = List<SheetModel>.from(currentSpreadsheet.sheets);
@@ -676,6 +689,7 @@ class SpreadsheetController extends ChangeNotifier {
       headers: activeSheet.headers,
       columnWidths: activeSheet.columnWidths,
       isRtl: rtl,
+      textDefaults: activeSheet.textDefaults,
     );
 
     final updatedSheets = List<SheetModel>.from(currentSpreadsheet.sheets);
@@ -693,6 +707,164 @@ class SpreadsheetController extends ChangeNotifier {
     save = _service.setRtl(rtl: rtl).then((_) {}, onError: (Object error) {
       debugPrint('[SpreadsheetController.setRtl] Save failed: $error');
       _lastSaveError = 'Failed to save sheet direction: $error';
+      notifyListeners();
+    }).whenComplete(() {
+      _pendingSaves.remove(save);
+    });
+
+    _pendingSaves.add(save);
+  }
+
+  // ============================================================
+  // Text styles
+  // ============================================================
+
+  /// The style the cell at ([row], [column]) is actually drawn with: its
+  /// own overrides merged over the sheet's default text style. Fields
+  /// still unset fall through to the grid's built-in text style.
+  TextStyleSpec effectiveTextStyleAt(int row, int column) {
+    final sheet = _spreadsheet?.activeSheet;
+
+    if (sheet == null || row < 0 || row >= sheet.rows.length) {
+      return TextStyleSpec.empty;
+    }
+
+    final cells = sheet.rows[row].cells;
+
+    if (column < 0 || column >= cells.length) {
+      return sheet.textDefaults;
+    }
+
+    return cells[column].style.mergedOver(sheet.textDefaults);
+  }
+
+  /// Applies [set] (fields to set) and [reset] (fields to return to
+  /// "inherit from the sheet default") to every cell in the rectangle
+  /// from ([startRow], [startColumn]) to ([endRow], [endColumn]), in any
+  /// corner order, clamped to the sheet.
+  ///
+  /// Updates locally first, then persists fire-and-forget like
+  /// [_persistCellEdits] (failures surface via [lastSaveError]). Unlike
+  /// RTL or column width this DOES record an undo point, since it is a
+  /// document edit - but note that, as with cell edits, undo/redo only
+  /// rewinds the local model; it does not re-persist.
+  void applyTextStyle({
+    required int startRow,
+    required int startColumn,
+    required int endRow,
+    required int endColumn,
+    TextStyleSpec set = TextStyleSpec.empty,
+    Set<String> reset = const {},
+  }) {
+    final currentSpreadsheet = _spreadsheet;
+
+    if (currentSpreadsheet == null || (set.isEmpty && reset.isEmpty)) {
+      return;
+    }
+
+    final sheet = currentSpreadsheet.activeSheet;
+
+    if (sheet.rows.isEmpty || sheet.headers.isEmpty) {
+      return;
+    }
+
+    final firstRow = (startRow < endRow ? startRow : endRow)
+        .clamp(0, sheet.rows.length - 1);
+    final lastRow = (startRow > endRow ? startRow : endRow)
+        .clamp(0, sheet.rows.length - 1);
+    final firstColumn = (startColumn < endColumn ? startColumn : endColumn)
+        .clamp(0, sheet.headers.length - 1);
+    final lastColumn = (startColumn > endColumn ? startColumn : endColumn)
+        .clamp(0, sheet.headers.length - 1);
+
+    _recordHistoryPoint();
+
+    final updatedRows = List<RowModel>.from(sheet.rows);
+
+    for (int row = firstRow; row <= lastRow; row++) {
+      final cells = List<CellModel>.from(updatedRows[row].cells);
+
+      for (int column = firstColumn;
+          column <= lastColumn && column < cells.length;
+          column++) {
+        final cell = cells[column];
+        cells[column] = cell.copyWith(
+          style: cell.style.applied(set, reset: reset),
+        );
+      }
+
+      updatedRows[row] = RowModel(index: updatedRows[row].index, cells: cells);
+    }
+
+    final updatedSheets = List<SheetModel>.from(currentSpreadsheet.sheets);
+    updatedSheets[currentSpreadsheet.activeSheetIndex] =
+        sheet.copyWith(rows: updatedRows);
+
+    _spreadsheet = SpreadsheetModel(
+      activeSheetIndex: currentSpreadsheet.activeSheetIndex,
+      sheets: updatedSheets,
+      availableSheetNames: currentSpreadsheet.availableSheetNames,
+    );
+
+    notifyListeners();
+
+    late final Future<void> save;
+    save = _service
+        .setCellStyle(
+          startRow: firstRow,
+          startColumn: firstColumn,
+          endRow: lastRow,
+          endColumn: lastColumn,
+          style: set.toJson(),
+          reset: reset.toList(),
+        )
+        .then((_) {}, onError: (Object error) {
+      debugPrint('[SpreadsheetController.applyTextStyle] Save failed: $error');
+      _lastSaveError = 'Failed to save formatting: $error';
+      notifyListeners();
+    }).whenComplete(() {
+      _pendingSaves.remove(save);
+    });
+
+    _pendingSaves.add(save);
+  }
+
+  /// Applies [set] / [reset] to the active sheet's DEFAULT text style -
+  /// what every cell inherits unless it has its own override. Like
+  /// [setRtl] this is sheet-level state set from the Settings dialog, so
+  /// it is persisted but not recorded in the undo history.
+  void setTextDefaults(
+    TextStyleSpec set, {
+    Set<String> reset = const {},
+  }) {
+    final currentSpreadsheet = _spreadsheet;
+
+    if (currentSpreadsheet == null || (set.isEmpty && reset.isEmpty)) {
+      return;
+    }
+
+    final activeSheetIndex = currentSpreadsheet.activeSheetIndex;
+    final activeSheet = currentSpreadsheet.sheets[activeSheetIndex];
+
+    final updatedSheets = List<SheetModel>.from(currentSpreadsheet.sheets);
+    updatedSheets[activeSheetIndex] = activeSheet.copyWith(
+      textDefaults: activeSheet.textDefaults.applied(set, reset: reset),
+    );
+
+    _spreadsheet = SpreadsheetModel(
+      activeSheetIndex: activeSheetIndex,
+      sheets: updatedSheets,
+      availableSheetNames: currentSpreadsheet.availableSheetNames,
+    );
+
+    notifyListeners();
+
+    late final Future<void> save;
+    save = _service
+        .setTextDefaults(style: set.toJson(), reset: reset.toList())
+        .then((_) {}, onError: (Object error) {
+      debugPrint('[SpreadsheetController.setTextDefaults] Save failed: $error');
+      _lastSaveError = 'Failed to save default text style: $error';
       notifyListeners();
     }).whenComplete(() {
       _pendingSaves.remove(save);
@@ -952,6 +1124,7 @@ class SpreadsheetController extends ChangeNotifier {
           formula: formula,
           isSelected: cell.isSelected,
           isEditing: false,
+          style: cell.style,
         ),
       );
     }
@@ -978,6 +1151,7 @@ class SpreadsheetController extends ChangeNotifier {
       headers: sheet.headers,
       columnWidths: sheet.columnWidths,
       isRtl: sheet.isRtl,
+      textDefaults: sheet.textDefaults,
     );
 
     return SpreadsheetModel(
@@ -1100,6 +1274,7 @@ class SpreadsheetController extends ChangeNotifier {
       formula: newFormula,
       isSelected: oldCell.isSelected,
       isEditing: false,
+      style: oldCell.style,
     );
 
     // ----------------------------------------------------------
@@ -1141,6 +1316,7 @@ class SpreadsheetController extends ChangeNotifier {
       headers: currentSheet.headers,
       columnWidths: currentSheet.columnWidths,
       isRtl: currentSheet.isRtl,
+      textDefaults: currentSheet.textDefaults,
     );
 
     // ----------------------------------------------------------
@@ -1401,6 +1577,7 @@ class SpreadsheetController extends ChangeNotifier {
           formula: cellFormula,
           isSelected: oldCell.isSelected,
           isEditing: false,
+          style: oldCell.style,
         );
         changedCells.add(
           FormulaDependencyGraph.addressFor(
@@ -1427,6 +1604,7 @@ class SpreadsheetController extends ChangeNotifier {
       headers: currentSheet.headers,
       columnWidths: currentSheet.columnWidths,
       isRtl: currentSheet.isRtl,
+      textDefaults: currentSheet.textDefaults,
     );
 
     // ----------------------------------------------------------
@@ -1550,6 +1728,7 @@ class SpreadsheetController extends ChangeNotifier {
           formula: null,
           isSelected: oldCell.isSelected,
           isEditing: false,
+          style: oldCell.style,
         );
         changedCells.add(
           FormulaDependencyGraph.addressFor(
@@ -1576,6 +1755,7 @@ class SpreadsheetController extends ChangeNotifier {
       headers: currentSheet.headers,
       columnWidths: currentSheet.columnWidths,
       isRtl: currentSheet.isRtl,
+      textDefaults: currentSheet.textDefaults,
     );
 
     // ----------------------------------------------------------

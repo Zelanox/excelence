@@ -1,3 +1,5 @@
+from typing import Any
+
 from fastapi import APIRouter, Depends
 
 from backend.utils.logger import get_logger
@@ -14,6 +16,30 @@ router = APIRouter(
 )
 
 logger = get_logger("api.spreadsheet")
+
+
+def _grid_fields(controller: Controller) -> dict[str, Any]:
+    """
+    The complete grid payload shared by every grid-returning response.
+
+    One snapshot of the active sheet (headers, rows, counts, column
+    widths, direction, text styles) so no endpoint can forget a field.
+    Before this existed each route listed its own subset, and any route
+    that omitted `rtl`/`column_widths` made the client silently reset
+    them (the client defaults a missing `rtl` to false).
+    """
+    data = controller.grid_data()
+
+    return {
+        "headers": data.headers,
+        "rows": data.rows,
+        "row_count": data.row_count,
+        "column_count": data.column_count,
+        "column_widths": data.column_widths,
+        "rtl": data.rtl,
+        "cell_styles": data.cell_styles,
+        "text_defaults": data.text_defaults,
+    }
 
 
 @router.get(
@@ -44,12 +70,7 @@ def data(
     return SpreadsheetDataResponse(
         success=True,
         message="Data loaded.",
-        headers=controller.headers(),
-        rows=controller.data(),
-        row_count=controller.row_count(),
-        column_count=controller.column_count(),
-        column_widths=controller.column_widths(),
-        rtl=controller.rtl()
+        **_grid_fields(controller)
     )
 
 
@@ -125,10 +146,7 @@ def search(
     return SearchResponse(
         success=success,
         message=message,
-        headers=controller.headers(),
-        rows=controller.data(),
-        row_count=controller.row_count(),
-        column_count=controller.column_count()
+        **_grid_fields(controller)
     )
 
 
@@ -146,10 +164,7 @@ def clear_search(
     return SearchResponse(
         success=success,
         message=message,
-        headers=controller.headers(),
-        rows=controller.data(),
-        row_count=controller.row_count(),
-        column_count=controller.column_count()
+        **_grid_fields(controller)
     )
 
 
@@ -172,10 +187,7 @@ def sort(
     return SortResponse(
         success=success,
         message=message,
-        headers=controller.headers(),
-        rows=controller.data(),
-        row_count=controller.row_count(),
-        column_count=controller.column_count()
+        **_grid_fields(controller)
     )
 
 
@@ -193,10 +205,7 @@ def clear_sort(
     return SortResponse(
         success=success,
         message=message,
-        headers=controller.headers(),
-        rows=controller.data(),
-        row_count=controller.row_count(),
-        column_count=controller.column_count()
+        **_grid_fields(controller)
     )
 
 
@@ -215,10 +224,7 @@ def edit_cell(
     return SpreadsheetEditResponse(
         success=success,
         message=message,
-        headers=controller.headers(),
-        rows=controller.data(),
-        row_count=controller.row_count(),
-        column_count=controller.column_count()
+        **_grid_fields(controller)
     )
 
 
@@ -237,10 +243,7 @@ def insert_row(
     return SpreadsheetEditResponse(
         success=success,
         message=message,
-        headers=controller.headers(),
-        rows=controller.data(),
-        row_count=controller.row_count(),
-        column_count=controller.column_count()
+        **_grid_fields(controller)
     )
 
 
@@ -259,10 +262,7 @@ def delete_row(
     return SpreadsheetEditResponse(
         success=success,
         message=message,
-        headers=controller.headers(),
-        rows=controller.data(),
-        row_count=controller.row_count(),
-        column_count=controller.column_count()
+        **_grid_fields(controller)
     )
 
 
@@ -281,10 +281,7 @@ def insert_column(
     return SpreadsheetEditResponse(
         success=success,
         message=message,
-        headers=controller.headers(),
-        rows=controller.data(),
-        row_count=controller.row_count(),
-        column_count=controller.column_count()
+        **_grid_fields(controller)
     )
 
 
@@ -303,10 +300,7 @@ def delete_column(
     return SpreadsheetEditResponse(
         success=success,
         message=message,
-        headers=controller.headers(),
-        rows=controller.data(),
-        row_count=controller.row_count(),
-        column_count=controller.column_count()
+        **_grid_fields(controller)
     )
 
 
@@ -325,10 +319,7 @@ def rename_column(
     return SpreadsheetEditResponse(
         success=success,
         message=message,
-        headers=controller.headers(),
-        rows=controller.data(),
-        row_count=controller.row_count(),
-        column_count=controller.column_count()
+        **_grid_fields(controller)
     )
 
 
@@ -347,11 +338,7 @@ def set_column_width(
     return SpreadsheetEditResponse(
         success=success,
         message=message,
-        headers=controller.headers(),
-        rows=controller.data(),
-        row_count=controller.row_count(),
-        column_count=controller.column_count(),
-        column_widths=controller.column_widths()
+        **_grid_fields(controller)
     )
 
 
@@ -370,12 +357,55 @@ def set_rtl(
     return SpreadsheetEditResponse(
         success=success,
         message=message,
-        headers=controller.headers(),
-        rows=controller.data(),
-        row_count=controller.row_count(),
-        column_count=controller.column_count(),
-        column_widths=controller.column_widths(),
-        rtl=controller.rtl()
+        **_grid_fields(controller)
+    )
+
+
+@router.post(
+    "/cells/style",
+    response_model=SpreadsheetEditResponse
+)
+def set_cell_style(
+    request: CellStyleRequest,
+    controller: Controller = Depends(get_controller)
+):
+    """Set or clear text-style fields on a rectangle of cells."""
+    success = controller.set_cell_style(
+        request.start_row,
+        request.start_column,
+        request.end_row,
+        request.end_column,
+        request.style.model_dump(exclude_none=True),
+        request.reset
+    )
+
+    message = "Cell style updated." if success else "Unable to update cell style."
+    return SpreadsheetEditResponse(
+        success=success,
+        message=message,
+        **_grid_fields(controller)
+    )
+
+
+@router.post(
+    "/text-defaults",
+    response_model=SpreadsheetEditResponse
+)
+def set_text_defaults(
+    request: TextDefaultsRequest,
+    controller: Controller = Depends(get_controller)
+):
+    """Set or clear the active worksheet's default text style."""
+    success = controller.set_text_defaults(
+        request.style.model_dump(exclude_none=True),
+        request.reset
+    )
+
+    message = "Text defaults updated." if success else "Unable to update text defaults."
+    return SpreadsheetEditResponse(
+        success=success,
+        message=message,
+        **_grid_fields(controller)
     )
 
 

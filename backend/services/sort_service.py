@@ -35,8 +35,13 @@ class SortService:
         if not columns:
             return dataframe.copy()
 
+        # Deliberately NOT reset_index(): each row keeps its original
+        # dataframe position as its index label, which is how a sorted
+        # (and/or filtered) view row is mapped back to the underlying
+        # row - see Sheet._view_positions. Nothing consumes the view's
+        # index otherwise (rows are emitted via to_dict("records")).
         return dataframe.sort_values(
             by=columns,
             ascending=ascending,
             kind="stable"
-        ).reset_index(drop=True)
+        )

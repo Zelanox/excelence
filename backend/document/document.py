@@ -1,15 +1,19 @@
 from typing import Any
 
+import json
 import os
 import pandas as pd
 from openpyxl import Workbook
+from openpyxl.styles import Font
 from openpyxl.utils import get_column_letter
+from openpyxl.workbook.defined_name import DefinedName
 
 
 from backend.models.spreadsheet_status import DocumentInfo, SpreadsheetData, SpreadsheetSheet
 from backend.utils.config import DOCUMENTS_FOLDER
 from backend.utils.logger import get_logger
 
+from backend.models.cell_style import CellStyle
 from backend.models.spreadsheet import Spreadsheet
 from backend.models.sheet import Sheet
 from backend.models.spreadsheet_row import SpreadsheetRow
@@ -19,6 +23,18 @@ from backend.services.sort_service import SortService
 from backend.services.editing_service import EditingService
 
 logger = get_logger("document")
+
+# Excel has no per-sheet default font (only a workbook-wide "Normal"
+# style), so the sheet-wide default text style is stored as a hidden,
+# worksheet-scoped defined name holding JSON as a string constant. It
+# travels with the worksheet (survives a sheet rename) and Excel ignores
+# it. Per-cell overrides, by contrast, are stored as ordinary cell fonts.
+_TEXT_DEFAULTS_NAME = "_excelence_text_defaults"
+
+# What an unstyled cell is in an Excel/openpyxl workbook.
+_BASE_FONT_FAMILY = "Calibri"
+_BASE_FONT_SIZE = 11.0
+_BASE_FONT_COLOR = "000000"
 
 
 class Document:
@@ -110,6 +126,11 @@ class Document:
         self.workbook = Workbook()
         self.sheet = self.workbook.active
         self.sheet.title = "Sheet1"
+
+        # Same clean boundary as load_local - see the note there.
+        self.spreadsheet = Spreadsheet()
+        self.search_text = ""
+        self.sort_rules = []
 
         self.filename = filename
         self.sheet_name = self.sheet.title
@@ -231,6 +252,15 @@ class Document:
             if sheet_model is None:
                 sheet_model = Sheet(name=worksheet_name)
 
+                # Only a brand-new model reads text styles back from the
+                # worksheet. An existing model is already authoritative
+                # (every style change is written to the worksheet as it
+                # happens), and re-scanning every cell on each sheet
+                # switch would be wasted work.
+                sheet_model.text_defaults, sheet_model.cell_styles = (
+                    self._read_text_styles(worksheet, dataframe.columns)
+                )
+
             sheet_model.bind(worksheet, dataframe.copy())
             sheet_model.column_widths = self._read_column_widths(worksheet, dataframe.columns)
             sheet_model.rtl = bool(worksheet.sheet_view.rightToLeft)
@@ -275,6 +305,14 @@ class Document:
         self.sheet = self.workbook.active
         self.sheet_name = self.sheet.title
 
+        # Opening a workbook is a clean boundary: drop the previous
+        # document's domain model (and its search/sort state) so a
+        # same-named sheet (e.g. "Sheet1") can't carry the old
+        # document's per-cell styles, search or sort into this one.
+        self.spreadsheet = Spreadsheet()
+        self.search_text = ""
+        self.sort_rules = []
+
         self._set_view_data(self.storage.read_sheet(self.sheet))
         self.dataframe_to_spreadsheet()
         self.modified = False
@@ -304,6 +342,7 @@ class Document:
         if active_sheet is not None:
             self._write_column_widths(self.sheet, self.df.columns, active_sheet.column_widths)
             self.sheet.sheet_view.rightToLeft = active_sheet.rtl
+            self._write_text_styles(self.sheet, self.df, active_sheet)
 
         saved = self.storage.save(self.workbook, resolved)
         self.modified = False
@@ -430,6 +469,7 @@ class Document:
         if active_sheet is not None and active_sheet.worksheet is self.sheet:
             self._write_column_widths(self.sheet, self.df.columns, active_sheet.column_widths)
             self.sheet.sheet_view.rightToLeft = active_sheet.rtl
+            self._write_text_styles(self.sheet, self.df, active_sheet)
 
     def _refresh_view(self) -> None:
         """Reload the active worksheet and reapply the current search/sort state."""
@@ -656,6 +696,78 @@ class Document:
         # other edit in between, still persists it.
         if self.sheet is not None:
             self.sheet.sheet_view.rightToLeft = rtl
+
+        self.modified = True
+        return True
+
+    def set_cell_style(
+        self,
+        start_row: int,
+        start_column: int,
+        end_row: int,
+        end_column: int,
+        values: dict[str, Any] | None = None,
+        reset: list[str] | None = None,
+    ) -> bool:
+        """
+        Set or clear text-style fields on a rectangle of cells.
+
+        Args:
+            start_row, start_column, end_row, end_column: Inclusive
+                rectangle in view coordinates, in any corner order.
+            values: Style fields to set (bold, italic, underline,
+                strikethrough, font_family, font_size, color).
+            reset: Style fields to return to "inherit from sheet default".
+
+        Returns:
+            True if the style was applied, otherwise False (invalid
+            patch or out-of-range rectangle - nothing is changed).
+        """
+        if self.workbook is None:
+            return False
+
+        success = self.spreadsheet.set_cell_style(
+            start_row,
+            start_column,
+            end_row,
+            end_column,
+            values,
+            reset,
+        )
+
+        if not success:
+            return False
+
+        # Unlike a width or RTL flip, a style change can also REMOVE a
+        # font from a cell, so the worksheet is rebuilt via
+        # _sync_active_sheet (clear + rewrite + reapply fonts) rather than
+        # patched in place - otherwise a cell that lost its override
+        # would keep its old font in the saved file.
+        self._sync_active_sheet()
+
+        self.modified = True
+        return True
+
+    def set_text_defaults(
+        self,
+        values: dict[str, Any] | None = None,
+        reset: list[str] | None = None,
+    ) -> bool:
+        """
+        Set or clear fields of the active sheet's default text style.
+
+        Returns:
+            True if the defaults were updated, otherwise False.
+        """
+        if self.workbook is None:
+            return False
+
+        success = self.spreadsheet.set_text_defaults(values, reset)
+
+        if not success:
+            return False
+
+        self._sync_active_sheet()
 
         self.modified = True
         return True
@@ -1150,6 +1262,184 @@ class Document:
 
         for _ in range(row_count):
             worksheet.append(["" for _ in headers])
+
+    def _font_for_style(self, style: CellStyle) -> Font:
+        """Build the openpyxl Font for an effective (already merged) style."""
+        return Font(
+            name=style.font_family or _BASE_FONT_FAMILY,
+            sz=style.font_size if style.font_size is not None else _BASE_FONT_SIZE,
+            b=bool(style.bold),
+            i=bool(style.italic),
+            u="single" if style.underline else None,
+            strike=bool(style.strikethrough),
+            color=("FF" + style.color) if style.color else None,
+        )
+
+    def _write_text_styles(self, worksheet: Any, dataframe: pd.DataFrame, sheet_model: Sheet) -> None:
+        """
+        Write a sheet's text styles onto its worksheet.
+
+        Must run AFTER the worksheet's rows have been (re)written, since
+        write_sheet clears every cell - and its styles - first. The sheet
+        default is stored in a hidden defined name (so a fresh
+        ``Excelence`` load can tell default from override) AND applied to
+        every data cell, merged under any per-cell override, so the file
+        also looks right when opened in real Excel. The header row is
+        left untouched.
+        """
+        defaults = sheet_model.text_defaults
+
+        if defaults.is_empty():
+            if _TEXT_DEFAULTS_NAME in worksheet.defined_names:
+                del worksheet.defined_names[_TEXT_DEFAULTS_NAME]
+        else:
+            payload = json.dumps(defaults.to_dict(), separators=(",", ":"))
+            worksheet.defined_names[_TEXT_DEFAULTS_NAME] = DefinedName(
+                _TEXT_DEFAULTS_NAME,
+                attr_text='"' + payload.replace('"', '""') + '"',
+                hidden=True,
+            )
+
+        overrides = sheet_model.cell_styles
+
+        if defaults.is_empty() and not overrides:
+            return
+
+        columns = list(dataframe.columns)
+        column_index = {name: index + 1 for index, name in enumerate(columns)}
+        row_count = len(dataframe)
+        fonts: dict[tuple, Font] = {}
+
+        def font_for(style: CellStyle) -> Font:
+            key = tuple(sorted(style.to_dict().items()))
+
+            if key not in fonts:
+                fonts[key] = self._font_for_style(style)
+
+            return fonts[key]
+
+        if not defaults.is_empty():
+            # Every data cell carries the default (plus its override, if any).
+            for position in range(row_count):
+                row_overrides = overrides.get(position, {})
+
+                for name, column in column_index.items():
+                    override = row_overrides.get(name)
+                    style = override.merged_over(defaults) if override else defaults
+                    worksheet.cell(row=position + 2, column=column).font = font_for(style)
+
+            return
+
+        for position, row_overrides in overrides.items():
+            if position >= row_count:
+                continue
+
+            for name, override in row_overrides.items():
+                column = column_index.get(name)
+
+                if column is None:
+                    continue
+
+                worksheet.cell(row=position + 2, column=column).font = font_for(override)
+
+    def _read_text_styles(
+        self,
+        worksheet: Any,
+        headers: Any,
+    ) -> tuple[CellStyle, dict[int, dict[str, CellStyle]]]:
+        """
+        Read a worksheet's default text style and per-cell overrides.
+
+        The default comes from the hidden defined name written by
+        _write_text_styles (absent for a file Excelence didn't write).
+        A cell is an override for exactly the fields where its font
+        differs from that default (or from Excel's own baseline of
+        Calibri 11 when there is none), so styling from a workbook made
+        elsewhere is picked up too. Never raises on odd input: a foreign
+        or hand-edited file must still open.
+        """
+        defaults = CellStyle()
+        marker = worksheet.defined_names.get(_TEXT_DEFAULTS_NAME)
+
+        if marker is not None and isinstance(marker.attr_text, str):
+            text = marker.attr_text.strip()
+
+            if len(text) >= 2 and text[0] == '"' and text[-1] == '"':
+                try:
+                    defaults = CellStyle.from_dict(
+                        json.loads(text[1:-1].replace('""', '"'))
+                    )
+                except ValueError:
+                    defaults = CellStyle()
+
+        columns = [str(header) for header in headers]
+        overrides: dict[int, dict[str, CellStyle]] = {}
+
+        if not columns:
+            return defaults, overrides
+
+        effective = defaults.merged_over(CellStyle(
+            bold=False,
+            italic=False,
+            underline=False,
+            strikethrough=False,
+            font_family=_BASE_FONT_FAMILY,
+            font_size=_BASE_FONT_SIZE,
+            color=_BASE_FONT_COLOR,
+        ))
+
+        for row in worksheet.iter_rows(min_row=2, max_col=len(columns)):
+            for cell in row:
+                if not cell.has_style:
+                    continue
+
+                override = self._font_override(cell.font, effective)
+
+                if override.is_empty():
+                    continue
+
+                overrides.setdefault(cell.row - 2, {})[columns[cell.column - 1]] = override
+
+        return defaults, overrides
+
+    def _font_override(self, font: Any, effective: CellStyle) -> CellStyle:
+        """The fields in which ``font`` differs from the ``effective`` base."""
+        found: dict[str, Any] = {}
+
+        for field_name, value in (
+            ("bold", bool(font.b)),
+            ("italic", bool(font.i)),
+            ("underline", font.u not in (None, "none")),
+            ("strikethrough", bool(font.strike)),
+        ):
+            if value != bool(getattr(effective, field_name)):
+                found[field_name] = value
+
+        name = font.name
+
+        if isinstance(name, str) and name.strip() and name.strip() != effective.font_family:
+            found["font_family"] = name.strip()
+
+        size = font.sz
+
+        if (
+            isinstance(size, (int, float))
+            and not isinstance(size, bool)
+            and abs(float(size) - float(effective.font_size)) > 1e-6
+        ):
+            found["font_size"] = float(size)
+
+        color = font.color
+
+        if color is not None and color.type == "rgb" and isinstance(color.rgb, str):
+            rgb = color.rgb[-6:].upper()
+
+            if rgb != (effective.color or _BASE_FONT_COLOR):
+                found["color"] = rgb
+
+        # from_dict drops anything invalid (e.g. an out-of-range size)
+        # instead of raising.
+        return CellStyle.from_dict(found)
 
     def _read_column_widths(self, worksheet: Any, headers: Any) -> dict[str, float]:
         """

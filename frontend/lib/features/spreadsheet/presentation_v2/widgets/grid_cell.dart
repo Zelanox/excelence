@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../controllers/spreadsheet_controller.dart';
 import '../../controllers/viewport_controller.dart';
+import '../../fonts/font_catalog.dart';
 import '../../models/cell_position.dart';
 import '../../models/selection_model.dart';
 
@@ -370,6 +371,14 @@ class _GridCellState extends State<GridCell> {
 
         final cell = cells[widget.column];
 
+        // The cell's own style merged over the sheet default, resolved to
+        // a Flutter TextStyle (cached). Used for both the display Text
+        // and the edit TextField so entering edit mode doesn't change
+        // how the text looks.
+        final cellTextStyle = resolveCellTextStyle(
+          cell.style.mergedOver(sheet.textDefaults),
+        );
+
         final selection = widget.viewportController.selection;
         final isSelected =
             _isWithinSelection(selection, widget.row, widget.column);
@@ -445,7 +454,7 @@ class _GridCellState extends State<GridCell> {
               // makes focus changes preserve whatever selection/cursor
               // position we've explicitly set.
               selectAllOnFocus: false,
-              style: const TextStyle(fontSize: 12),
+              style: cellTextStyle,
               decoration: const InputDecoration(
                 border: InputBorder.none,
                 isDense: true,
@@ -557,7 +566,7 @@ class _GridCellState extends State<GridCell> {
                     cell.value,
                     overflow: TextOverflow.ellipsis,
                     maxLines: 1,
-                    style: const TextStyle(fontSize: 12),
+                    style: cellTextStyle,
                   ),
                 );
               },

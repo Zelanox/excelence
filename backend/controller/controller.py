@@ -446,6 +446,66 @@ class Controller:
         """
         return self.document.data().rtl
 
+    def set_cell_style(
+        self,
+        start_row: int,
+        start_column: int,
+        end_row: int,
+        end_column: int,
+        values: dict | None = None,
+        reset: list[str] | None = None,
+    ) -> bool:
+        """
+        Set or clear text-style fields on a rectangle of cells.
+
+        Coordinates are view coordinates (as shown in the current grid),
+        inclusive, in any corner order.
+
+        Returns:
+            True if the style was applied, otherwise False.
+        """
+        return self.spreadsheet_service.set_cell_style(
+            start_row,
+            start_column,
+            end_row,
+            end_column,
+            values,
+            reset,
+        )
+
+    def set_text_defaults(
+        self,
+        values: dict | None = None,
+        reset: list[str] | None = None,
+    ) -> bool:
+        """
+        Set or clear fields of the active sheet's default text style.
+
+        Returns:
+            True if the defaults were updated, otherwise False.
+        """
+        return self.spreadsheet_service.set_text_defaults(values, reset)
+
+    def grid_data(self):
+        """
+        Return the active sheet's complete grid payload in one call.
+
+        Every grid-returning API response is built from this single
+        snapshot (see the API layer's _grid_fields) rather than calling
+        data()/column_widths()/rtl()/... separately - each of those
+        rebuilds every visible row, and separate snapshots could also
+        disagree with one another.
+        """
+        return self.document.data()
+
+    def cell_styles(self) -> list[dict]:
+        """Return the active sheet's per-cell style overrides (view coordinates)."""
+        return self.document.data().cell_styles
+
+    def text_defaults(self) -> dict:
+        """Return the active sheet's default text style (set fields only)."""
+        return self.document.data().text_defaults
+
     def rename_sheet(self, old_name: str, new_name: str) -> bool:
         """
         Rename a worksheet in the active document.

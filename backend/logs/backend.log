@@ -1941,3 +1941,164 @@ Traceback (most recent call last):
     indexer = non_nan_idx[non_nans.argsort(kind=kind)]
                           ~~~~~~~~~~~~~~~~^^^^^^^^^^^
 TypeError: '<' not supported between instances of 'str' and 'int'
+2026-09-30 19:03:18,038 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-09-30 19:07:12,082 - INFO - document - Opened document test.xlsx
+2026-09-30 19:31:33,495 - INFO - document - Opened document test.xlsx
+2026-09-30 19:35:11,740 - INFO - document - Opened document test.xlsx
+2026-09-30 19:36:47,301 - INFO - document - Opened document نسخ احتياطي للفهرس - Copy.xlsx
+2026-09-30 19:43:41,601 - INFO - document - Opened document test.xlsx
+2026-09-30 20:05:47,181 - INFO - document - Opened document test.xlsx
+2026-09-30 20:13:21,858 - INFO - document - Opened document نسخ احتياطي للفهرس - Copy.xlsx
+2026-09-30 20:14:37,883 - ERROR - main - Unhandled API error for /spreadsheet/search
+Traceback (most recent call last):
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\cors.py", line 96, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\cors.py", line 154, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\middleware\exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\middleware\asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\routing.py", line 670, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 2734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1780, in handle
+    await self.original_router.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 2789, in handle
+    await included_router._handle_selected(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1800, in _handle_selected
+    await original_route.handle(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 1279, in handle
+    await app(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 158, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 144, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 706, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\fastapi\routing.py", line 354, in run_endpoint_function
+    return await run_in_threadpool(dependant.call, **values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\starlette\concurrency.py", line 34, in run_in_threadpool
+    return await anyio.to_thread.run_sync(func)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\to_thread.py", line 65, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        func, args, abandon_on_cancel=abandon_on_cancel, limiter=limiter
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\_backends\_asyncio.py", line 2706, in run_sync_in_worker_thread
+    return await future
+           ^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\anyio\_backends\_asyncio.py", line 1100, in run
+    result = context.run(func, *args)
+  File "E:\Projects\excelence\backend\api\spreadsheet.py", line 122, in search
+    success = controller.search(request.text)
+  File "E:\Projects\excelence\backend\controller\controller.py", line 206, in search
+    return self.spreadsheet_service.search(text)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "E:\Projects\excelence\backend\services\spreadsheet_service.py", line 116, in search
+    return self._execute(command)
+           ~~~~~~~~~~~~~^^^^^^^^^
+  File "E:\Projects\excelence\backend\services\spreadsheet_service.py", line 35, in _execute
+    return self.command_manager.execute(command)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "E:\Projects\excelence\backend\commands\manager.py", line 9, in execute
+    result = command.execute()
+  File "E:\Projects\excelence\backend\commands\spreadsheet\search.py", line 20, in execute
+    return self.document.search(
+           ~~~~~~~~~~~~~~~~~~~~^
+        self.text
+        ^^^^^^^^^
+    )
+    ^
+  File "E:\Projects\excelence\backend\document\document.py", line 337, in search
+    success = self.spreadsheet.search(text)
+  File "E:\Projects\excelence\backend\models\spreadsheet.py", line 115, in search
+    return sheet.search(text)
+           ~~~~~~~~~~~~^^^^^^
+  File "E:\Projects\excelence\backend\models\sheet.py", line 133, in search
+    self.active_view = self.search_service.search(self.dataframe, self.search_text)
+                       ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\Projects\excelence\backend\services\search_service.py", line 19, in search
+    mask = dataframe.astype(str).apply(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+    
+    
+    ...<9 lines>...
+    
+    
+    ).any(axis=1)
+    ^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\pandas\core\frame.py", line 12437, in apply
+    return op.apply().__finalize__(self, method="apply")
+           ~~~~~~~~^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\pandas\core\apply.py", line 1015, in apply
+    return self.apply_standard()
+           ~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\pandas\core\apply.py", line 1167, in apply_standard
+    results, res_index = self.apply_series_generator()
+                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\pandas\core\apply.py", line 1183, in apply_series_generator
+    results[i] = self.func(v, *self.args, **self.kwargs)
+                 ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\Projects\excelence\backend\services\search_service.py", line 23, in <lambda>
+    column.str.lower().str.contains(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+    
+    
+    ...<3 lines>...
+    
+    
+    )
+    ^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\pandas\core\strings\accessor.py", line 142, in wrapper
+    return func(self, *args, **kwargs)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\pandas\core\strings\accessor.py", line 1496, in contains
+    result = self._data.array._str_contains(pat, case, flags, na, regex)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\site-packages\pandas\core\strings\object_array.py", line 152, in _str_contains
+    pat = re.compile(pat, flags=flags)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\re\__init__.py", line 289, in compile
+    return _compile(pattern, flags)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\re\__init__.py", line 350, in _compile
+    p = _compiler.compile(pattern, flags)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\re\_compiler.py", line 762, in compile
+    p = _parser.parse(p, flags)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\re\_parser.py", line 973, in parse
+    p = _parse_sub(source, state, flags & SRE_FLAG_VERBOSE, 0)
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\re\_parser.py", line 460, in _parse_sub
+    itemsappend(_parse(source, state, verbose, nested + 1,
+                ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                       not nested and not items))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\re\_parser.py", line 530, in _parse
+    sourceget()
+    ~~~~~~~~~^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\re\_parser.py", line 263, in get
+    self.__next()
+    ~~~~~~~~~~~^^
+  File "C:\Users\Elsalam 1\AppData\Local\Programs\Python\Python314\Lib\re\_parser.py", line 252, in __next
+    raise error("bad escape (end of pattern)",
+                self.string, len(self.string) - 1) from None
+re.PatternError: bad escape (end of pattern) at position 3
+2026-10-03 13:16:50,549 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-10-03 13:21:16,551 - INFO - document - Opened document test.xlsx
+2026-10-03 13:43:51,260 - INFO - document - Opened document test.xlsx

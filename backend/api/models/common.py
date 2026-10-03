@@ -51,6 +51,10 @@ class SpreadsheetResponse(ApiResponse):
 
     rtl: bool = Field(default=False, description="Whether the active worksheet is right-to-left.")
 
+    cell_styles: list[dict[str, Any]] = Field(default_factory=list, description="Per-cell text-style overrides: {row, column, style}, in the coordinates of the visible grid.")
+
+    text_defaults: dict[str, Any] = Field(default_factory=dict, description="The active worksheet's default text style (only the fields that are set).")
+
 
 class StatusResponse(ApiResponse):
 

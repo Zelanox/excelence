@@ -242,3 +242,40 @@ class Spreadsheet:
             return False
 
         return sheet.set_rtl(rtl)
+
+    def set_cell_style(
+        self,
+        start_row,
+        start_column,
+        end_row,
+        end_column,
+        values=None,
+        reset=None
+    ):
+
+        sheet = self.current_sheet()
+
+        if sheet is None:
+            return False
+
+        return sheet.set_cell_style(
+            start_row,
+            start_column,
+            end_row,
+            end_column,
+            values,
+            reset
+        )
+
+    def set_text_defaults(
+        self,
+        values=None,
+        reset=None
+    ):
+
+        sheet = self.current_sheet()
+
+        if sheet is None:
+            return False
+
+        return sheet.set_text_defaults(values, reset)
