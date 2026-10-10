@@ -14,12 +14,6 @@ class FormulaEngine {
     Set<String> resolving = const {},
   }) {
     try {
-      debugPrint(
-        '[FormulaEngine.context] activeSheetIndex=${spreadsheet.activeSheetIndex} '
-        'sheetName="${spreadsheet.activeSheet.name}" '
-        'rowCount=${spreadsheet.activeSheet.rows.length} '
-        'columnCount=${spreadsheet.activeSheet.rows.isEmpty ? 0 : spreadsheet.activeSheet.rows.first.cells.length}',
-      );
       if (!formula.startsWith('=')) {
         return errorValue;
       }
@@ -57,12 +51,10 @@ class FormulaEngine {
       final result = parser.parse();
 
       return _formatNumber(result);
-    } catch (error, stackTrace) {
-      debugPrint(
-        '[FormulaEngine.error] formula="$formula" '
-        'type=${error.runtimeType} message=$error\n'
-        'stack=$stackTrace',
-      );
+    } catch (error) {
+      // Expected for unsupported or circular formulas; the cell shows the
+      // error value, so one short line is plenty.
+      debugPrint('[FormulaEngine] "$formula" -> $errorValue (${error.runtimeType})');
       return errorValue;
     }
   }
@@ -97,25 +89,17 @@ class FormulaEngine {
     final row = int.parse(match.group(2)!) - 1;
     final sheet = spreadsheet.activeSheet;
 
-    if (row < 0 || row >= sheet.rows.length ||
-        column < 0 || column >= sheet.rows[row].cells.length) {
-      debugPrint(
-        '[FormulaEngine.reference] INVALID $reference -> '
-        'row=$row column=$column '
-        'activeSheet=${spreadsheet.activeSheetIndex}',
-      );
+    // References name CANONICAL cells (A1 is the first row of the data),
+    // never "whatever is shown at that position" - so a search or sort in
+    // the user's view can't change what a formula refers to.
+    if (row < 0 || row >= sheet.allRows.length ||
+        column < 0 || column >= sheet.allRows[row].cells.length) {
       throw const FormatException();
     }
 
-    final cell = sheet.rows[row].cells[column];
-    debugPrint(
-      '[FormulaEngine.reference] $reference -> '
-      'row=$row column=$column '
-      'activeSheet=${spreadsheet.activeSheetIndex} '
-      'value="${cell.value}" formula="${cell.formula}"',
-    );
-
-    return cell;
+    // (No per-reference logging: every formula cell is evaluated on each
+    // load, and one line per reference floods the console on a big sheet.)
+    return sheet.allRows[row].cells[column];
   }
 
   int _columnIndex(String columnText) {
@@ -271,7 +255,6 @@ class _FormulaParser {
     }
 
     final reference = '$parsedColumnText$rowNumber';
-    debugPrint('[FormulaEngine.parseReference] reference="$reference"');
     references.add(reference);
     final resolved = _resolveReference(reference);
     if (resolved.error || resolved.value == null) {
@@ -388,10 +371,6 @@ class _FormulaParser {
 
     final endColumn = _columnIndex(endColumnText);
     final endRow = endRowNumber - 1;
-    debugPrint(
-      '[FormulaEngine.parseRange] start="$columnText$rowNumber" '
-      'end="$endColumnText$endRowNumber"',
-    );
     final minRow = startRow < endRow ? startRow : endRow;
     final maxRow = startRow > endRow ? startRow : endRow;
     final minColumn = startColumn < endColumn ? startColumn : endColumn;

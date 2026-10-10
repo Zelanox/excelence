@@ -272,10 +272,11 @@ class _GridCellState extends State<GridCell> {
   /// only its top and left sides are actually on the boundary).
   BoxBorder _cellBorder({
     required _SelectionEdges? edges,
+    required Color gridColor,
     Color rangeColor = Colors.blue,
     double rangeWidth = 2,
   }) {
-    final gridline = BorderSide(color: Colors.grey.shade300, width: 0.5);
+    final gridline = BorderSide(color: gridColor, width: 0.5);
     final rangeLine = BorderSide(color: rangeColor, width: rangeWidth);
 
     if (edges == null) {
@@ -384,9 +385,23 @@ class _GridCellState extends State<GridCell> {
         // a Flutter TextStyle (cached). Used for both the display Text
         // and the edit TextField so entering edit mode doesn't change
         // how the text looks.
-        final cellTextStyle = resolveCellTextStyle(
-          cell.style.mergedOver(sheet.textDefaults),
+        final fill = resolveCellFill(
+          own: cell.style,
+          defaults: sheet.textDefaults,
+          appearance: sheet.appearance,
+          row: widget.row,
         );
+        final cellTextStyle = readableOnFill(
+          resolveCellTextStyle(cell.style.mergedOver(sheet.textDefaults)),
+          fill,
+        );
+
+        // What the cell looks like with no selection on it. The selection
+        // tint is blended OVER this so a filled cell stays visibly filled
+        // when selected, instead of the tint replacing the fill.
+        final baseColor = fill ?? Colors.white;
+        final gridColor =
+            parseHexColor(sheet.appearance.gridColor) ?? Colors.grey.shade300;
 
         final selection = widget.viewportController.selection;
         final isSelected =
@@ -444,7 +459,7 @@ class _GridCellState extends State<GridCell> {
         if (isEditingThisCell) {
           return Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: baseColor,
               border: Border.all(color: Colors.blue, width: 2),
             ),
             padding: const EdgeInsets.symmetric(horizontal: 2),
@@ -557,17 +572,27 @@ class _GridCellState extends State<GridCell> {
                 return Container(
                   decoration: BoxDecoration(
                     color: isInReferenceRangeDrag
-                        ? Colors.orange.withValues(alpha: 0.15)
+                        ? Color.alphaBlend(
+                            Colors.orange.withValues(alpha: 0.15),
+                            baseColor,
+                          )
                         : isSelected
-                            ? Colors.blue.withValues(alpha: 0.08)
-                            : Colors.white,
+                            ? Color.alphaBlend(
+                                Colors.blue.withValues(alpha: 0.08),
+                                baseColor,
+                              )
+                            : baseColor,
                     border: isInReferenceRangeDrag
                         ? _cellBorder(
                             edges: referenceRangeEdges,
+                            gridColor: gridColor,
                             rangeColor: Colors.orange,
                             rangeWidth: 1,
                           )
-                        : _cellBorder(edges: selectionEdges),
+                        : _cellBorder(
+                            edges: selectionEdges,
+                            gridColor: gridColor,
+                          ),
                   ),
                   alignment: AlignmentDirectional.centerStart,
                   padding: const EdgeInsets.symmetric(horizontal: 4),

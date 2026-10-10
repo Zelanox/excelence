@@ -18,7 +18,12 @@ from dataclasses import dataclass
 from typing import Any
 
 BOOL_FIELDS = ("bold", "italic", "underline", "strikethrough")
-FIELDS = BOOL_FIELDS + ("font_family", "font_size", "color")
+FIELDS = BOOL_FIELDS + ("font_family", "font_size", "color", "background")
+
+# A cell fill of "NONE" means "explicitly no fill" - distinct from unset
+# (None, inherit). It lets one cell stay clear on a sheet whose default
+# has a fill color.
+NO_FILL = "NONE"
 
 MAX_FAMILY_LENGTH = 64
 MIN_FONT_SIZE = 1.0
@@ -75,6 +80,22 @@ def _normalize_field(name: str, value: Any) -> tuple[bool, Any]:
 
         return True, match.group(1).upper()
 
+    if name == "background":
+        if not isinstance(value, str):
+            return False, None
+
+        text = value.strip()
+
+        if text.upper() == NO_FILL:
+            return True, NO_FILL
+
+        match = _COLOR_PATTERN.match(text)
+
+        if match is None:
+            return False, None
+
+        return True, match.group(1).upper()
+
     return False, None
 
 
@@ -88,6 +109,9 @@ class CellStyle:
     font_family: str | None = None
     font_size: float | None = None
     color: str | None = None  # "RRGGBB", upper-case, no leading "#".
+
+    # Cell fill: "RRGGBB", or NO_FILL ("NONE") for explicitly none.
+    background: str | None = None
 
     def is_empty(self) -> bool:
         return all(getattr(self, name) is None for name in FIELDS)

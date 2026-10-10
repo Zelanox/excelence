@@ -468,6 +468,50 @@ class Controller:
         """
         return self.document.data().rtl
 
+    def set_cell_style_ranges(
+        self,
+        ranges: list[tuple[int, int, int, int]],
+        values: dict | None = None,
+        reset: list[str] | None = None,
+    ) -> bool:
+        """
+        Set or clear text-style fields on several rectangles as one undoable change.
+
+        Returns:
+            True if the style was applied, otherwise False.
+        """
+        return self.spreadsheet_service.set_cell_style_ranges(ranges, values, reset)
+
+    def set_appearance(
+        self,
+        values: dict | None = None,
+        reset: list[str] | None = None,
+    ) -> bool:
+        """
+        Set or clear sheet-level display settings: grid line color and
+        alternating row colors (banding). Settings, not edits - not undoable.
+
+        Returns:
+            True if the settings were updated, otherwise False.
+        """
+        return self.spreadsheet_service.set_appearance(values, reset)
+
+    def appearance(self) -> dict:
+        """Return the active sheet's display settings (set fields only)."""
+        return self.document.data().appearance
+
+    def last_document(self) -> str | None:
+        """The most recently opened document, or None if there isn't a usable one."""
+        return self.document.last_document()
+
+    def preferences(self) -> dict:
+        """The stored user preferences."""
+        return self.document.app_state.get_preferences()
+
+    def set_preference(self, key: str, value: object) -> bool:
+        """Store one user preference. False if the key or value is not acceptable."""
+        return self.document.app_state.set_preference(key, value)
+
     def edit_cells(self, edits: list[tuple[int, int, object]]) -> bool:
         """
         Update several cells as one undoable change.
@@ -480,6 +524,16 @@ class Controller:
             True if every edit was applied, otherwise False.
         """
         return self.spreadsheet_service.edit_cells(edits)
+
+    def append_row(self, first_value: str | None = None) -> bool:
+        """
+        Add a row at the end of the data, optionally with its first cell
+        set, as one undoable change. Safe while a sort or filter is active.
+
+        Returns:
+            True if the row was added, otherwise False.
+        """
+        return self.spreadsheet_service.append_row(first_value)
 
     def undo(self) -> bool:
         """Undo the last content change. False if there is nothing to undo."""

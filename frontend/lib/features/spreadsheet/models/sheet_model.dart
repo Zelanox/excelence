@@ -1,43 +1,52 @@
 import 'row_model.dart';
+import 'sheet_appearance.dart';
+import 'sheet_view.dart';
 import 'text_style_spec.dart';
 
+/// One worksheet as the client holds it.
+///
+/// There are TWO views of its rows, and keeping them straight is the point
+/// of this class:
+///
+///  * [allRows] - the CANONICAL rows: every row of the data, in the data's
+///    own order, never filtered or sorted. Row/column positions here are
+///    what formulas (`=A1+A2`) and everything sent to the server mean. All
+///    edits ultimately land here.
+///  * [rows] - the rows currently SHOWN: [allRows] with this sheet's [view]
+///    (search filter and sort) applied. This is what the grid draws, and
+///    what a "row number" from the UI refers to. Convert with
+///    [sourceRowOf] before touching the data.
+///
+/// Sorting and filtering are client-local (see [SheetView]): they change
+/// which rows [rows] contains, never [allRows].
 class SheetModel {
-  const SheetModel({
+  SheetModel({
     required this.name,
-    required this.rows,
+    required this.allRows,
     this.headers = const [],
     this.columnWidths = const {},
     this.isRtl = false,
     this.textDefaults = TextStyleSpec.empty,
-  });
+    this.appearance = SheetAppearance.empty,
+    this.view = SheetView.none,
+    this.viewToSource,
+  }) : assert(
+          viewToSource == null ||
+              viewToSource.every((index) => index >= 0 && index < allRows.length),
+          'viewToSource points outside allRows',
+        );
 
   final String name;
-  final List<RowModel> rows;
 
-  /// Real column header names as returned by the backend (e.g. "Name",
-  /// "Age", "Score") - NOT the same as the display letters (A, B, C) used
-  /// by GridColumnHeader. The backend's insert/delete-column endpoints
-  /// identify columns by this name, not by letter/index, so it needs to
-  /// be tracked here rather than only derived from column position.
+  /// Every row of the data, in the data's own order. See the class comment.
+  final List<RowModel> allRows;
+
   final List<String> headers;
 
-  /// Column name to display width, for any column with an explicitly
-  /// set width. Keyed by name (like [headers], not by position) for the
-  /// same reason - a column's width should survive an unrelated
-  /// insert/delete elsewhere in the sheet, and letter/index positions
-  /// shift while names don't. A column absent from this map has no
-  /// explicitly set width and falls back to SpreadsheetGrid.columnWidth.
+  /// Per-column pixel widths, keyed by column NAME (survives inserts and
+  /// deletes elsewhere in the sheet). Absent = default width.
   final Map<String, double> columnWidths;
 
-  /// Whether this sheet is right-to-left (mirrors the backend's
-  /// Sheet.rtl, itself backed by the worksheet's native sheet_view.
-  /// rightToLeft). Deliberately does NOT change [headers]' order - the
-  /// backend always returns columns in true logical order regardless of
-  /// direction, so column 0 is always the real first column. Only the
-  /// grid's rendering (via an ambient Directionality wrapping the
-  /// TableView - see SpreadsheetGrid) flips which physical edge that
-  /// logical order renders at. Reordering headers here on top of that
-  /// would double-flip the layout.
   final bool isRtl;
 
   /// The sheet-wide default text style. Each cell's own
@@ -46,21 +55,122 @@ class SheetModel {
   /// Sheet.text_defaults (stored in the .xlsx).
   final TextStyleSpec textDefaults;
 
+  /// Grid line color and alternating row colors for this sheet.
+  final SheetAppearance appearance;
+
+  /// The search filter / sort this client is looking at the sheet through.
+  final SheetView view;
+
+  /// For each SHOWN row, the index of its row in [allRows]; null means the
+  /// shown rows are exactly [allRows] (the common case: no view).
+  ///
+  /// This is the view's RESULT, kept rather than recomputed so that editing
+  /// a cell doesn't make rows jump around under a sort or vanish under a
+  /// filter mid-edit - the order is refreshed only when the view itself, or
+  /// the set of rows, changes (see [withView]).
+  final List<int>? viewToSource;
+
+  /// The rows currently shown: [allRows] seen through [view]. Computed once
+  /// per instance; the same list as [allRows] when there is no view.
+  late final List<RowModel> rows = _visibleRows();
+
+  List<RowModel> _visibleRows() {
+    final mapping = viewToSource;
+
+    if (mapping == null) {
+      return allRows;
+    }
+
+    return [for (final index in mapping) allRows[index]];
+  }
+
+  /// True when [rows] is a filtered and/or reordered subset of [allRows].
+  bool get isViewActive => viewToSource != null;
+
+  /// The index in [allRows] of the row shown at [viewRow].
+  int sourceRowOf(int viewRow) {
+    final mapping = viewToSource;
+    return mapping == null ? viewRow : mapping[viewRow];
+  }
+
+  /// The position in [rows] at which canonical row [sourceRow] is shown, or
+  /// null if the view hides it.
+  int? viewRowOf(int sourceRow) {
+    final mapping = viewToSource;
+
+    if (mapping == null) {
+      return sourceRow >= 0 && sourceRow < allRows.length ? sourceRow : null;
+    }
+
+    final position = mapping.indexOf(sourceRow);
+    return position < 0 ? null : position;
+  }
+
+  /// A copy looking at the same data through [newView]: the shown rows are
+  /// recomputed (filter, then sort) from the CURRENT [allRows].
+  SheetModel withView(SheetView newView) {
+    return SheetModel(
+      name: name,
+      allRows: allRows,
+      headers: headers,
+      columnWidths: columnWidths,
+      isRtl: isRtl,
+      textDefaults: textDefaults,
+      appearance: appearance,
+      view: newView,
+      viewToSource: newView.apply(headers, allRows),
+    );
+  }
+
+  /// A copy with the given canonical rows replaced, KEEPING the current
+  /// view's row order (see [viewToSource]). [replacements] maps an index in
+  /// [allRows] to its new row. The number of rows is unchanged, which is
+  /// what keeps the kept mapping valid.
+  SheetModel withSourceRows(Map<int, RowModel> replacements) {
+    if (replacements.isEmpty) {
+      return this;
+    }
+
+    final updated = List<RowModel>.of(allRows);
+
+    replacements.forEach((index, row) {
+      updated[index] = row;
+    });
+
+    return SheetModel(
+      name: name,
+      allRows: updated,
+      headers: headers,
+      columnWidths: columnWidths,
+      isRtl: isRtl,
+      textDefaults: textDefaults,
+      appearance: appearance,
+      view: view,
+      viewToSource: viewToSource,
+    );
+  }
+
+  /// A copy with other properties changed. The row data and the view are
+  /// kept as they are; to change the data's SHAPE (rows added/removed) build
+  /// a new sheet, then apply the view with [withView].
   SheetModel copyWith({
     String? name,
-    List<RowModel>? rows,
     List<String>? headers,
     Map<String, double>? columnWidths,
     bool? isRtl,
     TextStyleSpec? textDefaults,
+    SheetAppearance? appearance,
   }) {
     return SheetModel(
       name: name ?? this.name,
-      rows: rows ?? this.rows,
+      allRows: allRows,
       headers: headers ?? this.headers,
       columnWidths: columnWidths ?? this.columnWidths,
       isRtl: isRtl ?? this.isRtl,
       textDefaults: textDefaults ?? this.textDefaults,
+      appearance: appearance ?? this.appearance,
+      view: view,
+      viewToSource: viewToSource,
     );
   }
 }

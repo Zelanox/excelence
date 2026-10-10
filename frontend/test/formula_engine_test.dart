@@ -117,7 +117,7 @@ SpreadsheetModel _spreadsheet({Map<String, String> values = const {}}) {
     sheets: [
       SheetModel(
         name: 'Sheet1',
-        rows: [RowModel(index: 0, cells: cells)],
+        allRows: [RowModel(index: 0, cells: cells)],
       ),
     ],
   );

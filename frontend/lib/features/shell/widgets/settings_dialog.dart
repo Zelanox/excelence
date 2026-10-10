@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/preferences/app_preferences.dart';
 import '../../spreadsheet/controllers/spreadsheet_controller.dart';
 import '../../spreadsheet/fonts/font_catalog.dart';
+import '../../spreadsheet/models/sheet_appearance.dart';
 import '../../spreadsheet/models/text_style_spec.dart';
+import 'color_picker_dialog.dart';
 import 'font_options_dialog.dart';
 
 /// The app's settings dialog, opened via the gear icon in the toolbar
@@ -50,11 +53,27 @@ class SettingsDialog extends StatelessWidget {
       animation: spreadsheetController,
       builder: (context, _) {
         final sheet = spreadsheetController.spreadsheet?.activeSheet;
+        final appearance = sheet?.appearance ?? SheetAppearance.empty;
+        final defaultFill = parseHexColor(sheet?.textDefaults.background);
+
+        // A small round color swatch used by the color rows below.
+        Widget dot(Color color) => Container(
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: color,
+                border: Border.all(color: Colors.grey.shade400),
+              ),
+            );
 
         return AlertDialog(
           title: const Text('Settings'),
           content: SizedBox(
             width: 360,
+            // Scrolls so the dialog still fits on a short window now that
+            // it has several sections.
+            child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -126,18 +145,135 @@ class SettingsDialog extends StatelessWidget {
                   width: double.infinity,
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: defaultFill ?? Colors.white,
                     border: Border.all(color: Colors.grey.shade300),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
                     'Sample text   نص تجريبي   123',
-                    style: resolveCellTextStyle(
-                      sheet?.textDefaults ?? TextStyleSpec.empty,
+                    style: readableOnFill(
+                      resolveCellTextStyle(
+                        sheet?.textDefaults ?? TextStyleSpec.empty,
+                      ),
+                      defaultFill,
                     ),
                   ),
                 ),
+                const SizedBox(height: 16),
+                Text(
+                  'Appearance',
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+                const SizedBox(height: 4),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: dot(
+                    parseHexColor(appearance.gridColor) ??
+                        Colors.grey.shade300,
+                  ),
+                  title: const Text('Grid line color'),
+                  subtitle: Text(
+                    appearance.gridColor == null
+                        ? 'Default'
+                        : '#${appearance.gridColor}',
+                  ),
+                  trailing: TextButton(
+                    onPressed: sheet == null
+                        ? null
+                        : () async {
+                            final result = await ColorPickerDialog.show(
+                              context,
+                              title: 'Grid line color',
+                              initial: appearance.gridColor,
+                              defaultLabel: 'Default',
+                            );
+
+                            if (result == null) {
+                              return;
+                            }
+
+                            spreadsheetController.setAppearance(
+                              result.value == null
+                                  ? SheetAppearance.empty
+                                  : SheetAppearance(gridColor: result.value),
+                              reset: result.value == null
+                                  ? {SheetAppearance.fieldGridColor}
+                                  : const {},
+                            );
+                          },
+                    child: const Text('Change...'),
+                  ),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Alternating row colors'),
+                  subtitle: const Text('Shade every other row'),
+                  value: appearance.bandingOn,
+                  onChanged: sheet == null
+                      ? null
+                      : (value) => spreadsheetController.setAppearance(
+                            SheetAppearance(banding: value),
+                          ),
+                ),
+                if (appearance.bandingOn)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: dot(
+                      parseHexColor(
+                            appearance.bandingColor ??
+                                SheetAppearance.defaultBandingColor,
+                          ) ??
+                          Colors.grey.shade200,
+                    ),
+                    title: const Text('Stripe color'),
+                    subtitle: Text(
+                      appearance.bandingColor == null
+                          ? 'Default'
+                          : '#${appearance.bandingColor}',
+                    ),
+                    trailing: TextButton(
+                      onPressed: () async {
+                        final result = await ColorPickerDialog.show(
+                          context,
+                          title: 'Stripe color',
+                          initial: appearance.bandingColor,
+                          defaultLabel: 'Default',
+                        );
+
+                        if (result == null) {
+                          return;
+                        }
+
+                        spreadsheetController.setAppearance(
+                          result.value == null
+                              ? SheetAppearance.empty
+                              : SheetAppearance(bandingColor: result.value),
+                          reset: result.value == null
+                              ? {SheetAppearance.fieldBandingColor}
+                              : const {},
+                        );
+                      },
+                      child: const Text('Change...'),
+                    ),
+                  ),
+                const SizedBox(height: 4),
+                Text(
+                  'Grid line and stripe colors are saved in the file but '
+                  'only shown in Excelence, not in Excel. Cell fills are '
+                  'real Excel fills.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.grey.shade600,
+                      ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Behavior',
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+                const SizedBox(height: 4),
+                const _AutoSearchAfterAddRowTile(),
               ],
+            ),
             ),
           ),
           actions: [
@@ -148,6 +284,68 @@ class SettingsDialog extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+/// "Search for a new row after adding it" - a per-user/device preference
+/// (see AppPreferences), not part of the document, so unlike the rows above
+/// it reads and writes AppPreferences directly instead of going through
+/// the spreadsheet controller.
+///
+/// Its own StatefulWidget because the stored value loads asynchronously;
+/// the switch shows the default (on) until it arrives, and is disabled
+/// until then so an early tap can't be overwritten by the late load.
+class _AutoSearchAfterAddRowTile extends StatefulWidget {
+  const _AutoSearchAfterAddRowTile();
+
+  @override
+  State<_AutoSearchAfterAddRowTile> createState() =>
+      _AutoSearchAfterAddRowTileState();
+}
+
+class _AutoSearchAfterAddRowTileState
+    extends State<_AutoSearchAfterAddRowTile> {
+  static const AppPreferences _preferences = AppPreferences();
+
+  bool _value = true;
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final stored = await _preferences.getAutoSearchAfterAddRow();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _value = stored;
+      _loaded = true;
+    });
+  }
+
+  Future<void> _change(bool value) async {
+    setState(() => _value = value);
+    await _preferences.setAutoSearchAfterAddRow(value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SwitchListTile(
+      contentPadding: EdgeInsets.zero,
+      title: const Text('Search for a new row after adding it'),
+      subtitle: const Text(
+        'After adding a row from the status bar, filter the sheet by the '
+        'value you typed so the new row is easy to find and fill in.',
+      ),
+      value: _value,
+      onChanged: _loaded ? _change : null,
     );
   }
 }

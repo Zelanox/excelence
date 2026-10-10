@@ -55,6 +55,23 @@ class GridRowHeader extends StatelessWidget {
     }
   }
 
+  /// The number shown for this row: its position in the DATA, not on screen.
+  ///
+  /// With a sort or filter in place the shown row N is some other row of the
+  /// data. Formulas refer to the data's own row numbers (`=A3` is the third
+  /// row of the data), so the gutter shows those - sorted rows appear out of
+  /// order and filtered-out rows leave gaps, as in Excel - which keeps the
+  /// number you read here the number a formula needs.
+  int _dataRowNumber() {
+    final sheet = spreadsheetController.spreadsheet?.activeSheet;
+
+    if (sheet == null || rowIndex < 0 || rowIndex >= sheet.rows.length) {
+      return rowIndex + 1;
+    }
+
+    return sheet.sourceRowOf(rowIndex) + 1;
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -70,7 +87,7 @@ class GridRowHeader extends StatelessWidget {
         ),
         alignment: Alignment.center,
         child: Text(
-          '${rowIndex + 1}',
+          '${_dataRowNumber()}',
           style: const TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w600,

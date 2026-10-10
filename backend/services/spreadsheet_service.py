@@ -13,9 +13,12 @@ from backend.commands.spreadsheet.set_column_width import SetColumnWidthCommand
 from backend.commands.spreadsheet.set_rtl import SetRtlCommand
 from backend.commands.spreadsheet.set_cell_style import SetCellStyleCommand
 from backend.commands.spreadsheet.edit_cells import EditCellsCommand
+from backend.commands.spreadsheet.append_row import AppendRowCommand
 from backend.commands.spreadsheet.undo import UndoCommand
 from backend.commands.spreadsheet.redo import RedoCommand
 from backend.commands.spreadsheet.set_text_defaults import SetTextDefaultsCommand
+from backend.commands.spreadsheet.set_appearance import SetAppearanceCommand
+from backend.commands.spreadsheet.set_cell_style_ranges import SetCellStyleRangesCommand
 from backend.commands.spreadsheet.search import SearchCommand
 from backend.commands.spreadsheet.clear_search import ClearSearchCommand
 from backend.commands.spreadsheet.sort import SortCommand
@@ -55,6 +58,9 @@ class SpreadsheetService:
 
     def edit_cells(self, edits: list[tuple[int, int, Any]]) -> bool:
         return self._execute(EditCellsCommand(self.document, edits))
+
+    def append_row(self, first_value: str | None = None) -> bool:
+        return self._execute(AppendRowCommand(self.document, first_value))
 
     def undo(self) -> bool:
         return self._execute(UndoCommand(self.document))
@@ -141,6 +147,21 @@ class SpreadsheetService:
         )
 
         return self._execute(command)
+
+    def set_cell_style_ranges(
+        self,
+        ranges: list[tuple[int, int, int, int]],
+        values: dict[str, Any] | None,
+        reset: list[str] | None,
+    ) -> bool:
+        return self._execute(SetCellStyleRangesCommand(self.document, ranges, values, reset))
+
+    def set_appearance(
+        self,
+        values: dict[str, Any] | None,
+        reset: list[str] | None,
+    ) -> bool:
+        return self._execute(SetAppearanceCommand(self.document, values, reset))
 
     def set_text_defaults(
         self,

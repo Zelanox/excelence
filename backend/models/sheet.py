@@ -1,11 +1,14 @@
 import math
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
 import pandas as pd
 
-from backend.models.cell_style import CellStyle
+from backend.models.cell_style import NO_FILL, CellStyle
+from backend.models.formula_refs import RefChange, adjust_formula
+from backend.models.sheet_appearance import SheetAppearance
 from backend.models.spreadsheet_row import SpreadsheetRow
 from backend.models.spreadsheet_status import SpreadsheetData
 from backend.services.search_service import SearchService
@@ -65,6 +68,9 @@ class Sheet:
     # workbook/spreadsheet pair, so any new structural operation must
     # update it too. Persisted as real cell fonts - see Document.
     text_defaults: CellStyle = field(default_factory=CellStyle)
+    # Sheet-level display settings (grid color, alternating rows): not
+    # cell content, not part of undo. See SheetAppearance.
+    appearance: SheetAppearance = field(default_factory=SheetAppearance)
     cell_styles: dict[int, dict[str, CellStyle]] = field(default_factory=dict)
     search_service: SearchService = field(default_factory=SearchService, repr=False, compare=False)
     sort_service: SortService = field(default_factory=SortService, repr=False, compare=False)
@@ -117,6 +123,7 @@ class Sheet:
             rtl=self.rtl,
             cell_styles=self._style_entries(view),
             text_defaults=self.text_defaults.to_dict(),
+            appearance=self.appearance.to_dict(),
         )
 
     def _style_entries(self, view: pd.DataFrame) -> list[dict[str, Any]]:
@@ -283,15 +290,35 @@ class Sheet:
 
             resolved.append((positions[0], column, value))
 
+        # Whether a column "prefers numbers" is decided once per column per
+        # batch - it means scanning the column, and a large paste would
+        # otherwise rescan it for every cell.
+        preferences: dict[int, bool] = {}
+
+        def prefers_numbers(column: int) -> Callable[[], bool]:
+            def decide() -> bool:
+                if column not in preferences:
+                    preferences[column] = self._prefers_numbers(self.dataframe.iloc[:, column])
+
+                return preferences[column]
+
+            return decide
+
         for position, column, value in resolved:
-            self._write_cell(position, column, value)
+            self._write_cell(position, column, value, prefers_numbers(column))
 
         self.active_view = self.dataframe.copy()
         return True
 
     _INTEGER_PATTERN = re.compile(r"^[+-]?\d+$")
 
-    def _write_cell(self, position: int, column: int, value: Any) -> None:
+    def _write_cell(
+        self,
+        position: int,
+        column: int,
+        value: Any,
+        prefers_numbers: Callable[[], bool] | None = None,
+    ) -> None:
         """
         Store one value, keeping the column's type sensible.
 
@@ -305,33 +332,150 @@ class Sheet:
         Non-numeric columns store the value exactly as given.
         """
         series = self.dataframe.iloc[:, column]
+        value, cast_to = self._coerce_value(value, series, prefers_numbers)
+
+        if cast_to is not None:
+            self.dataframe.isetitem(column, series.astype(cast_to))
+
+        self.dataframe.iloc[position, column] = value
+
+    @staticmethod
+    def _prefers_numbers(series: pd.Series) -> bool:
+        """
+        Whether a general-purpose (text/mixed) column is mostly numbers.
+
+        Used to decide if a numeric-looking entry should be stored as a
+        number. Blank cells and formulas say nothing either way; a column
+        with no content yet counts as numeric (typing 5 into a fresh column
+        gives the number 5, as in Excel), while a column of names or IDs
+        stays text so "007" keeps its zeros.
+        """
+        numbers = 0
+        texts = 0
+
+        for value in series:
+            try:
+                if pd.isna(value):
+                    continue
+            except (TypeError, ValueError):
+                pass
+
+            if isinstance(value, bool):
+                texts += 1
+            elif isinstance(value, (int, float)) or hasattr(value, "__float__") and not isinstance(value, str):
+                numbers += 1
+            elif isinstance(value, str):
+                stripped = value.strip()
+
+                if stripped and not stripped.startswith("="):
+                    texts += 1
+            else:
+                texts += 1
+
+        return numbers >= texts
+
+    def _coerce_value(
+        self,
+        value: Any,
+        series: pd.Series,
+        prefers_numbers: Callable[[], bool] | None = None,
+    ) -> tuple[Any, Any]:
+        """
+        Decide how to store ``value`` in a column shaped like ``series``.
+
+        Returns ``(value, cast_to)``: the value to store (text that is a
+        valid number becomes a number when the column is numeric - or is a
+        text/mixed column that is mostly numbers, see _prefers_numbers),
+        and the dtype the column must first be cast to, or None. See
+        _write_cell.
+        """
         is_numeric = (
             pd.api.types.is_numeric_dtype(series)
             and not pd.api.types.is_bool_dtype(series)
         )
 
-        if is_numeric and isinstance(value, str):
+        if isinstance(value, str) and not is_numeric and not (
+            pd.api.types.is_bool_dtype(series) or pd.api.types.is_datetime64_any_dtype(series)
+        ):
+            # A general-purpose column (object, or pandas' string dtype):
+            # numbers typed into a column that holds mostly numbers - say a
+            # data column with a formula "total" row, which makes it mixed -
+            # must still be stored as numbers, not as text.
             text = value.strip()
-            is_integer_column = pd.api.types.is_integer_dtype(series)
+            is_integer_text = bool(self._INTEGER_PATTERN.match(text))
+            number = None
 
-            if self._INTEGER_PATTERN.match(text):
-                value = int(text)
-                if not is_integer_column:
-                    value = float(value)
-            else:
+            if not is_integer_text:
                 try:
                     number = float(text)
                 except ValueError:
                     number = None
 
-                if number is not None and math.isfinite(number):
-                    value = number
-                    if is_integer_column:
-                        self.dataframe.isetitem(column, series.astype("float64"))
-                else:
-                    self.dataframe.isetitem(column, series.astype(object))
+                if number is not None and not math.isfinite(number):
+                    number = None
 
-        self.dataframe.iloc[position, column] = value
+            if (is_integer_text or number is not None) and (
+                prefers_numbers() if prefers_numbers is not None else self._prefers_numbers(series)
+            ):
+                converted = int(text) if is_integer_text else number
+                return converted, (None if pd.api.types.is_object_dtype(series) else object)
+
+            return value, None
+
+        if not (is_numeric and isinstance(value, str)):
+            return value, None
+
+        text = value.strip()
+        is_integer_column = pd.api.types.is_integer_dtype(series)
+
+        if self._INTEGER_PATTERN.match(text):
+            number = int(text)
+            return (number if is_integer_column else float(number)), None
+
+        try:
+            number = float(text)
+        except ValueError:
+            return value, object
+
+        if not math.isfinite(number):
+            return value, object
+
+        return number, ("float64" if is_integer_column else None)
+
+    def _rewrite_formulas(self, change: RefChange) -> None:
+        """
+        Re-point every stored formula after a row/column was inserted or deleted.
+
+        Formulas are kept as text (``=A1+A2``) and name cells by position, so
+        without this they would keep pointing at the OLD positions and quietly
+        compute with different cells (see formula_refs for the rules). Only
+        text columns are scanned, and only cells that start with ``=``.
+        """
+        changed_any = False
+
+        for column in range(len(self.dataframe.columns)):
+            series = self.dataframe.iloc[:, column]
+
+            if pd.api.types.is_numeric_dtype(series) or pd.api.types.is_datetime64_any_dtype(series):
+                continue
+
+            values = series.tolist()
+            changed = False
+
+            for position, value in enumerate(values):
+                if isinstance(value, str) and value.startswith("="):
+                    rewritten = adjust_formula(value, change)
+
+                    if rewritten != value:
+                        values[position] = rewritten
+                        changed = True
+
+            if changed:
+                self.dataframe.isetitem(column, pd.Series(values, index=series.index, dtype=object))
+                changed_any = True
+
+        if changed_any:
+            self.active_view = self.dataframe.copy()
 
     def snapshot(self) -> "SheetSnapshot":
         """An exact, independent copy of this sheet's undoable state."""
@@ -354,12 +498,48 @@ class Sheet:
         }
         self.column_widths = dict(snapshot.column_widths)
 
-    def insert_row(self, index: int | None = None) -> bool:
-        if index is None:
-            index = len(self.dataframe)
+    def _row_position(self, view_row: int | None) -> int | None:
+        """
+        Translate a row of the grid as shown into a dataframe row position.
 
-        if index < 0 or index > len(self.dataframe):
+        With a sort or filter in place the visible row N is not the
+        underlying row N, so anything addressed by a row number a client
+        read off the screen must go through here (see _view_positions).
+        ``None`` or one-past-the-last visible row means "the end" and maps
+        to the end of the underlying data. Returns None if invalid.
+        """
+        view_length = len(self.active_view) if self.active_view is not None else len(self.dataframe)
+
+        if view_row is None or view_row == view_length:
+            return len(self.dataframe)
+
+        if isinstance(view_row, bool) or not isinstance(view_row, int):
+            return None
+
+        if view_row < 0 or view_row > view_length:
+            return None
+
+        positions = self._view_positions(view_row, view_row)
+
+        if positions is None:
+            return None
+
+        return positions[0]
+
+    def insert_row(self, index: int | None = None) -> bool:
+        """
+        Insert an empty row before visible row ``index`` (or at the end).
+
+        ``index`` is a row of the grid as currently shown; it is mapped to
+        the underlying row, so inserting "above row 3" of a sorted view
+        goes where that row really is.
+        """
+        position = self._row_position(index)
+
+        if position is None:
             return False
+
+        index = position
 
         empty = {column: "" for column in self.dataframe.columns}
         top = self.dataframe.iloc[:index]
@@ -374,11 +554,64 @@ class Sheet:
             (position + 1 if position >= index else position): styles
             for position, styles in self.cell_styles.items()
         }
+        self._rewrite_formulas(RefChange("row", "insert", index))
+        return True
+
+    def append_row(self, first_value: Any = None) -> bool:
+        """
+        Add a row at the end of the data, optionally setting its first cell.
+
+        Done as ONE operation, rather than an insert followed by an edit,
+        because with a sort or filter in place the new row's visible
+        position is unpredictable (an empty row can sort anywhere, and a
+        filter may hide it) - so a client can't reliably address it by
+        row number afterwards.
+        """
+        if len(self.dataframe.columns) == 0:
+            return False
+
+        # A whitespace-only value is treated as no value.
+        if isinstance(first_value, str) and not first_value.strip():
+            first_value = ""
+
+        # Decide how to store the value BEFORE adding the row: the blank
+        # row turns a numeric column into a general one, after which "3"
+        # typed into a column of numbers would no longer be recognised as
+        # a number.
+        if first_value not in (None, ""):
+            first_value, _ = self._coerce_value(first_value, self.dataframe.iloc[:, 0])
+
+        if not self.insert_row(None):
+            return False
+
+        if first_value not in (None, ""):
+            self.dataframe.iloc[len(self.dataframe) - 1, 0] = first_value
+            self.active_view = self.dataframe.copy()
+
         return True
 
     def delete_row(self, index: int) -> bool:
-        if index < 0 or index >= len(self.dataframe):
+        """
+        Delete visible row ``index`` (a row of the grid as currently shown).
+
+        Mapped to the underlying row first: with a sort or filter in place
+        the visible row N is not the underlying row N, and deleting by the
+        raw number removes a different row than the one on screen.
+        """
+        view_length = len(self.active_view) if self.active_view is not None else len(self.dataframe)
+
+        if isinstance(index, bool) or not isinstance(index, int):
             return False
+
+        if index < 0 or index >= view_length:
+            return False
+
+        position = self._row_position(index)
+
+        if position is None or position >= len(self.dataframe):
+            return False
+
+        index = position
 
         self.dataframe = self.dataframe.drop(index)
         self.dataframe.reset_index(drop=True, inplace=True)
@@ -388,6 +621,7 @@ class Sheet:
             for position, styles in self.cell_styles.items()
             if position != index
         }
+        self._rewrite_formulas(RefChange("row", "delete", index))
         return True
 
     def insert_column(self, name: str, index: int | None = None) -> bool:
@@ -405,6 +639,7 @@ class Sheet:
 
         self.dataframe.insert(index, name, "")
         self.active_view = self.dataframe.copy()
+        self._rewrite_formulas(RefChange("column", "insert", index))
         return True
 
     def delete_column(self, name: str) -> bool:
@@ -422,9 +657,12 @@ class Sheet:
             # allowed to drop its last remaining sheet.
             return False
 
+        position = list(self.dataframe.columns).index(name)
+
         self.dataframe.drop(columns=[name], inplace=True)
         self.active_view = self.dataframe.copy()
         self.column_widths.pop(name, None)
+        self._rewrite_formulas(RefChange("column", "delete", position))
 
         for position in list(self.cell_styles):
             self.cell_styles[position].pop(name, None)
@@ -498,58 +736,103 @@ class Sheet:
         reset: list[str] | None = None,
     ) -> bool:
         """
-        Set or clear text-style fields on a rectangle of cells.
+        Set or clear text-style fields on one rectangle of cells.
 
-        Coordinates are VIEW coordinates (what the client sees in the
-        current filtered/sorted grid), inclusive on both ends and in any
-        corner order. ``values`` sets fields; ``reset`` returns fields to
-        "inherit from the sheet default". All-or-nothing: an invalid
-        patch or an out-of-range rectangle changes nothing.
+        See set_cell_style_ranges; this is the single-rectangle form.
         """
-        coordinates = (start_row, start_column, end_row, end_column)
+        return self.set_cell_style_ranges(
+            [(start_row, start_column, end_row, end_column)],
+            values,
+            reset,
+        )
 
-        if any(isinstance(c, bool) or not isinstance(c, int) for c in coordinates):
+    def set_cell_style_ranges(
+        self,
+        ranges: list[tuple[int, int, int, int]],
+        values: dict[str, Any] | None = None,
+        reset: list[str] | None = None,
+    ) -> bool:
+        """
+        Set or clear text-style fields on several rectangles of cells at once.
+
+        Each range is ``(start_row, start_column, end_row, end_column)`` in
+        VIEW coordinates (what the client sees in the current grid),
+        inclusive on both ends and in any corner order. A client with its
+        own sort/filter selects a block of VISIBLE rows that may be
+        scattered through the data, which is why this takes a list: it can
+        describe them all in one request, applied as one undoable change.
+        ``values`` sets fields; ``reset`` returns fields to "inherit from
+        the sheet default". All-or-nothing: an invalid patch or any
+        out-of-range rectangle changes nothing.
+        """
+        if not isinstance(ranges, (list, tuple)) or not ranges:
             return False
 
         view = self.active_view if self.active_view is not None else self.dataframe
 
-        row_low, row_high = sorted((start_row, end_row))
-        column_low, column_high = sorted((start_column, end_column))
-
-        if row_low < 0 or column_low < 0:
-            return False
-
-        if row_high >= len(view) or column_high >= len(view.columns):
-            return False
-
         # Validate the patch once up front so a bad request can't leave a
-        # half-applied rectangle behind.
+        # half-applied selection behind.
         if CellStyle().apply_patch(values, reset) is None:
             return False
 
-        positions = self._view_positions(row_low, row_high)
+        resolved: list[tuple[list[int], list[str]]] = []
 
-        if positions is None:
+        for rectangle in ranges:
+            if not isinstance(rectangle, (list, tuple)) or len(rectangle) != 4:
+                return False
+
+            if any(isinstance(c, bool) or not isinstance(c, int) for c in rectangle):
+                return False
+
+            start_row, start_column, end_row, end_column = rectangle
+
+            row_low, row_high = sorted((start_row, end_row))
+            column_low, column_high = sorted((start_column, end_column))
+
+            if row_low < 0 or column_low < 0:
+                return False
+
+            if row_high >= len(view) or column_high >= len(view.columns):
+                return False
+
+            positions = self._view_positions(row_low, row_high)
+
+            if positions is None:
+                return False
+
+            resolved.append((positions, list(view.columns[column_low:column_high + 1])))
+
+        for positions, names in resolved:
+            for position in positions:
+                row_styles = self.cell_styles.get(position, {})
+
+                for name in names:
+                    updated = row_styles.get(name, CellStyle()).apply_patch(values, reset)
+
+                    if updated is None or updated.is_empty():
+                        row_styles.pop(name, None)
+                    else:
+                        row_styles[name] = updated
+
+                if row_styles:
+                    self.cell_styles[position] = row_styles
+                else:
+                    self.cell_styles.pop(position, None)
+
+        return True
+
+    def set_appearance(
+        self,
+        values: dict[str, Any] | None = None,
+        reset: list[str] | None = None,
+    ) -> bool:
+        """Set or clear sheet-level display settings (grid color, banding)."""
+        updated = self.appearance.apply_patch(values, reset)
+
+        if updated is None:
             return False
 
-        names = list(view.columns[column_low:column_high + 1])
-
-        for position in positions:
-            row_styles = self.cell_styles.get(position, {})
-
-            for name in names:
-                updated = row_styles.get(name, CellStyle()).apply_patch(values, reset)
-
-                if updated is None or updated.is_empty():
-                    row_styles.pop(name, None)
-                else:
-                    row_styles[name] = updated
-
-            if row_styles:
-                self.cell_styles[position] = row_styles
-            else:
-                self.cell_styles.pop(position, None)
-
+        self.appearance = updated
         return True
 
     def set_text_defaults(
@@ -560,7 +843,9 @@ class Sheet:
         """Set or clear fields of the sheet-wide default text style."""
         updated = self.text_defaults.apply_patch(values, reset)
 
-        if updated is None:
+        # "No fill" only means something as an override on a single cell;
+        # as the sheet default it is just "unset".
+        if updated is None or updated.background == NO_FILL:
             return False
 
         self.text_defaults = updated

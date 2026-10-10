@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../spreadsheet/fonts/font_catalog.dart';
 import '../../spreadsheet/models/text_style_spec.dart';
+import 'color_picker_dialog.dart';
 
 /// What the user chose in [FontOptionsDialog], expressed as a change to
 /// apply rather than a full style: [set] holds only the fields the user
@@ -20,7 +21,7 @@ class FontOptionsResult {
 }
 
 /// A font options dialog with a live preview: family, size, bold / italic
-/// / underline / strikethrough, and text color.
+/// / underline / strikethrough, text color and cell fill.
 ///
 /// Used for both levels of text formatting - the sheet-wide default
 /// (opened from Settings) and the selected cells (opened from the
@@ -34,9 +35,15 @@ class FontOptionsDialog extends StatefulWidget {
     required this.title,
     required this.initial,
     required this.resetLabel,
+    this.allowNoFill = false,
   });
 
   final String title;
+
+  /// Whether "No fill" is offered for the fill color. True when editing
+  /// cells (one cell can opt out of a sheet-wide fill); false for the sheet
+  /// default itself, where "no fill" is just "not set".
+  final bool allowNoFill;
 
   /// The style the dialog starts from (null fields show as "Default").
   final TextStyleSpec initial;
@@ -49,6 +56,7 @@ class FontOptionsDialog extends StatefulWidget {
     required String title,
     required TextStyleSpec initial,
     required String resetLabel,
+    bool allowNoFill = false,
   }) {
     return showDialog<FontOptionsResult>(
       context: context,
@@ -56,6 +64,7 @@ class FontOptionsDialog extends StatefulWidget {
         title: title,
         initial: initial,
         resetLabel: resetLabel,
+        allowNoFill: allowNoFill,
       ),
     );
   }
@@ -72,6 +81,7 @@ class _FontOptionsDialogState extends State<FontOptionsDialog> {
   String? _family;
   double? _size;
   String? _color;
+  String? _background;
 
   static const String _groupPrefix = '__group__';
 
@@ -86,6 +96,7 @@ class _FontOptionsDialogState extends State<FontOptionsDialog> {
     _family = initial.fontFamily;
     _size = initial.fontSize;
     _color = initial.color;
+    _background = initial.background;
   }
 
   /// What the preview (and a later Apply) is based on.
@@ -97,6 +108,7 @@ class _FontOptionsDialogState extends State<FontOptionsDialog> {
         fontFamily: _family,
         fontSize: _size,
         color: _color,
+        background: _background,
       );
 
   /// The change from [FontOptionsDialog.initial] to the current choices.
@@ -146,6 +158,11 @@ class _FontOptionsDialogState extends State<FontOptionsDialog> {
         TextStyleSpec.fieldFontSize,
       ),
       color: value<String>(initial.color, _color, TextStyleSpec.fieldColor),
+      background: value<String>(
+        initial.background,
+        _background,
+        TextStyleSpec.fieldBackground,
+      ),
     );
 
     return FontOptionsResult(set: set, reset: reset);
@@ -240,39 +257,68 @@ class _FontOptionsDialogState extends State<FontOptionsDialog> {
     );
   }
 
-  Widget _colorSwatch({required String? hex}) {
-    final selected = _color == hex;
-    final color = parseHexColor(hex);
+  /// A "label  [swatch] value  Change..." row that opens the color picker.
+  Widget _colorRow({
+    required String label,
+    required String? value,
+    required String defaultLabel,
+    required bool allowNoFill,
+    required ValueChanged<String?> onPicked,
+  }) {
+    final color = parseHexColor(value);
+    final description = value == null
+        ? defaultLabel
+        : value == TextStyleSpec.noFill
+            ? 'No fill'
+            : '#$value';
 
-    return Tooltip(
-      message: hex == null ? 'Default color' : '#$hex',
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: () => setState(() => _color = hex),
-        child: Container(
-          width: 28,
-          height: 28,
+    return Row(
+      children: [
+        SizedBox(
+          width: 90,
+          child: Text(label, style: Theme.of(context).textTheme.labelLarge),
+        ),
+        Container(
+          width: 22,
+          height: 22,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: color ?? Colors.white,
-            border: Border.all(
-              color: selected
-                  ? Theme.of(context).colorScheme.primary
-                  : Colors.grey.shade400,
-              width: selected ? 3 : 1,
-            ),
+            border: Border.all(color: Colors.grey.shade400),
           ),
-          child: hex == null
-              ? Icon(Icons.format_color_reset, size: 16, color: Colors.grey.shade700)
+          child: color == null
+              ? Icon(Icons.block, size: 14, color: Colors.grey.shade500)
               : null,
         ),
-      ),
+        const SizedBox(width: 8),
+        Expanded(child: Text(description)),
+        TextButton(
+          onPressed: () async {
+            final result = await ColorPickerDialog.show(
+              context,
+              title: label,
+              initial: value,
+              defaultLabel: defaultLabel,
+              allowNoFill: allowNoFill,
+            );
+
+            if (result != null) {
+              onPicked(result.value);
+            }
+          },
+          child: const Text('Change...'),
+        ),
+      ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final previewStyle = resolveCellTextStyle(_working);
+    final previewFill = parseHexColor(_background);
+    final previewStyle = readableOnFill(
+      resolveCellTextStyle(_working),
+      previewFill,
+    );
 
     return AlertDialog(
       title: Text(widget.title),
@@ -342,15 +388,19 @@ class _FontOptionsDialogState extends State<FontOptionsDialog> {
                 ],
               ),
               const SizedBox(height: 12),
-              Text('Color', style: Theme.of(context).textTheme.labelLarge),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _colorSwatch(hex: null),
-                  for (final hex in kTextColors) _colorSwatch(hex: hex),
-                ],
+              _colorRow(
+                label: 'Text color',
+                value: _color,
+                defaultLabel: 'Automatic',
+                allowNoFill: false,
+                onPicked: (value) => setState(() => _color = value),
+              ),
+              _colorRow(
+                label: 'Fill',
+                value: _background,
+                defaultLabel: widget.allowNoFill ? 'Sheet default' : 'None',
+                allowNoFill: widget.allowNoFill,
+                onPicked: (value) => setState(() => _background = value),
               ),
               const SizedBox(height: 16),
               Text('Preview', style: Theme.of(context).textTheme.labelLarge),
@@ -359,7 +409,7 @@ class _FontOptionsDialogState extends State<FontOptionsDialog> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: previewFill ?? Colors.white,
                   border: Border.all(color: Colors.grey.shade400),
                   borderRadius: BorderRadius.circular(6),
                 ),

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../core/api/api_client.dart';
+import '../../../core/api/api_config.dart';
 import '../../../core/preferences/app_preferences.dart';
 import '../../spreadsheet/controllers/spreadsheet_controller.dart';
 import '../../spreadsheet/controllers/viewport_controller.dart';
@@ -41,8 +42,19 @@ class _ShellPageState extends State<ShellPage> with WidgetsBindingObserver {
   void initState() {
     super.initState();
 
-    final api = ApiClient(baseUrl: 'http://localhost:8000');
+    // The server's address (and optional access token) are build-time
+    // settings - see ApiConfig - so this same code can talk to a server on
+    // another machine.
+    final api = ApiClient(
+      baseUrl: ApiConfig.baseUrl,
+      accessToken: ApiConfig.accessToken.isEmpty ? null : ApiConfig.accessToken,
+    );
     final service = SpreadsheetService(api);
+
+    // Last-opened document and preferences are stored by the backend (see
+    // AppPreferences for why the browser can't be relied on). Must be set
+    // before _loadInitialDocument reads them.
+    AppPreferences.useBackend(api);
 
     spreadsheetController = SpreadsheetController(service);
     viewportController = ViewportController();

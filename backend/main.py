@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, status
+from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -6,12 +6,28 @@ from fastapi.responses import JSONResponse
 from backend.api.status import router as status_router
 from backend.api.documents import router as documents_router
 from backend.api.spreadsheet import router as spreadsheet_router
+from backend.api.app_state import router as app_state_router
 from backend.api.models.common import ErrorResponse
 from backend.utils.logger import get_logger
+from backend.utils.settings import LOCALHOST_ORIGIN_REGEX, load_settings, token_matches
 
 logger = get_logger("main")
 
+settings = load_settings()
+
+
+def require_access_token(request: Request) -> None:
+    """Reject requests without the shared access token, when one is configured."""
+    if not token_matches(request.headers.get("authorization"), settings.access_token):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing or invalid access token.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
 app = FastAPI(
+    dependencies=[Depends(require_access_token)],
     title="Excelence Backend",
     version="1.0.0",
     description="Local spreadsheet API for Excelence.",
@@ -19,14 +35,17 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# Excelence is a local-first desktop/web app talking to a locally-run backend,
-# so we allow any localhost/127.0.0.1 origin regardless of port (flutter run
-# -d chrome picks a random port each launch). allow_credentials stays False
-# since we don't use cookies - this keeps allow_origin_regex valid under CORS
-# rules (browsers reject "*" + credentials=True together).
+# Which web pages may call the API from a browser. By default any
+# localhost/127.0.0.1 origin regardless of port (flutter run -d chrome picks
+# a random port each launch); a client served from another machine is
+# allowed by listing its exact origin in EXCELENCE_ALLOWED_ORIGINS.
+# allow_credentials stays False (the access token travels in a header, not a
+# cookie), which keeps these rules valid - browsers reject "*" together with
+# credentials=True.
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:\d+)?",
+    allow_origins=list(settings.allowed_origins),
+    allow_origin_regex=LOCALHOST_ORIGIN_REGEX if settings.allow_any_localhost else None,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -35,6 +54,7 @@ app.add_middleware(
 app.include_router(status_router)
 app.include_router(documents_router)
 app.include_router(spreadsheet_router)
+app.include_router(app_state_router)
 
 
 @app.exception_handler(RequestValidationError)

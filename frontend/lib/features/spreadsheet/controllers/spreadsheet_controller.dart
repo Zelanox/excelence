@@ -9,6 +9,8 @@ import '../models/row_model.dart';
 import '../models/sheet_model.dart';
 import '../models/spreadsheet_model.dart';
 import '../models/selection_model.dart';
+import '../models/sheet_appearance.dart';
+import '../models/sheet_view.dart';
 import '../models/text_style_spec.dart';
 
 import '../services/spreadsheet_service.dart';
@@ -54,16 +56,24 @@ class SpreadsheetController extends ChangeNotifier {
     await Future.wait(List<Future<void>>.of(_pendingSaves));
   }
 
-  // The currently active single-column sort, if any - tracked here so
-  // GridColumnHeader can show an ascending/descending indicator without
-  // each header needing its own separate source of truth. Null means no
-  // column is currently sorted.
-  String? _sortedColumn;
-  bool _sortAscending = true;
-
   SpreadsheetModel? get spreadsheet => _spreadsheet;
-  String? get sortedColumn => _sortedColumn;
-  bool get sortAscending => _sortAscending;
+
+  // This client's view of the active sheet - the search filter and the
+  // single-column sort - lives on the sheet itself (see SheetView), so it is
+  // per sheet and is never shared with, or saved for, anyone else. These
+  // getters let GridColumnHeader show its sort indicator and the search bar
+  // show its text without each keeping a separate source of truth.
+
+  /// The column the active sheet is sorted by, or null. A sort on a column
+  /// that has since been deleted or renamed counts as no sort.
+  String? get sortedColumn {
+    final sheet = _spreadsheet?.activeSheet;
+    final column = sheet?.view.sortColumn;
+
+    return column != null && sheet!.headers.contains(column) ? column : null;
+  }
+
+  bool get sortAscending => _spreadsheet?.activeSheet.view.sortAscending ?? true;
 
   bool get canUndo => _undoStack.isNotEmpty;
   bool get canRedo => _redoStack.isNotEmpty;
@@ -89,6 +99,12 @@ class SpreadsheetController extends ChangeNotifier {
 
   Timer? _autosaveTimer;
   bool _hasUnsavedChanges = false;
+
+  /// The text of the active search filter ('' when none). It is part of
+  /// the sheet's view rather than only the search bar's text field, so a
+  /// search started from elsewhere - e.g. after adding a row - shows up in
+  /// the search box too.
+  String get searchQuery => _spreadsheet?.activeSheet.view.searchQuery ?? '';
 
   /// True while the open document has changes that haven't been written
   /// to disk yet (they're about to be, by autosave).
@@ -352,10 +368,11 @@ class SpreadsheetController extends ChangeNotifier {
     return _service.browseFolder(folder);
   }
 
-  /// Converts a raw API [SpreadsheetData] response into a [SheetModel].
-  /// Shared by loadDocument and every row/column mutation (insert/delete),
-  /// since each of those endpoints returns the same shape - the sheet's
-  /// full refreshed data - after applying its change.
+  /// Converts a raw API [SpreadsheetData] response into a [SheetModel] of
+  /// canonical rows with no view applied. Shared by loadDocument and every
+  /// row/column mutation (insert/delete), since each of those endpoints
+  /// returns the same shape - the sheet's full refreshed data - after
+  /// applying its change.
   SheetModel _sheetFromApiData({
     required String name,
     required SpreadsheetData data,
@@ -380,12 +397,20 @@ class SpreadsheetController extends ChangeNotifier {
         final header = data.headers[columnIndex];
 
         final rawValue = apiRow[header];
+        final text = rawValue?.toString() ?? '';
+
+        // The server stores a cell's INPUT as typed, so a formula arrives as
+        // its text ("=A1+A2"). It becomes a formula cell here, and its
+        // value is filled in below once every cell exists (a formula can
+        // refer to cells further down or to other formulas).
+        final isFormula = _isFormula(text);
 
         cells.add(
           CellModel(
             row: rowIndex,
             column: columnIndex,
-            value: rawValue?.toString() ?? '',
+            value: isFormula ? '' : text,
+            formula: isFormula ? text : null,
             style: stylesByCell[(rowIndex, columnIndex)] ??
                 TextStyleSpec.empty,
           ),
@@ -400,14 +425,62 @@ class SpreadsheetController extends ChangeNotifier {
       );
     }
 
-    return SheetModel(
-      name: name,
-      rows: rows,
-      headers: data.headers,
-      columnWidths: data.columnWidths,
-      isRtl: data.isRtl,
-      textDefaults: data.textDefaults,
+    // The backend returns the CANONICAL data (it no longer sorts or
+    // filters for this client), so these rows are the sheet's allRows and
+    // row r of the response is row r of the data. The caller applies this
+    // client's view (see _replaceActiveSheet).
+    return _evaluateLoadedFormulas(
+      SheetModel(
+        name: name,
+        allRows: rows,
+        headers: data.headers,
+        columnWidths: data.columnWidths,
+        isRtl: data.isRtl,
+        textDefaults: data.textDefaults,
+        appearance: data.appearance,
+      ),
     );
+  }
+
+  /// Fills in the value of every formula cell of a freshly loaded [sheet].
+  ///
+  /// Formulas are stored as text and never as results, so after every load
+  /// (and every refresh from the server) each client works the results out
+  /// for itself with the same engine - which is what makes everyone see the
+  /// same numbers. The engine resolves a formula's references recursively,
+  /// so the order the cells are evaluated in doesn't matter.
+  SheetModel _evaluateLoadedFormulas(SheetModel sheet) {
+    final probe = SpreadsheetModel(
+      activeSheetIndex: 0,
+      sheets: [sheet],
+      availableSheetNames: [sheet.name],
+    );
+
+    final replacements = <int, RowModel>{};
+
+    for (final row in sheet.allRows) {
+      List<CellModel>? updatedCells;
+
+      for (int column = 0; column < row.cells.length; column++) {
+        final cell = row.cells[column];
+        final formula = cell.formula;
+
+        if (formula == null) {
+          continue;
+        }
+
+        updatedCells ??= List<CellModel>.from(row.cells);
+        updatedCells[column] = cell.copyWith(
+          value: _formulaEngine.evaluate(formula, probe),
+        );
+      }
+
+      if (updatedCells != null) {
+        replacements[row.index] = RowModel(index: row.index, cells: updatedCells);
+      }
+    }
+
+    return sheet.withSourceRows(replacements);
   }
 
   // ============================================================
@@ -437,10 +510,9 @@ class SpreadsheetController extends ChangeNotifier {
         availableSheetNames: sheetsData.sheetNames,
       );
 
+      // A freshly loaded sheet starts with no search or sort.
       _undoStack.clear();
       _redoStack.clear();
-      _sortedColumn = null;
-      _sortAscending = true;
 
       notifyListeners();
     } catch (error, stackTrace) {
@@ -467,10 +539,9 @@ class SpreadsheetController extends ChangeNotifier {
         availableSheetNames: sheetsData.sheetNames,
       );
 
+      // A freshly loaded sheet starts with no search or sort.
       _undoStack.clear();
       _redoStack.clear();
-      _sortedColumn = null;
-      _sortAscending = true;
 
       notifyListeners();
     } catch (error, stackTrace) {
@@ -503,10 +574,9 @@ class SpreadsheetController extends ChangeNotifier {
         availableSheetNames: sheetsData.sheetNames,
       );
 
+      // A freshly loaded sheet starts with no search or sort.
       _undoStack.clear();
       _redoStack.clear();
-      _sortedColumn = null;
-      _sortAscending = true;
 
       notifyListeners();
     } catch (error, stackTrace) {
@@ -540,14 +610,7 @@ class SpreadsheetController extends ChangeNotifier {
       final activeSheet = currentSpreadsheet.sheets[activeSheetIndex];
 
       final renamedActiveSheet = activeSheet.name == oldName
-          ? SheetModel(
-              name: sheetsData.currentSheet,
-              rows: activeSheet.rows,
-              headers: activeSheet.headers,
-              columnWidths: activeSheet.columnWidths,
-              isRtl: activeSheet.isRtl,
-              textDefaults: activeSheet.textDefaults,
-            )
+          ? activeSheet.copyWith(name: sheetsData.currentSheet)
           : activeSheet;
 
       final updatedSheets = List<SheetModel>.of(currentSpreadsheet.sheets);
@@ -576,17 +639,26 @@ class SpreadsheetController extends ChangeNotifier {
   /// the backend's response rather than reconstructing it locally, since
   /// the backend is the source of truth for how the insertion actually
   /// landed (e.g. formula adjustments it may perform).
+  ///
+  /// [index] is a row of the grid as SHOWN; the server is told the real
+  /// (canonical) row it stands for. A row number one past the last shown
+  /// row means "at the end of the data".
   Future<void> insertRow({required int index}) async {
     final currentSpreadsheet = _spreadsheet;
     if (currentSpreadsheet == null) {
       return;
     }
 
+    final sheet = currentSpreadsheet.activeSheet;
+    final canonicalIndex = index >= 0 && index < sheet.rows.length
+        ? sheet.sourceRowOf(index)
+        : (index == sheet.rows.length ? sheet.allRows.length : index);
+
     _recordHistoryPoint();
 
     try {
       await _flushPendingSaves();
-      final data = await _service.insertRow(index: index);
+      final data = await _service.insertRow(index: canonicalIndex);
       _markDirty();
       _replaceActiveSheet(data);
       notifyListeners();
@@ -602,39 +674,16 @@ class SpreadsheetController extends ChangeNotifier {
     }
   }
 
-  /// Appends a new row at the end of the active sheet and sets its
-  /// first column's value to [value] in one composite action - the
-  /// status bar's quick-add field uses this rather than the grid's own
-  /// separate "+" row-add handle (SpreadsheetGrid._appendRow), since
-  /// that only inserts a blank row with no way to pass an initial
-  /// value inline.
+  /// Adds a row at the end of the data with [value] in its first column
+  /// (empty [value]: a blank row), as one undoable step.
   ///
-  /// Deliberately two sequential calls, not a single combined backend
-  /// request: insertRow first (awaited, so the backend's actual
-  /// response - including the real row count it landed at - is known
-  /// before editCell targets it), then editCell on the row insertRow
-  /// just confirmed exists. editCell requires an already-existing row
-  /// (see its own row-bounds check) and can't create one itself, so
-  /// this ordering isn't optional. If [value] is empty, only the row is
-  /// inserted - there's nothing meaningful to write to the first cell.
+  /// This is a single backend operation rather than "insert a row, then
+  /// edit the last row": with a sort or filter active the new row is not
+  /// necessarily the last VISIBLE row (an empty row can sort anywhere, and
+  /// a filter can hide it), so it could not be addressed by row number
+  /// afterwards. The grid is refreshed from the backend's response, so the
+  /// current sort/filter stays applied.
   Future<void> appendRowWithFirstColumnValue(String value) async {
-    final currentSpreadsheet = _spreadsheet;
-    if (currentSpreadsheet == null) {
-      return;
-    }
-
-    final newRowIndex = currentSpreadsheet.activeSheet.rows.length;
-    await insertRow(index: newRowIndex);
-
-    if (value.isEmpty) {
-      return;
-    }
-
-    editCell(row: newRowIndex, column: 0, value: value);
-  }
-
-  /// Deletes the row at [index] (zero-based).
-  Future<void> deleteRow({required int index}) async {
     final currentSpreadsheet = _spreadsheet;
     if (currentSpreadsheet == null) {
       return;
@@ -644,7 +693,39 @@ class SpreadsheetController extends ChangeNotifier {
 
     try {
       await _flushPendingSaves();
-      final data = await _service.deleteRow(index: index);
+      final data = await _service.appendRow(value);
+      _markDirty();
+      _replaceActiveSheet(data);
+      notifyListeners();
+    } catch (error, stackTrace) {
+      debugPrint('[SpreadsheetController.appendRow] Error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      if (_undoStack.isNotEmpty) {
+        _undoStack.removeLast();
+      }
+      rethrow;
+    }
+  }
+
+  /// Deletes the row at [index], a row of the grid as SHOWN (zero-based).
+  /// The server is told which real (canonical) row that is, so with a sort
+  /// or filter in place the row on screen is the one that goes.
+  Future<void> deleteRow({required int index}) async {
+    final currentSpreadsheet = _spreadsheet;
+    if (currentSpreadsheet == null) {
+      return;
+    }
+
+    final sheet = currentSpreadsheet.activeSheet;
+    final canonicalIndex = index >= 0 && index < sheet.rows.length
+        ? sheet.sourceRowOf(index)
+        : index;
+
+    _recordHistoryPoint();
+
+    try {
+      await _flushPendingSaves();
+      final data = await _service.deleteRow(index: canonicalIndex);
       _markDirty();
       _replaceActiveSheet(data);
       notifyListeners();
@@ -765,14 +846,7 @@ class SpreadsheetController extends ChangeNotifier {
     final updatedWidths = Map<String, double>.from(activeSheet.columnWidths);
     updatedWidths[name] = width;
 
-    final updatedSheet = SheetModel(
-      name: activeSheet.name,
-      rows: activeSheet.rows,
-      headers: activeSheet.headers,
-      columnWidths: updatedWidths,
-      isRtl: activeSheet.isRtl,
-      textDefaults: activeSheet.textDefaults,
-    );
+    final updatedSheet = activeSheet.copyWith(columnWidths: updatedWidths);
 
     final updatedSheets = List<SheetModel>.from(currentSpreadsheet.sheets);
     updatedSheets[activeSheetIndex] = updatedSheet;
@@ -849,14 +923,7 @@ class SpreadsheetController extends ChangeNotifier {
     final activeSheetIndex = currentSpreadsheet.activeSheetIndex;
     final activeSheet = currentSpreadsheet.sheets[activeSheetIndex];
 
-    final updatedSheet = SheetModel(
-      name: activeSheet.name,
-      rows: activeSheet.rows,
-      headers: activeSheet.headers,
-      columnWidths: activeSheet.columnWidths,
-      isRtl: rtl,
-      textDefaults: activeSheet.textDefaults,
-    );
+    final updatedSheet = activeSheet.copyWith(isRtl: rtl);
 
     final updatedSheets = List<SheetModel>.from(currentSpreadsheet.sheets);
     updatedSheets[activeSheetIndex] = updatedSheet;
@@ -946,10 +1013,18 @@ class SpreadsheetController extends ChangeNotifier {
 
     _recordHistoryPoint();
 
-    final updatedRows = List<RowModel>.from(sheet.rows);
+    // The selection is a block of SHOWN rows. With a sort or filter in
+    // place those are scattered through the real data, so work out which
+    // canonical rows they are - that is what gets changed and saved.
+    final sourceRows = <int>[
+      for (int row = firstRow; row <= lastRow; row++) sheet.sourceRowOf(row),
+    ];
 
-    for (int row = firstRow; row <= lastRow; row++) {
-      final cells = List<CellModel>.from(updatedRows[row].cells);
+    final replacements = <int, RowModel>{};
+
+    for (final sourceRow in sourceRows) {
+      final current = sheet.allRows[sourceRow];
+      final cells = List<CellModel>.from(current.cells);
 
       for (int column = firstColumn;
           column <= lastColumn && column < cells.length;
@@ -960,12 +1035,12 @@ class SpreadsheetController extends ChangeNotifier {
         );
       }
 
-      updatedRows[row] = RowModel(index: updatedRows[row].index, cells: cells);
+      replacements[sourceRow] = RowModel(index: current.index, cells: cells);
     }
 
     final updatedSheets = List<SheetModel>.from(currentSpreadsheet.sheets);
     updatedSheets[currentSpreadsheet.activeSheetIndex] =
-        sheet.copyWith(rows: updatedRows);
+        sheet.withSourceRows(replacements);
 
     _spreadsheet = SpreadsheetModel(
       activeSheetIndex: currentSpreadsheet.activeSheetIndex,
@@ -975,14 +1050,93 @@ class SpreadsheetController extends ChangeNotifier {
 
     notifyListeners();
 
+    // One request for the whole selection (one undo step on the server),
+    // as runs of consecutive canonical rows.
+    final ranges = [
+      for (final (first, last) in _contiguousRuns(sourceRows))
+        (
+          startRow: first,
+          startColumn: firstColumn,
+          endRow: last,
+          endColumn: lastColumn,
+        ),
+    ];
+
     _enqueueBackendWrite(
       errorPrefix: 'Failed to save formatting',
       job: () async {
-        await _service.setCellStyle(
-          startRow: firstRow,
-          startColumn: firstColumn,
-          endRow: lastRow,
-          endColumn: lastColumn,
+        await _service.setCellStyles(
+          ranges: ranges,
+          style: set.toJson(),
+          reset: reset.toList(),
+        );
+      },
+    );
+  }
+
+  /// Groups [rows] into runs of consecutive numbers, in ascending order:
+  /// [7, 3, 4, 5, 9, 8] becomes [(3, 5), (7, 9)]. Used to describe a set of
+  /// canonical rows to the server as a few ranges instead of one per row.
+  List<(int, int)> _contiguousRuns(List<int> rows) {
+    if (rows.isEmpty) {
+      return const [];
+    }
+
+    final sorted = List<int>.of(rows)..sort();
+    final runs = <(int, int)>[];
+
+    var start = sorted.first;
+    var previous = sorted.first;
+
+    for (final row in sorted.skip(1)) {
+      if (row == previous || row == previous + 1) {
+        previous = row;
+        continue;
+      }
+
+      runs.add((start, previous));
+      start = row;
+      previous = row;
+    }
+
+    runs.add((start, previous));
+    return runs;
+  }
+
+  /// Applies [set] / [reset] to the active sheet's display settings: grid
+  /// line color and alternating row colors. Like [setRtl] these are
+  /// sheet-level settings set from the Settings dialog - persisted, but
+  /// not recorded in the undo history.
+  void setAppearance(
+    SheetAppearance set, {
+    Set<String> reset = const {},
+  }) {
+    final currentSpreadsheet = _spreadsheet;
+
+    if (currentSpreadsheet == null || (set.isEmpty && reset.isEmpty)) {
+      return;
+    }
+
+    final activeSheetIndex = currentSpreadsheet.activeSheetIndex;
+    final activeSheet = currentSpreadsheet.sheets[activeSheetIndex];
+
+    final updatedSheets = List<SheetModel>.from(currentSpreadsheet.sheets);
+    updatedSheets[activeSheetIndex] = activeSheet.copyWith(
+      appearance: activeSheet.appearance.applied(set, reset: reset),
+    );
+
+    _spreadsheet = SpreadsheetModel(
+      activeSheetIndex: activeSheetIndex,
+      sheets: updatedSheets,
+      availableSheetNames: currentSpreadsheet.availableSheetNames,
+    );
+
+    notifyListeners();
+
+    _enqueueBackendWrite(
+      errorPrefix: 'Failed to save sheet appearance',
+      job: () async {
+        await _service.setAppearance(
           style: set.toJson(),
           reset: reset.toList(),
         );
@@ -1031,96 +1185,41 @@ class SpreadsheetController extends ChangeNotifier {
     );
   }
 
-  /// Filters the active sheet's visible rows to those matching [query].
-  /// Unlike row/column mutations, search does NOT record an undo history
-  /// point - filtering which rows are shown isn't a document edit the
-  /// user should be able to Ctrl+Z, any more than scrolling would be. It
-  /// does CLEAR existing undo history, since that history describes the
-  /// rows of the previous view.
+  /// Filters the rows shown to those where some cell contains [query]
+  /// (case-insensitive; blank = no filter).
+  ///
+  /// Purely local: it changes which rows THIS client shows, never the data,
+  /// and nothing is sent to the server - so in a shared sheet one person's
+  /// search can't change anyone else's screen. Formulas and edits keep
+  /// working on the real rows (see SheetModel). It is not an edit, so it
+  /// isn't undoable - but it doesn't disturb undo history either, since
+  /// that history describes the data.
   Future<void> search(String query) async {
-    final currentSpreadsheet = _spreadsheet;
-    if (currentSpreadsheet == null) {
-      return;
-    }
-
-    try {
-      await _flushPendingSaves();
-      final data = await _service.search(query);
-      _replaceActiveSheet(data);
-      // History is tied to the rows being shown; a different view makes
-      // it meaningless (the backend clears its side too).
-      _undoStack.clear();
-      _redoStack.clear();
-      notifyListeners();
-    } catch (error, stackTrace) {
-      debugPrint('[SpreadsheetController.search] Error: $error');
-      debugPrintStack(stackTrace: stackTrace);
-      rethrow;
-    }
+    _changeView((view) => view.withSearch(query));
   }
 
-  /// Clears the active search filter, restoring every row. Like [search],
-  /// like [search], this clears undo/redo history.
+  /// Clears the search filter, showing every row again.
   Future<void> clearSearch() async {
-    final currentSpreadsheet = _spreadsheet;
-    if (currentSpreadsheet == null) {
-      return;
-    }
-
-    try {
-      await _flushPendingSaves();
-      final data = await _service.clearSearch();
-      _replaceActiveSheet(data);
-      // History is tied to the rows being shown; a different view makes
-      // it meaningless (the backend clears its side too).
-      _undoStack.clear();
-      _redoStack.clear();
-      notifyListeners();
-    } catch (error, stackTrace) {
-      debugPrint('[SpreadsheetController.clearSearch] Error: $error');
-      debugPrintStack(stackTrace: stackTrace);
-      rethrow;
-    }
+    _changeView((view) => view.withSearch(''));
   }
 
-  /// Sorts the active sheet by [column]. Like [search], this is a view
-  /// arrangement rather than a document edit, so it isn't undoable - and
-  /// it clears existing undo history, which describes the previous order.
+  /// Sorts the shown rows by [column] (numbers, then text, then blanks -
+  /// blanks always last). Local to this client, like [search].
   Future<void> sort({required String column, required bool ascending}) async {
-    final currentSpreadsheet = _spreadsheet;
-    if (currentSpreadsheet == null) {
-      return;
-    }
-
-    try {
-      await _flushPendingSaves();
-      final data = await _service.sort(column: column, ascending: ascending);
-      _replaceActiveSheet(data);
-      // History is tied to the rows being shown; a different view makes
-      // it meaningless (the backend clears its side too).
-      _undoStack.clear();
-      _redoStack.clear();
-      _sortedColumn = column;
-      _sortAscending = ascending;
-      notifyListeners();
-    } catch (error, stackTrace) {
-      debugPrint('[SpreadsheetController.sort] Error: $error');
-      debugPrintStack(stackTrace: stackTrace);
-      rethrow;
-    }
+    _changeView((view) => view.withSort(column, ascending: ascending));
   }
 
   /// Cycles [column]'s sort state on each call, matching standard
-  /// spreadsheet header-click behavior: unsorted -> ascending -> ->
+  /// spreadsheet header-click behavior: unsorted -> ascending ->
   /// descending -> unsorted (clearing the sort entirely on the third
   /// click).
   Future<void> toggleSort(String column) async {
-    if (_sortedColumn != column) {
+    if (sortedColumn != column) {
       await sort(column: column, ascending: true);
       return;
     }
 
-    if (_sortAscending) {
+    if (sortAscending) {
       await sort(column: column, ascending: false);
       return;
     }
@@ -1128,36 +1227,48 @@ class SpreadsheetController extends ChangeNotifier {
     await clearSort();
   }
 
-  /// Clears the active sort, restoring natural row order. Does not touch
-  /// undo/redo history, same as [sort].
+  /// Clears the sort, restoring the data's own row order.
   Future<void> clearSort() async {
+    _changeView((view) => view.withSort(null));
+  }
+
+  /// Applies [change] to the active sheet's view and recomputes which rows
+  /// are shown from the sheet's current data.
+  void _changeView(SheetView Function(SheetView view) change) {
     final currentSpreadsheet = _spreadsheet;
+
     if (currentSpreadsheet == null) {
       return;
     }
 
-    try {
-      await _flushPendingSaves();
-      final data = await _service.clearSort();
-      _replaceActiveSheet(data);
-      // History is tied to the rows being shown; a different view makes
-      // it meaningless (the backend clears its side too).
-      _undoStack.clear();
-      _redoStack.clear();
-      _sortedColumn = null;
-      _sortAscending = true;
-      notifyListeners();
-    } catch (error, stackTrace) {
-      debugPrint('[SpreadsheetController.clearSort] Error: $error');
-      debugPrintStack(stackTrace: stackTrace);
-      rethrow;
+    final activeSheetIndex = currentSpreadsheet.activeSheetIndex;
+    final sheet = currentSpreadsheet.sheets[activeSheetIndex];
+    final newView = change(sheet.view);
+
+    if (newView == sheet.view) {
+      return;
     }
+
+    final sheets = List<SheetModel>.from(currentSpreadsheet.sheets);
+    sheets[activeSheetIndex] = sheet.withView(newView);
+
+    _spreadsheet = SpreadsheetModel(
+      activeSheetIndex: activeSheetIndex,
+      sheets: sheets,
+      availableSheetNames: currentSpreadsheet.availableSheetNames,
+    );
+
+    notifyListeners();
   }
 
   /// Replaces the active sheet's data with a fresh conversion of [data],
   /// preserving the sheet's name and every other sheet untouched. Shared
   /// by every row/column mutation, which all refresh the active sheet
   /// from the backend's response after applying their change.
+  ///
+  /// The response is the CANONICAL data; this client's own view (search
+  /// filter and sort) is applied on top of it, so inserting or deleting a
+  /// row doesn't throw away what the user was searching or sorting by.
   void _replaceActiveSheet(SpreadsheetData data) {
     final currentSpreadsheet = _spreadsheet;
     if (currentSpreadsheet == null) {
@@ -1172,7 +1283,7 @@ class SpreadsheetController extends ChangeNotifier {
     updatedSheets[activeSheetIndex] = _sheetFromApiData(
       name: activeSheetName,
       data: data,
-    );
+    ).withView(currentSpreadsheet.sheets[activeSheetIndex].view);
 
     _spreadsheet = SpreadsheetModel(
       activeSheetIndex: activeSheetIndex,
@@ -1191,7 +1302,7 @@ class SpreadsheetController extends ChangeNotifier {
       sheets: [
         SheetModel(
           name: "Sheet1",
-          rows: List.generate(
+          allRows: List.generate(
             100,
             (r) => RowModel(
               index: r,
@@ -1257,7 +1368,7 @@ class SpreadsheetController extends ChangeNotifier {
   }
 
   /// Applies [restored] (an old snapshot) but keeps the CURRENT sheet's
-  /// direction and default text style. Those are settings, not edits -
+  /// direction, default text style and appearance. Those are settings, not edits -
   /// and the backend leaves them alone on undo - so undoing a cell edit
   /// must not also flip RTL back or reset the default font.
   SpreadsheetModel _withCurrentSettings(
@@ -1272,11 +1383,17 @@ class SpreadsheetController extends ChangeNotifier {
       return restored;
     }
 
+    // Undo restores the DATA, not how this user happens to be looking at
+    // it: keep the current search/sort and re-apply it to the restored rows
+    // (their number may differ - e.g. when undoing a row insert).
     final sheets = List<SheetModel>.from(restored.sheets);
-    sheets[index] = sheets[index].copyWith(
-      isRtl: current.sheets[index].isRtl,
-      textDefaults: current.sheets[index].textDefaults,
-    );
+    sheets[index] = sheets[index]
+        .copyWith(
+          isRtl: current.sheets[index].isRtl,
+          textDefaults: current.sheets[index].textDefaults,
+          appearance: current.sheets[index].appearance,
+        )
+        .withView(current.sheets[index].view);
 
     return SpreadsheetModel(
       activeSheetIndex: index,
@@ -1322,7 +1439,7 @@ class SpreadsheetController extends ChangeNotifier {
 
     for (final changedCell in changedCells) {
       final position = FormulaDependencyGraph.positionFor(changedCell);
-      final cell = spreadsheet.activeSheet.rows[position.row]
+      final cell = spreadsheet.activeSheet.allRows[position.row]
           .cells[position.column];
       if (cell.formula != null) {
         cellsToRecalculate.add(changedCell);
@@ -1332,7 +1449,7 @@ class SpreadsheetController extends ChangeNotifier {
     var recalculatedSpreadsheet = spreadsheet;
     for (final address in cellsToRecalculate) {
       final position = FormulaDependencyGraph.positionFor(address);
-      final cell = recalculatedSpreadsheet.activeSheet.rows[position.row]
+      final cell = recalculatedSpreadsheet.activeSheet.allRows[position.row]
           .cells[position.column];
       final formula = cell.formula;
       if (formula == null) {
@@ -1363,6 +1480,10 @@ class SpreadsheetController extends ChangeNotifier {
     return recalculatedSpreadsheet;
   }
 
+  /// Replaces one cell. [row] is a CANONICAL row (an index into the
+  /// sheet's allRows - the same row numbers formulas use), NOT a position
+  /// in the currently shown rows; callers holding a shown row convert it
+  /// with [SheetModel.sourceRowOf] first.
   SpreadsheetModel _replaceCell(
     SpreadsheetModel spreadsheet,
     int row,
@@ -1370,20 +1491,14 @@ class SpreadsheetController extends ChangeNotifier {
     CellModel cell,
   ) {
     final sheet = spreadsheet.activeSheet;
-    final rows = List<RowModel>.from(sheet.rows);
-    final cells = List<CellModel>.from(rows[row].cells);
+    final current = sheet.allRows[row];
+    final cells = List<CellModel>.from(current.cells);
     cells[column] = cell;
-    rows[row] = RowModel(index: rows[row].index, cells: cells);
 
     final sheets = List<SheetModel>.from(spreadsheet.sheets);
-    sheets[spreadsheet.activeSheetIndex] = SheetModel(
-      name: sheet.name,
-      rows: rows,
-      headers: sheet.headers,
-      columnWidths: sheet.columnWidths,
-      isRtl: sheet.isRtl,
-      textDefaults: sheet.textDefaults,
-    );
+    sheets[spreadsheet.activeSheetIndex] = sheet.withSourceRows({
+      row: RowModel(index: current.index, cells: cells),
+    });
 
     return SpreadsheetModel(
       sheets: sheets,
@@ -1396,6 +1511,15 @@ class SpreadsheetController extends ChangeNotifier {
   // Cell editing
   // ============================================================
 
+  /// Sets one cell's content. [row] is a row of the grid as SHOWN (this
+  /// client's search/sort applied); it is converted to the canonical row
+  /// once, up front, and everything after that - the stored cell, formula
+  /// references and what is sent to the server - uses canonical rows.
+  ///
+  /// [value] is the cell's INPUT: either plain text or, if it starts with
+  /// "=", a formula. The input is what gets saved, so formulas are stored
+  /// as text and re-evaluated whenever the sheet is loaded (the computed
+  /// result is derived, never saved).
   void editCell({
     required int row,
     required int column,
@@ -1407,94 +1531,26 @@ class SpreadsheetController extends ChangeNotifier {
       return;
     }
 
-    final activeSheetIndex =
-        currentSpreadsheet.activeSheetIndex;
-
-    final currentSheet =
-        currentSpreadsheet.sheets[activeSheetIndex];
+    final activeSheetIndex = currentSpreadsheet.activeSheetIndex;
+    final currentSheet = currentSpreadsheet.sheets[activeSheetIndex];
 
     if (row < 0 || row >= currentSheet.rows.length) {
       return;
     }
 
-    final currentRow = currentSheet.rows[row];
+    final sourceRow = currentSheet.sourceRowOf(row);
+    final currentRow = currentSheet.allRows[sourceRow];
 
     if (column < 0 || column >= currentRow.cells.length) {
       return;
     }
 
-    debugPrint(
-      '[SpreadsheetController.editCell] target=($row,$column) '
-      'activeSheet=$activeSheetIndex value="$value"',
-    );
-    final references = RegExp(r'[A-Z]+[1-9][0-9]*').allMatches(value);
-    for (final match in references) {
-      final reference = match.group(0)!;
-      final positionMatch =
-          RegExp(r'^([A-Z]+)([1-9][0-9]*)$').firstMatch(reference);
-      if (positionMatch == null) {
-        continue;
-      }
-      var referenceColumn = 0;
-      for (final code in positionMatch.group(1)!.codeUnits) {
-        referenceColumn = referenceColumn * 26 + code - 64;
-      }
-      final referenceRow = int.parse(positionMatch.group(2)!) - 1;
-      if (referenceRow >= 0 &&
-          referenceRow < currentSheet.rows.length &&
-          referenceColumn - 1 >= 0 &&
-          referenceColumn - 1 < currentSheet.rows[referenceRow].cells.length) {
-        final referencedCell =
-            currentSheet.rows[referenceRow].cells[referenceColumn - 1];
-        debugPrint(
-          '[SpreadsheetController.editCell] referenced cell $reference: '
-          'value="${referencedCell.value}"; '
-          'formula="${referencedCell.formula}"',
-        );
-      } else {
-        debugPrint(
-          '[SpreadsheetController.editCell] referenced cell $reference: '
-          'does not exist in active sheet',
-        );
-      }
-      if (referenceRow == row && referenceColumn - 1 == column) {
-        debugPrint(
-          '[FormulaEngine.selfReference] target=($row,$column) '
-          'reference=$reference',
-        );
-      }
-    }
-
-    // ----------------------------------------------------------
-    // Record history point before mutation
-    // ----------------------------------------------------------
-
     _recordHistoryPoint();
 
-    // ----------------------------------------------------------
-    // Determine if input is a formula or normal value
-    // ----------------------------------------------------------
-
     final isFormula = _isFormula(value);
-    late final String newValue;
-    if (isFormula) {
-      debugPrint(
-        '[SpreadsheetController.formula] formula="$value" '
-        'target=($row,$column)',
-      );
-      newValue = _formulaEngine.evaluate(value, currentSpreadsheet);
-      debugPrint(
-        '[SpreadsheetController.formula.result] formula="$value" '
-        'result="$newValue"',
-      );
-    } else {
-      newValue = value;
-    }
+    final newValue =
+        isFormula ? _formulaEngine.evaluate(value, currentSpreadsheet) : value;
     final newFormula = isFormula ? value : null;
-
-    // ----------------------------------------------------------
-    // Create the new cell
-    // ----------------------------------------------------------
 
     final oldCell = currentRow.cells[column];
 
@@ -1508,61 +1564,13 @@ class SpreadsheetController extends ChangeNotifier {
       style: oldCell.style,
     );
 
-    // ----------------------------------------------------------
-    // Create a new cell list
-    // ----------------------------------------------------------
-
-    final newCells = List<CellModel>.from(
-      currentRow.cells,
-    );
-
+    final newCells = List<CellModel>.from(currentRow.cells);
     newCells[column] = newCell;
 
-    // ----------------------------------------------------------
-    // Create a new row
-    // ----------------------------------------------------------
-
-    final newRow = RowModel(
-      index: currentRow.index,
-      cells: newCells,
-    );
-
-    // ----------------------------------------------------------
-    // Create a new row list
-    // ----------------------------------------------------------
-
-    final newRows = List<RowModel>.from(
-      currentSheet.rows,
-    );
-
-    newRows[row] = newRow;
-
-    // ----------------------------------------------------------
-    // Create a new sheet
-    // ----------------------------------------------------------
-
-    final newSheet = SheetModel(
-      name: currentSheet.name,
-      rows: newRows,
-      headers: currentSheet.headers,
-      columnWidths: currentSheet.columnWidths,
-      isRtl: currentSheet.isRtl,
-      textDefaults: currentSheet.textDefaults,
-    );
-
-    // ----------------------------------------------------------
-    // Create a new sheet list
-    // ----------------------------------------------------------
-
-    final newSheets = List<SheetModel>.from(
-      currentSpreadsheet.sheets,
-    );
-
-    newSheets[activeSheetIndex] = newSheet;
-
-    // ----------------------------------------------------------
-    // Replace spreadsheet
-    // ----------------------------------------------------------
+    final newSheets = List<SheetModel>.from(currentSpreadsheet.sheets);
+    newSheets[activeSheetIndex] = currentSheet.withSourceRows({
+      sourceRow: RowModel(index: currentRow.index, cells: newCells),
+    });
 
     final updatedSpreadsheet = SpreadsheetModel(
       sheets: newSheets,
@@ -1574,7 +1582,7 @@ class SpreadsheetController extends ChangeNotifier {
       updatedSpreadsheet,
       {
         FormulaDependencyGraph.addressFor(
-          row: row,
+          row: sourceRow,
           column: column,
         ),
       },
@@ -1582,7 +1590,7 @@ class SpreadsheetController extends ChangeNotifier {
 
     notifyListeners();
 
-    _persistCellEdits([(row: row, column: column, value: newValue)]);
+    _persistCellEdits([(row: sourceRow, column: column, value: value)]);
   }
 
   /// The most recent background save failure (cell edit, paste, clear),
@@ -1608,16 +1616,14 @@ class SpreadsheetController extends ChangeNotifier {
   /// search, sort, switching sheets and back) silently overwrites it with
   /// the backend's still-unedited data - which is what "my edit
   /// disappeared after I did something else" looks like from the
-  /// outside. Each edit's `value` is the cell's already-evaluated display
-  /// value, not raw formula text - the backend has no concept of
-  /// formulas and just stores whatever value it's given.
+  /// outside. Each edit's `value` is the cell's INPUT - formula text such
+  /// as "=A1+A2" for a formula, otherwise the plain value - never a computed
+  /// result. The server stores it as typed (and writes it to the .xlsx as a
+  /// real formula); every client re-evaluates formulas itself on load, so
+  /// everyone sees the same results. Rows are CANONICAL rows (indices into
+  /// the sheet's allRows), not positions in whatever the user is currently
+  /// sorting or filtering.
   ///
-  /// Requests are sent concurrently (not one-at-a-time) since the backend
-  /// applies each by (row, column) independently and order between
-  /// different cells doesn't matter; only the first failure is surfaced
-  /// via [lastSaveError] even if several edits in the same batch fail, to
-  /// avoid stacking up redundant error messages for what's usually one
-  /// underlying cause (e.g. the connection dropping).
   void _persistCellEdits(
     List<({int row, int column, String value})> edits,
   ) {
@@ -1755,8 +1761,9 @@ class SpreadsheetController extends ChangeNotifier {
     // Create new rows
     // ----------------------------------------------------------
 
-    final newRows =
-        List<RowModel>.from(currentSheet.rows);
+    // The paste runs down the SHOWN rows; each is converted to the
+    // canonical row it really is, which is what gets changed and saved.
+    final replacements = <int, RowModel>{};
     final changedCells = <String>{};
     final pastedEdits = <({int row, int column, String value})>[];
 
@@ -1769,7 +1776,8 @@ class SpreadsheetController extends ChangeNotifier {
         break;
       }
 
-      final currentRow = currentSheet.rows[targetRow];
+      final sourceRow = currentSheet.sourceRowOf(targetRow);
+      final currentRow = currentSheet.allRows[sourceRow];
 
       final newCells =
           List<CellModel>.from(currentRow.cells);
@@ -1802,14 +1810,14 @@ class SpreadsheetController extends ChangeNotifier {
         );
         changedCells.add(
           FormulaDependencyGraph.addressFor(
-            row: targetRow,
+            row: sourceRow,
             column: targetColumn,
           ),
         );
-        pastedEdits.add((row: targetRow, column: targetColumn, value: pastedValue));
+        pastedEdits.add((row: sourceRow, column: targetColumn, value: pastedValue));
       }
 
-      newRows[targetRow] = RowModel(
+      replacements[sourceRow] = RowModel(
         index: currentRow.index,
         cells: newCells,
       );
@@ -1819,14 +1827,7 @@ class SpreadsheetController extends ChangeNotifier {
     // Create new sheet
     // ----------------------------------------------------------
 
-    final newSheet = SheetModel(
-      name: currentSheet.name,
-      rows: newRows,
-      headers: currentSheet.headers,
-      columnWidths: currentSheet.columnWidths,
-      isRtl: currentSheet.isRtl,
-      textDefaults: currentSheet.textDefaults,
-    );
+    final newSheet = currentSheet.withSourceRows(replacements);
 
     // ----------------------------------------------------------
     // Create new sheet list
@@ -1915,8 +1916,9 @@ class SpreadsheetController extends ChangeNotifier {
     // Create new rows
     // ----------------------------------------------------------
 
-    final newRows =
-        List<RowModel>.from(currentSheet.rows);
+    // The selection is a block of SHOWN rows; convert each to the
+    // canonical row it really is before changing or saving anything.
+    final replacements = <int, RowModel>{};
     final changedCells = <String>{};
     final clearedEdits = <({int row, int column, String value})>[];
 
@@ -1925,7 +1927,8 @@ class SpreadsheetController extends ChangeNotifier {
         break;
       }
 
-      final currentRow = currentSheet.rows[row];
+      final sourceRow = currentSheet.sourceRowOf(row);
+      final currentRow = currentSheet.allRows[sourceRow];
 
       final newCells =
           List<CellModel>.from(currentRow.cells);
@@ -1953,14 +1956,14 @@ class SpreadsheetController extends ChangeNotifier {
         );
         changedCells.add(
           FormulaDependencyGraph.addressFor(
-            row: row,
+            row: sourceRow,
             column: column,
           ),
         );
-        clearedEdits.add((row: row, column: column, value: ""));
+        clearedEdits.add((row: sourceRow, column: column, value: ""));
       }
 
-      newRows[row] = RowModel(
+      replacements[sourceRow] = RowModel(
         index: currentRow.index,
         cells: newCells,
       );
@@ -1970,14 +1973,7 @@ class SpreadsheetController extends ChangeNotifier {
     // Create new sheet
     // ----------------------------------------------------------
 
-    final newSheet = SheetModel(
-      name: currentSheet.name,
-      rows: newRows,
-      headers: currentSheet.headers,
-      columnWidths: currentSheet.columnWidths,
-      isRtl: currentSheet.isRtl,
-      textDefaults: currentSheet.textDefaults,
-    );
+    final newSheet = currentSheet.withSourceRows(replacements);
 
     // ----------------------------------------------------------
     // Create new sheet list

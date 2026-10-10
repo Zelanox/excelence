@@ -32,10 +32,41 @@ class _SpreadsheetSearchBarState extends State<SpreadsheetSearchBar> {
   Timer? _debounce;
   bool _isSearching = false;
 
+  /// The controller's search query as of the last notification, so a
+  /// CHANGE can be told apart from an unrelated rebuild.
+  String _lastSeenQuery = '';
+
   @override
   void initState() {
     super.initState();
     _textController.addListener(_handleTextChanged);
+    _lastSeenQuery = widget.spreadsheetController.searchQuery;
+    widget.spreadsheetController.addListener(_syncFromController);
+  }
+
+  /// Shows a search started from somewhere else (e.g. the status bar's
+  /// "Add row" field filtering by the value it just added) in the text
+  /// box. Skipped while the user's OWN typing is driving the search -
+  /// a pending debounce or a request in flight - otherwise the box could
+  /// be overwritten with an older query mid-keystroke.
+  void _syncFromController() {
+    final query = widget.spreadsheetController.searchQuery;
+
+    if (query == _lastSeenQuery) {
+      return;
+    }
+
+    _lastSeenQuery = query;
+
+    if (_isSearching || (_debounce?.isActive ?? false)) {
+      return;
+    }
+
+    if (query != _textController.text) {
+      // Programmatic assignment doesn't fire onChanged, so this can't
+      // trigger a second search.
+      _textController.text = query;
+    }
   }
 
   void _handleTextChanged() {
@@ -47,6 +78,7 @@ class _SpreadsheetSearchBarState extends State<SpreadsheetSearchBar> {
   @override
   void dispose() {
     _debounce?.cancel();
+    widget.spreadsheetController.removeListener(_syncFromController);
     _textController.removeListener(_handleTextChanged);
     _textController.dispose();
     super.dispose();

@@ -168,6 +168,15 @@ class Spreadsheet:
 
         return sheet.edit_cells(edits)
 
+    def append_row(self, first_value=None):
+
+        sheet = self.current_sheet()
+
+        if sheet is None:
+            return False
+
+        return sheet.append_row(first_value)
+
     def insert_row(self, index=None):
 
         sheet = self.current_sheet()
@@ -275,6 +284,33 @@ class Spreadsheet:
             values,
             reset
         )
+
+    def set_cell_style_ranges(
+        self,
+        ranges,
+        values=None,
+        reset=None
+    ):
+
+        sheet = self.current_sheet()
+
+        if sheet is None:
+            return False
+
+        return sheet.set_cell_style_ranges(ranges, values, reset)
+
+    def set_appearance(
+        self,
+        values=None,
+        reset=None
+    ):
+
+        sheet = self.current_sheet()
+
+        if sheet is None:
+            return False
+
+        return sheet.set_appearance(values, reset)
 
     def set_text_defaults(
         self,

@@ -492,3 +492,37 @@ def test_large_sheet_timing_smoke():
             f"20k rows x 5 cols: defaults {defaults_seconds:.2f}s, "
             f"whole-sheet bold {range_seconds:.2f}s, save+reopen {reopen_seconds:.2f}s"
         )
+
+
+# ----------------------------------------------------------------------
+# Several rectangles at once (a client-side sort/filter selects scattered rows)
+# ----------------------------------------------------------------------
+
+def test_set_cell_style_ranges_applies_every_range_as_one_undo_step():
+    with tempfile.TemporaryDirectory() as folder:
+        c = make_controller(folder)
+        assert c.set_cell_style_ranges([(0, 0, 0, 1), (2, 0, 3, 0)], {"bold": True}) is True
+        assert set(styles(c)) == {(0, 0), (0, 1), (2, 0), (3, 0)}
+        assert len(c.document.undo_stack) == 1
+        assert c.undo() is True
+        assert styles(c) == {}
+
+
+def test_set_cell_style_ranges_is_all_or_nothing():
+    with tempfile.TemporaryDirectory() as folder:
+        c = make_controller(folder)
+        assert c.set_cell_style_ranges([(0, 0, 0, 0), (9, 0, 9, 0)], {"bold": True}) is False   # 2nd out of range
+        assert c.set_cell_style_ranges([(0, 0, 0, 0)], {"color": "nope"}) is False
+        assert c.set_cell_style_ranges([], {"bold": True}) is False
+        assert c.set_cell_style_ranges([(0, 0, 0)], {"bold": True}) is False
+        assert c.set_cell_style_ranges([(0, 0, 0, True)], {"bold": True}) is False
+        assert styles(c) == {} and len(c.document.undo_stack) == 0
+
+
+def test_overlapping_ranges_are_harmless_and_the_single_rectangle_form_still_works():
+    with tempfile.TemporaryDirectory() as folder:
+        c = make_controller(folder)
+        assert c.set_cell_style_ranges([(0, 0, 1, 1), (1, 1, 2, 2)], {"italic": True}) is True
+        assert len(styles(c)) == 4 + 4 - 1
+        assert c.set_cell_style(3, 0, 3, 0, {"bold": True}) is True
+        assert styles(c)[(3, 0)] == {"bold": True}

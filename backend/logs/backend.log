@@ -2102,3 +2102,54 @@ re.PatternError: bad escape (end of pattern) at position 3
 2026-10-03 13:16:50,549 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
 2026-10-03 13:21:16,551 - INFO - document - Opened document test.xlsx
 2026-10-03 13:43:51,260 - INFO - document - Opened document test.xlsx
+2026-10-03 20:35:04,771 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-10-03 20:37:19,470 - INFO - document - Opened document test.xlsx
+2026-10-03 20:38:24,965 - INFO - document - Saved document test.xlsx
+2026-10-03 20:45:47,289 - INFO - document - Opened document نسخ احتياطي للفهرس - Copy.xlsx
+2026-10-03 20:50:29,906 - INFO - document - Saved document نسخ احتياطي للفهرس - Copy.xlsx
+2026-10-03 20:50:36,101 - INFO - document - Saved document نسخ احتياطي للفهرس - Copy.xlsx
+2026-10-03 20:50:49,936 - INFO - document - Saved document نسخ احتياطي للفهرس - Copy.xlsx
+2026-10-03 20:54:27,876 - INFO - document - Opened document test.xlsx
+2026-10-03 20:54:38,397 - INFO - document - Opened document نسخ احتياطي للفهرس - Copy.xlsx
+2026-10-04 18:26:52,206 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-10-04 18:29:05,969 - INFO - document - Opened document test.xlsx
+2026-10-04 19:04:58,675 - INFO - document - Opened document نسخ احتياطي للفهرس - Copy.xlsx
+2026-10-04 19:08:29,379 - INFO - document - Saved document نسخ احتياطي للفهرس - Copy.xlsx
+2026-10-04 19:08:45,016 - INFO - document - Saved document نسخ احتياطي للفهرس - Copy.xlsx
+2026-10-04 19:08:59,918 - INFO - document - Saved document نسخ احتياطي للفهرس - Copy.xlsx
+2026-10-04 19:11:48,261 - INFO - document - Saved document نسخ احتياطي للفهرس - Copy.xlsx
+2026-10-04 19:12:02,629 - INFO - document - Saved document نسخ احتياطي للفهرس - Copy.xlsx
+2026-10-04 19:49:48,028 - INFO - document - Saved document نسخ احتياطي للفهرس - Copy.xlsx
+2026-10-04 19:49:55,990 - INFO - document - Saved document نسخ احتياطي للفهرس - Copy.xlsx
+2026-10-04 19:50:10,723 - INFO - document - Saved document نسخ احتياطي للفهرس - Copy.xlsx
+2026-10-04 19:50:52,495 - INFO - document - Saved document نسخ احتياطي للفهرس - Copy.xlsx
+2026-10-04 19:52:18,731 - INFO - document - Saved document نسخ احتياطي للفهرس - Copy.xlsx
+2026-10-04 19:53:07,253 - INFO - document - Saved document نسخ احتياطي للفهرس - Copy.xlsx
+2026-10-04 19:53:09,694 - INFO - document - Saved document نسخ احتياطي للفهرس - Copy.xlsx
+2026-10-04 19:53:17,234 - INFO - document - Saved document نسخ احتياطي للفهرس - Copy.xlsx
+2026-10-04 19:53:22,013 - INFO - document - Saved document نسخ احتياطي للفهرس - Copy.xlsx
+2026-10-04 19:53:25,449 - INFO - document - Saved document نسخ احتياطي للفهرس - Copy.xlsx
+2026-10-04 19:53:50,324 - INFO - document - Saved document نسخ احتياطي للفهرس - Copy.xlsx
+2026-10-04 19:53:58,509 - INFO - document - Saved document نسخ احتياطي للفهرس - Copy.xlsx
+2026-10-04 19:54:10,078 - INFO - document - Saved document نسخ احتياطي للفهرس - Copy.xlsx
+2026-10-04 19:54:33,257 - INFO - document - Saved document نسخ احتياطي للفهرس - Copy.xlsx
+2026-10-05 13:44:44,265 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-10-05 13:47:25,465 - INFO - document - Opened document test.xlsx
+2026-10-05 13:48:12,884 - INFO - document - Opened document نسخ احتياطي للفهرس - Copy.xlsx
+2026-10-05 13:49:33,947 - INFO - document - Saved document نسخ احتياطي للفهرس - Copy.xlsx
+2026-10-05 13:49:41,992 - INFO - document - Saved document نسخ احتياطي للفهرس - Copy.xlsx
+2026-10-05 13:51:29,857 - INFO - document - Saved document نسخ احتياطي للفهرس - Copy.xlsx
+2026-10-05 13:51:43,870 - INFO - document - Saved document نسخ احتياطي للفهرس - Copy.xlsx
+2026-10-05 13:52:36,751 - INFO - document - Saved document نسخ احتياطي للفهرس - Copy.xlsx
+2026-10-05 13:52:56,396 - INFO - document - Saved document نسخ احتياطي للفهرس - Copy.xlsx
+2026-10-05 16:53:28,887 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-10-05 16:55:41,038 - INFO - document - Opened document test.xlsx
+2026-10-05 16:56:01,985 - INFO - document - Opened document نسخ احتياطي للفهرس - Copy.xlsx
+2026-10-05 16:56:17,695 - INFO - document - Saved document نسخ احتياطي للفهرس - Copy.xlsx
+2026-10-05 16:56:23,267 - INFO - document - Saved document نسخ احتياطي للفهرس - Copy.xlsx
+2026-10-06 16:35:18,125 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-10-06 16:37:47,040 - INFO - document - Opened document test.xlsx
+2026-10-06 16:37:56,387 - INFO - document - Opened document نسخ احتياطي للفهرس - Copy.xlsx
+2026-10-06 16:38:10,274 - INFO - document - Saved document نسخ احتياطي للفهرس - Copy.xlsx
+2026-10-06 16:38:13,337 - INFO - document - Saved document نسخ احتياطي للفهرس - Copy.xlsx
+2026-10-06 16:38:16,992 - INFO - document - Saved document نسخ احتياطي للفهرس - Copy.xlsx

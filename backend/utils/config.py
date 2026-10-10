@@ -18,7 +18,12 @@ else:
 
 CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
 
-DOCUMENTS_FOLDER = os.path.join(BASE_DIR, "data", "documents")
+# Where workbooks live. EXCELENCE_DOCUMENTS_DIR moves it (e.g. onto a data
+# disk of a shared server) without touching the code.
+DOCUMENTS_FOLDER = (
+    os.environ.get("EXCELENCE_DOCUMENTS_DIR", "").strip()
+    or os.path.join(BASE_DIR, "data", "documents")
+)
 
 logger = get_logger("config")
 logger.info("Using config file %s", CONFIG_FILE)

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/preferences/app_preferences.dart';
 import '../../spreadsheet/controllers/spreadsheet_controller.dart';
 import '../../spreadsheet/controllers/viewport_controller.dart';
 
@@ -119,6 +120,22 @@ class _QuickAddRowFieldState extends State<_QuickAddRowField> {
       await widget.spreadsheetController
           .appendRowWithFirstColumnValue(trimmed);
       _controller.clear();
+
+      // Optionally filter the sheet by what was just typed, so the new
+      // row (and any look-alikes) is right there to fill in. Its own
+      // try/catch: the row WAS added, so a failed search must not be
+      // reported as a failed add.
+      if (await const AppPreferences().getAutoSearchAfterAddRow()) {
+        try {
+          await widget.spreadsheetController.search(trimmed);
+        } catch (error) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Row added, but searching failed: $error')),
+            );
+          }
+        }
+      }
     } catch (error) {
       // Same convention as SpreadsheetGrid._showError: a snackbar, since
       // this is a direct user-initiated action awaiting its own result

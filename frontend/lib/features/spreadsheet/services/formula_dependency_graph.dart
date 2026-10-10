@@ -9,7 +9,7 @@ class FormulaDependencyGraph {
   ) {
     final sheet = spreadsheet.activeSheet;
 
-    for (final row in sheet.rows) {
+    for (final row in sheet.allRows) {
       for (final cell in row.cells) {
         final formula = cell.formula;
         if (formula == null) {

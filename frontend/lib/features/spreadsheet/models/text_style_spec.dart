@@ -10,6 +10,9 @@ import 'package:flutter/foundation.dart';
 /// ([mergedOver]); anything still unset after that falls through to the
 /// grid's built-in text style.
 ///
+/// Despite the name it also carries the cell FILL ([background]) - fill and
+/// font are applied, defaulted and undone together, so they share one type.
+///
 /// Field names in [toJson]/[fromJson] are the backend's snake_case names,
 /// and [bold]..[color] are also the keys used in a "reset" set - see
 /// [fieldBold] etc.
@@ -23,9 +26,14 @@ class TextStyleSpec {
     this.fontFamily,
     this.fontSize,
     this.color,
+    this.background,
   });
 
   static const TextStyleSpec empty = TextStyleSpec();
+
+  /// A [background] of this value means "explicitly no fill" - distinct
+  /// from null (inherit the sheet default / stripes).
+  static const String noFill = 'NONE';
 
   static const String fieldBold = 'bold';
   static const String fieldItalic = 'italic';
@@ -34,6 +42,7 @@ class TextStyleSpec {
   static const String fieldFontFamily = 'font_family';
   static const String fieldFontSize = 'font_size';
   static const String fieldColor = 'color';
+  static const String fieldBackground = 'background';
 
   static const Set<String> allFields = {
     fieldBold,
@@ -43,6 +52,7 @@ class TextStyleSpec {
     fieldFontFamily,
     fieldFontSize,
     fieldColor,
+    fieldBackground,
   };
 
   final bool? bold;
@@ -55,6 +65,9 @@ class TextStyleSpec {
   /// "RRGGBB", upper-case, no leading "#" (the backend's format).
   final String? color;
 
+  /// Cell fill: "RRGGBB", or [noFill].
+  final String? background;
+
   bool get isEmpty =>
       bold == null &&
       italic == null &&
@@ -62,7 +75,8 @@ class TextStyleSpec {
       strikethrough == null &&
       fontFamily == null &&
       fontSize == null &&
-      color == null;
+      color == null &&
+      background == null;
 
   /// Tolerant of missing/odd values - never throws on server data.
   factory TextStyleSpec.fromJson(Map<String, dynamic> json) {
@@ -80,6 +94,9 @@ class TextStyleSpec {
           ? (json[fieldFontSize] as num).toDouble()
           : null,
       color: json[fieldColor] is String ? json[fieldColor] as String : null,
+      background: json[fieldBackground] is String
+          ? json[fieldBackground] as String
+          : null,
     );
   }
 
@@ -93,6 +110,7 @@ class TextStyleSpec {
       if (fontFamily != null) fieldFontFamily: fontFamily,
       if (fontSize != null) fieldFontSize: fontSize,
       if (color != null) fieldColor: color,
+      if (background != null) fieldBackground: background,
     };
   }
 
@@ -106,6 +124,7 @@ class TextStyleSpec {
       fontFamily: fontFamily ?? base.fontFamily,
       fontSize: fontSize ?? base.fontSize,
       color: color ?? base.color,
+      background: background ?? base.background,
     );
   }
 
@@ -124,6 +143,8 @@ class TextStyleSpec {
       fontFamily: reset.contains(fieldFontFamily) ? null : merged.fontFamily,
       fontSize: reset.contains(fieldFontSize) ? null : merged.fontSize,
       color: reset.contains(fieldColor) ? null : merged.color,
+      background:
+          reset.contains(fieldBackground) ? null : merged.background,
     );
   }
 
@@ -136,7 +157,8 @@ class TextStyleSpec {
         other.strikethrough == strikethrough &&
         other.fontFamily == fontFamily &&
         other.fontSize == fontSize &&
-        other.color == color;
+        other.color == color &&
+        other.background == background;
   }
 
   @override
@@ -148,6 +170,7 @@ class TextStyleSpec {
         fontFamily,
         fontSize,
         color,
+        background,
       );
 
   @override

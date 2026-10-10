@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import '../../../core/api/api_client.dart';
+import '../models/sheet_appearance.dart';
 import '../models/text_style_spec.dart';
 
 /// One cell's own text-style overrides, in the coordinates of the grid as
@@ -27,6 +28,7 @@ class SpreadsheetData {
     this.isRtl = false,
     this.cellStyles = const [],
     this.textDefaults = TextStyleSpec.empty,
+    this.appearance = SheetAppearance.empty,
   });
 
   final List<String> headers;
@@ -37,6 +39,7 @@ class SpreadsheetData {
   final bool isRtl;
   final List<CellStyleEntry> cellStyles;
   final TextStyleSpec textDefaults;
+  final SheetAppearance appearance;
 
   factory SpreadsheetData.fromJson(Map<String, dynamic> json) {
     final rawHeaders = json['headers'] as List<dynamic>? ?? [];
@@ -44,6 +47,7 @@ class SpreadsheetData {
     final rawWidths = json['column_widths'] as Map<String, dynamic>? ?? {};
     final rawStyles = json['cell_styles'] as List<dynamic>? ?? [];
     final rawDefaults = json['text_defaults'] as Map<String, dynamic>? ?? {};
+    final rawAppearance = json['appearance'] as Map<String, dynamic>? ?? {};
 
     return SpreadsheetData(
       headers: rawHeaders.map((header) => header.toString()).toList(),
@@ -68,6 +72,7 @@ class SpreadsheetData {
             ),
       ],
       textDefaults: TextStyleSpec.fromJson(rawDefaults),
+      appearance: SheetAppearance.fromJson(rawAppearance),
     );
   }
 }
@@ -537,6 +542,18 @@ class SpreadsheetService {
     );
   }
 
+  /// Adds a row at the end of the data with [value] in its first cell, as
+  /// one atomic, undoable backend operation. Safe while a sort or filter
+  /// is active (unlike inserting a row and then editing "the last row",
+  /// which can't be addressed reliably in a sorted or filtered view).
+  Future<SpreadsheetData> appendRow(String value) {
+    return _postEdit(
+      '/spreadsheet/rows/append',
+      body: {'value': value},
+      failureMessage: 'Failed to add row',
+    );
+  }
+
   /// Undoes the backend's most recent content change. Fails (throws) if
   /// the backend has nothing to undo.
   Future<SpreadsheetData> undo() {
@@ -579,6 +596,47 @@ class SpreadsheetService {
         'reset': reset,
       },
       failureMessage: 'Failed to update cell formatting',
+    );
+  }
+
+  /// Sets or clears text-style fields on several rectangles of CANONICAL
+  /// cells in one request (one undo step on the server). Used because a
+  /// selection of shown rows may be scattered through the data when the
+  /// client has a sort or filter in place.
+  Future<SpreadsheetData> setCellStyles({
+    required List<({int startRow, int startColumn, int endRow, int endColumn})>
+        ranges,
+    required Map<String, dynamic> style,
+    required List<String> reset,
+  }) {
+    return _postEdit(
+      '/spreadsheet/cells/styles',
+      body: {
+        'ranges': [
+          for (final range in ranges)
+            {
+              'start_row': range.startRow,
+              'start_column': range.startColumn,
+              'end_row': range.endRow,
+              'end_column': range.endColumn,
+            },
+        ],
+        'style': style,
+        'reset': reset,
+      },
+      failureMessage: 'Failed to update cell formatting',
+    );
+  }
+
+  /// Sets or clears the active worksheet's grid color / alternating rows.
+  Future<SpreadsheetData> setAppearance({
+    required Map<String, dynamic> style,
+    required List<String> reset,
+  }) {
+    return _postEdit(
+      '/spreadsheet/appearance',
+      body: {'style': style, 'reset': reset},
+      failureMessage: 'Failed to update sheet appearance',
     );
   }
 

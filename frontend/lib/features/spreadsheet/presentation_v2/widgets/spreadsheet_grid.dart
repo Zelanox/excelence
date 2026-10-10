@@ -4,13 +4,16 @@ import 'package:two_dimensional_scrollables/two_dimensional_scrollables.dart';
 
 import '../../controllers/spreadsheet_controller.dart';
 import '../../controllers/viewport_controller.dart';
+import '../../fonts/font_catalog.dart';
 import '../../models/cell_position.dart';
+import '../../models/sheet_model.dart';
 import '../../models/text_style_spec.dart';
 import '../actions/text_format_actions.dart';
 import '../column_naming.dart';
 import 'grid_cell.dart';
 import 'grid_column_header.dart';
 import 'grid_row_header.dart';
+import 'vertical_scroll_strip.dart';
 
 /// The scrollable grid of column headers, row headers, and cells.
 ///
@@ -53,6 +56,10 @@ class SpreadsheetGrid extends StatefulWidget {
   static const double rowHeight = 28;
   static const double headerSize = 40;
   static const double addHandleSize = 20.0;
+
+  /// Width of the always-visible vertical scroll strip (see
+  /// VerticalScrollStrip), which sits beside the table.
+  static const double scrollStripWidth = 14.0;
 
   @override
   State<SpreadsheetGrid> createState() => _SpreadsheetGridState();
@@ -212,6 +219,15 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
   }
 
   String _referenceFor(int row, int column) {
+    // A reference names a cell of the DATA (A1 = first row of the data), so
+    // a row of the grid as shown is converted to the data row it really is -
+    // otherwise clicking a cell while writing a formula under a sort or
+    // filter would insert the wrong cell's name.
+    final sheet = widget.spreadsheetController.spreadsheet?.activeSheet;
+    if (sheet != null && row >= 0 && row < sheet.rows.length) {
+      row = sheet.sourceRowOf(row);
+    }
+
     return '${columnLetterName(column)}${row + 1}';
   }
 
@@ -466,6 +482,101 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
     widget.spreadsheetController.setColumnWidth(name: name, width: finalWidth);
   }
 
+  // --- Fit column to content (double-tap on a column's resize handle) ---
+
+  /// Room added around the widest text so a "fitted" column doesn't clip
+  /// or ellipsize it: the cell's own horizontal padding plus a margin.
+  static const double _fitPadding = 20;
+  static const double _fitMinWidth = 48;
+  static const double _fitMaxWidth = 600;
+
+  /// How many of the longest cells (by character count) are actually
+  /// measured. Measuring every cell of a big sheet would be slow, and the
+  /// widest cell is almost always among the longest strings.
+  static const int _fitCandidateCount = 40;
+
+  /// Sizes [column] to fit its widest content - Excel's double-click on a
+  /// column border - applies it immediately and saves it like a manual
+  /// resize (local update now, one backend write).
+  void _handleColumnAutoFit(int column) {
+    final sheet = widget.spreadsheetController.spreadsheet?.activeSheet;
+    if (sheet == null || column < 0 || column >= sheet.headers.length) {
+      return;
+    }
+
+    final name = sheet.headers[column];
+    final width = _fitColumnWidth(sheet, column);
+
+    widget.spreadsheetController.setColumnWidthLocal(name: name, width: width);
+    widget.spreadsheetController.setColumnWidth(name: name, width: width);
+  }
+
+  /// The width that fits the header and the widest cell text of [column],
+  /// measured with each cell's real style (bold, size, family), so a
+  /// column of large or bold text fits properly.
+  double _fitColumnWidth(SheetModel sheet, int column) {
+    double measure(String text, TextStyle style) {
+      final painter = TextPainter(
+        text: TextSpan(text: text, style: style),
+        textDirection: TextDirection.ltr,
+        maxLines: 1,
+      )..layout();
+      final width = painter.width;
+      painter.dispose();
+      return width;
+    }
+
+    // The header: its text (same style the header draws with) plus room
+    // for the sort arrow.
+    var widest = measure(
+          sheet.headers[column],
+          const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+        ) +
+        16;
+
+    // Keep the longest few cells, ascending by length so the shortest of
+    // them is always first and cheap to compare against.
+    final longest = <(String, TextStyleSpec)>[];
+
+    int byLength((String, TextStyleSpec) a, (String, TextStyleSpec) b) =>
+        a.$1.length.compareTo(b.$1.length);
+
+    for (final row in sheet.rows) {
+      if (column >= row.cells.length) {
+        continue;
+      }
+
+      final cell = row.cells[column];
+      final text = cell.value;
+
+      if (text.isEmpty) {
+        continue;
+      }
+
+      if (longest.length < _fitCandidateCount) {
+        longest.add((text, cell.style));
+        longest.sort(byLength);
+      } else if (text.length > longest.first.$1.length) {
+        longest[0] = (text, cell.style);
+        longest.sort(byLength);
+      }
+    }
+
+    for (final (text, style) in longest) {
+      final textStyle =
+          resolveCellTextStyle(style.mergedOver(sheet.textDefaults));
+      final width = measure(text, textStyle);
+
+      if (width > widest) {
+        widest = width;
+      }
+    }
+
+    return (widest + _fitPadding)
+        .clamp(_fitMinWidth, _fitMaxWidth)
+        .toDouble();
+  }
+
   void _refreshSheetBounds() {
     final sheet = widget.spreadsheetController.spreadsheet?.activeSheet;
     if (sheet == null) {
@@ -550,8 +661,17 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
       y: _verticalController.offset,
     );
 
-    final viewportSize = (context.findRenderObject() as RenderBox?)?.size;
-    if (viewportSize == null) return;
+    final fullSize = (context.findRenderObject() as RenderBox?)?.size;
+    if (fullSize == null) return;
+
+    // The scroll strip takes its own slice of the width beside the table,
+    // so the table's real viewport is that much narrower than this box.
+    final viewportSize = Size(
+      (fullSize.width - SpreadsheetGrid.scrollStripWidth)
+          .clamp(0, fullSize.width)
+          .toDouble(),
+      fullSize.height,
+    );
 
     // Subtract the pinned header row/row-number column from the
     // available body size, since ensureVisible's math is in terms of
@@ -838,7 +958,16 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
             return Directionality(
               textDirection:
                   sheet.isRtl ? TextDirection.rtl : TextDirection.ltr,
-              child: LayoutBuilder(
+              // A Row of [grid | scroll strip]. Under the RTL Directionality
+              // a Row lays its FIRST child out on the right, so the strip -
+              // the last child - lands on the LEFT in RTL and the RIGHT in
+              // LTR: always on the side opposite to where the data is
+              // anchored, flipping with the sheet's direction for free.
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: LayoutBuilder(
                 builder: (context, constraints) {
                   final maxWidth = constraints.maxWidth;
                   final totalWidth = _totalTableWidth();
@@ -925,6 +1054,7 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
                         onRenamingChanged: _setRenamingHeader,
                         onResize: (newWidth) => _handleColumnResize(column, newWidth),
                         onResizeEnd: (finalWidth) => _handleColumnResizeEnd(column, finalWidth),
+                        onAutoFit: () => _handleColumnAutoFit(column),
                       ),
                     );
                   }
@@ -1011,6 +1141,17 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
                     ),
                   );
                 },
+              ),
+                  ),
+                  // Its own strip of the layout (not drawn over the
+                  // cells), always visible. Redraws when rows are added or
+                  // removed as well as when the grid scrolls.
+                  VerticalScrollStrip(
+                    controller: _verticalController,
+                    refresh: widget.spreadsheetController,
+                    width: SpreadsheetGrid.scrollStripWidth,
+                  ),
+                ],
               ),
             );
           },

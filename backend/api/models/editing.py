@@ -59,6 +59,11 @@ class CellEditItem(BaseModel):
     value: Any = Field(..., description="New value for the cell.", json_schema_extra={"example": "Alice"})
 
 
+class AppendRowRequest(BaseModel):
+
+    value: str = Field(default="", description="Value for the new row's first cell. Leave empty for a blank row.", json_schema_extra={"example": "Alice"})
+
+
 class CellsEditRequest(BaseModel):
 
     edits: list[CellEditItem] = Field(..., min_length=1, description="Cells to update. Applied together as ONE undoable change; all-or-nothing.")
@@ -81,6 +86,8 @@ class TextStyleFields(BaseModel):
 
     color: str | None = Field(default=None, description="Text color as RRGGBB hex (a leading # is accepted).", json_schema_extra={"example": "FF0000"})
 
+    background: str | None = Field(default=None, description="Cell fill as RRGGBB hex, or NONE for explicitly no fill.", json_schema_extra={"example": "FFF2CC"})
+
 
 class CellStyleRequest(BaseModel):
 
@@ -93,6 +100,43 @@ class CellStyleRequest(BaseModel):
     end_column: int = Field(..., ge=0, description="Last column of the range (inclusive).")
 
     style: TextStyleFields = Field(default_factory=TextStyleFields, description="Fields to set on every cell in the range.")
+
+    reset: list[str] = Field(default_factory=list, description="Fields to return to 'inherit from the sheet default'.", json_schema_extra={"example": ["bold"]})
+
+
+class AppearanceFields(BaseModel):
+    """Sheet display settings to SET. Omitted/null fields are left unchanged."""
+
+    grid_color: str | None = Field(default=None, description="Grid line color as RRGGBB hex.", json_schema_extra={"example": "D0D0D0"})
+
+    banding: bool | None = Field(default=None, description="Alternating row colors on/off.")
+
+    banding_color: str | None = Field(default=None, description="Color of the alternate rows as RRGGBB hex.", json_schema_extra={"example": "F2F2F2"})
+
+
+class AppearanceRequest(BaseModel):
+
+    style: AppearanceFields = Field(default_factory=AppearanceFields, description="Settings to set.")
+
+    reset: list[str] = Field(default_factory=list, description="Settings to return to their built-in default.", json_schema_extra={"example": ["grid_color"]})
+
+
+class CellRange(BaseModel):
+
+    start_row: int = Field(..., ge=0, description="First row of the range.")
+
+    start_column: int = Field(..., ge=0, description="First column of the range.")
+
+    end_row: int = Field(..., ge=0, description="Last row of the range (inclusive).")
+
+    end_column: int = Field(..., ge=0, description="Last column of the range (inclusive).")
+
+
+class CellStylesRequest(BaseModel):
+
+    ranges: list[CellRange] = Field(..., min_length=1, description="Rectangles to style. Applied together as ONE undoable change; all-or-nothing.")
+
+    style: TextStyleFields = Field(default_factory=TextStyleFields, description="Fields to set on every cell in every range.")
 
     reset: list[str] = Field(default_factory=list, description="Fields to return to 'inherit from the sheet default'.", json_schema_extra={"example": ["bold"]})
 

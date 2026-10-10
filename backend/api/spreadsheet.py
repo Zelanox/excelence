@@ -39,6 +39,7 @@ def _grid_fields(controller: Controller) -> dict[str, Any]:
         "rtl": data.rtl,
         "cell_styles": data.cell_styles,
         "text_defaults": data.text_defaults,
+        "appearance": data.appearance,
         "undo_depth": data.undo_depth,
         "redo_depth": data.redo_depth,
     }
@@ -364,6 +365,25 @@ def set_rtl(
 
 
 @router.post(
+    "/rows/append",
+    response_model=SpreadsheetEditResponse
+)
+def append_row(
+    request: AppendRowRequest,
+    controller: Controller = Depends(get_controller)
+):
+    """Add a row at the end of the data, optionally filling its first cell."""
+    success = controller.append_row(request.value)
+
+    message = "Row added." if success else "Unable to add row."
+    return SpreadsheetEditResponse(
+        success=success,
+        message=message,
+        **_grid_fields(controller)
+    )
+
+
+@router.post(
     "/edit-cells",
     response_model=SpreadsheetEditResponse
 )
@@ -435,6 +455,51 @@ def set_cell_style(
     )
 
     message = "Cell style updated." if success else "Unable to update cell style."
+    return SpreadsheetEditResponse(
+        success=success,
+        message=message,
+        **_grid_fields(controller)
+    )
+
+
+@router.post(
+    "/cells/styles",
+    response_model=SpreadsheetEditResponse
+)
+def set_cell_styles(
+    request: CellStylesRequest,
+    controller: Controller = Depends(get_controller)
+):
+    """Set or clear text-style fields on several rectangles at once (one undo step)."""
+    success = controller.set_cell_style_ranges(
+        [(r.start_row, r.start_column, r.end_row, r.end_column) for r in request.ranges],
+        request.style.model_dump(exclude_none=True),
+        request.reset
+    )
+
+    message = "Cell styles updated." if success else "Unable to update cell styles."
+    return SpreadsheetEditResponse(
+        success=success,
+        message=message,
+        **_grid_fields(controller)
+    )
+
+
+@router.post(
+    "/appearance",
+    response_model=SpreadsheetEditResponse
+)
+def set_appearance(
+    request: AppearanceRequest,
+    controller: Controller = Depends(get_controller)
+):
+    """Set or clear the active worksheet's grid color / alternating row colors."""
+    success = controller.set_appearance(
+        request.style.model_dump(exclude_none=True),
+        request.reset
+    )
+
+    message = "Appearance updated." if success else "Unable to update appearance."
     return SpreadsheetEditResponse(
         success=success,
         message=message,

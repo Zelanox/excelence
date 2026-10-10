@@ -5,6 +5,7 @@ import '../../spreadsheet/controllers/viewport_controller.dart';
 import '../../spreadsheet/fonts/font_catalog.dart';
 import '../../spreadsheet/models/text_style_spec.dart';
 import '../../spreadsheet/presentation_v2/actions/text_format_actions.dart';
+import 'color_picker_dialog.dart';
 import 'font_options_dialog.dart';
 import 'settings_dialog.dart';
 
@@ -94,6 +95,75 @@ class Toolbar extends StatelessWidget {
             );
           }
 
+          // A color button: the icon with a bar underneath showing the
+          // active cell's current color (like Excel's font/fill buttons).
+          Widget colorButton({
+            required IconData icon,
+            required String tooltip,
+            required String? current,
+            required String title,
+            required String defaultLabel,
+            required bool allowNoFill,
+            required void Function(String? value) onPicked,
+          }) {
+            final bar = parseHexColor(current);
+
+            return IconButton(
+              tooltip: tooltip,
+              onPressed: hasCells
+                  ? () async {
+                      final result = await ColorPickerDialog.show(
+                        context,
+                        title: title,
+                        initial: current,
+                        defaultLabel: defaultLabel,
+                        allowNoFill: allowNoFill,
+                      );
+
+                      if (result != null) {
+                        onPicked(result.value);
+                      }
+                    }
+                  : null,
+              icon: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, size: 20),
+                  const SizedBox(height: 2),
+                  Container(
+                    width: 20,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: bar ?? Colors.transparent,
+                      border: bar == null
+                          ? Border.all(color: Colors.grey.shade400, width: 0.5)
+                          : null,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          // Applies a picker result for ONE style field to the selection:
+          // null means "back to inherit", anything else sets it.
+          void applyColor(String field, String? value) {
+            final set = value == null
+                ? TextStyleSpec.empty
+                : field == TextStyleSpec.fieldColor
+                    ? TextStyleSpec(color: value)
+                    : TextStyleSpec(background: value);
+
+            spreadsheetController.applyTextStyle(
+              startRow: selection.startRow,
+              startColumn: selection.startColumn,
+              endRow: selection.endRow,
+              endColumn: selection.endColumn,
+              set: set,
+              reset: value == null ? {field} : const {},
+            );
+          }
+
           return Row(
             children: [
               flagButton(
@@ -116,6 +186,26 @@ class Toolbar extends StatelessWidget {
                 tooltip: 'Strikethrough',
                 field: TextStyleSpec.fieldStrikethrough,
               ),
+              colorButton(
+                icon: Icons.format_color_text,
+                tooltip: 'Text color',
+                current: active.color,
+                title: 'Text color',
+                defaultLabel: 'Automatic',
+                allowNoFill: false,
+                onPicked: (value) =>
+                    applyColor(TextStyleSpec.fieldColor, value),
+              ),
+              colorButton(
+                icon: Icons.format_color_fill,
+                tooltip: 'Fill color',
+                current: active.background,
+                title: 'Fill color',
+                defaultLabel: 'Sheet default',
+                allowNoFill: true,
+                onPicked: (value) =>
+                    applyColor(TextStyleSpec.fieldBackground, value),
+              ),
               const SizedBox(width: 4),
               TextButton.icon(
                 icon: const Icon(Icons.text_fields),
@@ -134,6 +224,7 @@ class Toolbar extends StatelessWidget {
                           title: 'Font for selected cells',
                           initial: active,
                           resetLabel: 'Reset to sheet default',
+                          allowNoFill: true,
                         );
 
                         if (result == null || result.isEmpty) {

@@ -32,6 +32,7 @@ class GridColumnHeader extends StatefulWidget {
     this.onRenamingChanged,
     this.onResize,
     this.onResizeEnd,
+    this.onAutoFit,
   });
 
   final int columnIndex;
@@ -59,6 +60,11 @@ class GridColumnHeader extends StatefulWidget {
   /// where the parent grid actually persists the new width to the
   /// backend - see SpreadsheetGrid._handleColumnResizeEnd.
   final ValueChanged<double>? onResizeEnd;
+
+  /// Called when the resize handle is double-tapped: the parent grid
+  /// sizes this column to fit its widest content, as Excel does on a
+  /// double-click of a column border.
+  final VoidCallback? onAutoFit;
 
   @override
   State<GridColumnHeader> createState() => _GridColumnHeaderState();
@@ -309,8 +315,10 @@ class _GridColumnHeaderState extends State<GridColumnHeader> {
           child: Container(
             decoration: BoxDecoration(
               color: Colors.grey.shade200,
-              border: Border(
-                right: BorderSide(color: Colors.grey.shade400),
+              // The END edge (right in LTR, left in RTL) - the edge a
+              // column grows away from, and where the resize handle sits.
+              border: BorderDirectional(
+                end: BorderSide(color: Colors.grey.shade400),
                 bottom: BorderSide(color: Colors.grey.shade400),
               ),
             ),
@@ -360,14 +368,19 @@ class _GridColumnHeaderState extends State<GridColumnHeader> {
           ),
         ),
         if (widget.onResize != null)
+          // On the END edge: a column is laid out growing away from its
+          // start, so the end edge is the one that actually moves when the
+          // width changes - which is what a drag handle must sit on.
+          // (Right edge in LTR, left edge in RTL.)
           PositionedDirectional(
-            start: 0,
+            end: 0,
             top: 0,
             bottom: 0,
             child: _ResizeHandle(
               startWidth: widget.width,
               onResize: widget.onResize!,
               onResizeEnd: widget.onResizeEnd,
+              onAutoFit: widget.onAutoFit,
             ),
           ),
       ],
@@ -375,9 +388,9 @@ class _GridColumnHeaderState extends State<GridColumnHeader> {
   }
 }
 
-/// A narrow draggable strip on a column header's start edge (right edge
-/// in LTR, left edge in RTL - see PositionedDirectional above), Excel/
-/// Sheets-style. Reports a running candidate width via [onResize] on
+/// A narrow draggable strip on a column header's END edge (right edge in
+/// LTR, left edge in RTL - see PositionedDirectional above), Excel/
+/// Sheets-style. Double-tapping it fits the column to its content. Reports a running candidate width via [onResize] on
 /// every drag-move frame (for live visual feedback - see
 /// SpreadsheetGrid._handleColumnResize), then [onResizeEnd] exactly once
 /// when the drag completes (for backend persistence - see
@@ -393,11 +406,13 @@ class _ResizeHandle extends StatefulWidget {
     required this.startWidth,
     required this.onResize,
     this.onResizeEnd,
+    this.onAutoFit,
   });
 
   final double startWidth;
   final ValueChanged<double> onResize;
   final ValueChanged<double>? onResizeEnd;
+  final VoidCallback? onAutoFit;
 
   @override
   State<_ResizeHandle> createState() => _ResizeHandleState();
@@ -412,28 +427,23 @@ class _ResizeHandleState extends State<_ResizeHandle> {
   static const double _minWidth = 32.0;
 
   double? _dragStartWidth;
+  double _dragStartX = 0;
   double _liveWidth = 0;
   bool _isHovering = false;
 
-  /// True when dragging this handle in the negative-x (visually
-  /// leftward) direction should WIDEN the column, rather than narrow
-  /// it. This handle sits on the column's start edge (see
-  /// PositionedDirectional in GridColumnHeader.build) - in LTR that's
-  /// the column's own left edge, so dragging left narrows it (the
-  /// normal case, delta unchanged). In RTL, with the whole grid
-  /// mirrored under Directionality, the start edge is the column's
-  /// RIGHT edge instead, shared with the next column in reading order
-  /// - dragging that edge further left/negative is what widens the
-  /// column, so the raw pointer delta needs negating. Read from
-  /// Directionality.of(context) rather than threaded down as a prop,
-  /// since raw gesture deltas (details.localPosition.dx) are physical
-  /// screen coordinates that Directionality does NOT reinterpret on
-  /// its own, unlike layout widgets such as PositionedDirectional.
+  /// True when dragging this handle toward negative x (visually LEFT)
+  /// should WIDEN the column. The handle is on the column's END edge:
+  /// the right edge in LTR (drag right to widen) and the LEFT edge in RTL
+  /// (drag left to widen) - the column grows away from its start edge in
+  /// both. Read from Directionality rather than passed down, since raw
+  /// pointer positions are physical screen coordinates that Directionality
+  /// does not reinterpret by itself.
   bool get _dragIsReversed =>
       Directionality.of(context) == TextDirection.rtl;
 
   void _handleDragStart(DragStartDetails details) {
     _dragStartWidth = widget.startWidth;
+    _dragStartX = details.globalPosition.dx;
     _liveWidth = widget.startWidth;
   }
 
@@ -441,8 +451,12 @@ class _ResizeHandleState extends State<_ResizeHandle> {
     final startWidth = _dragStartWidth;
     if (startWidth == null) return;
 
-    final delta =
-        _dragIsReversed ? -details.localPosition.dx : details.localPosition.dx;
+    // Measured from where the pointer was at drag START, in GLOBAL
+    // coordinates. (localPosition would be relative to this handle, which
+    // moves as the column resizes, and starts out up to a handle-width
+    // away from the edge - making the column jump on the first frame.)
+    final movedX = details.globalPosition.dx - _dragStartX;
+    final delta = _dragIsReversed ? -movedX : movedX;
     final newWidth = (startWidth + delta)
         .clamp(_minWidth, double.infinity)
         .toDouble();
@@ -470,8 +484,11 @@ class _ResizeHandleState extends State<_ResizeHandle> {
         // A stray tap on the handle shouldn't fall through to the
         // header's own onTap (which toggles sort) - swallow it here.
         onTap: () {},
+        // Double-tap: fit the column to its content (Excel's
+        // double-click on a column border).
+        onDoubleTap: widget.onAutoFit,
         child: SizedBox(
-          width: 8,
+          width: 10,
           child: Center(
             child: Container(
               width: (_isHovering || _dragStartWidth != null) ? 2 : 1,

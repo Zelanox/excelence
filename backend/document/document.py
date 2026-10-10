@@ -4,7 +4,7 @@ import json
 import os
 import pandas as pd
 from openpyxl import Workbook
-from openpyxl.styles import Font
+from openpyxl.styles import Font, PatternFill
 from openpyxl.utils import get_column_letter
 from openpyxl.workbook.defined_name import DefinedName
 
@@ -13,7 +13,9 @@ from backend.models.spreadsheet_status import DocumentInfo, SpreadsheetData, Spr
 from backend.utils.config import DOCUMENTS_FOLDER
 from backend.utils.logger import get_logger
 
-from backend.models.cell_style import CellStyle
+from backend.models.cell_style import NO_FILL, CellStyle
+from backend.storage.app_state import AppState
+from backend.models.sheet_appearance import SheetAppearance
 from backend.models.spreadsheet import Spreadsheet
 from backend.models.sheet import Sheet, SheetSnapshot
 from backend.models.spreadsheet_row import SpreadsheetRow
@@ -30,6 +32,10 @@ logger = get_logger("document")
 # travels with the worksheet (survives a sheet rename) and Excel ignores
 # it. Per-cell overrides, by contrast, are stored as ordinary cell fonts.
 _TEXT_DEFAULTS_NAME = "_excelence_text_defaults"
+
+# Sheet-level display settings (grid color, alternating rows) live in a
+# second hidden name the same way - they have no Excel equivalent at all.
+_APPEARANCE_NAME = "_excelence_appearance"
 
 # How many undo steps the backend keeps per document. Each step is a full
 # copy of the active sheet's cells, so this bounds memory on big sheets.
@@ -81,6 +87,11 @@ class Document:
         self.loaded = False
         self.modified = False
 
+        # Which document was open last, and user preferences - kept on disk
+        # next to the documents so they survive restarts (see AppState for
+        # why this isn't the browser's storage).
+        self.app_state = AppState(lambda: self.documents_folder)
+
         # Undo/redo. Each entry is (sheet name, exact snapshot of that
         # sheet taken BEFORE a content change). History is exact because
         # it holds copies of the real data (so column types survive), and
@@ -114,6 +125,7 @@ class Document:
         self.filename = filename
         self.loaded = True
         self.modified = False
+        self.app_state.set_last_document(filename)
         logger.info("Opened document %s", filename)
         return True
 
@@ -163,6 +175,7 @@ class Document:
 
         self.loaded = True
         self.modified = True
+        self.app_state.set_last_document(filename)
         logger.info("Created document %s", filename)
         return True
 
@@ -269,6 +282,9 @@ class Document:
                 # switch would be wasted work.
                 sheet_model.text_defaults, sheet_model.cell_styles = (
                     self._read_text_styles(worksheet, dataframe.columns)
+                )
+                sheet_model.appearance = SheetAppearance.from_dict(
+                    self._read_hidden_json(worksheet, _APPEARANCE_NAME)
                 )
 
             sheet_model.bind(worksheet, dataframe.copy())
@@ -630,6 +646,37 @@ class Document:
 
         return True
 
+    def append_row(self, first_value: str | None = None) -> bool:
+        """
+        Add a row at the end of the data, optionally with its first cell
+        filled in, as ONE undoable change.
+
+        Unlike insert_row followed by edit_cell this is safe while a sort
+        or filter is active - see Sheet.append_row.
+
+        Returns:
+            True if the row was added, otherwise False.
+        """
+        if self.workbook is None:
+            return False
+
+        history_entry = self._capture_history()
+        success = self.spreadsheet.append_row(first_value)
+
+        if not success:
+            return False
+
+        self._commit_history(history_entry)
+
+        self._sync_from_active_sheet()
+        self._sync_active_sheet()
+
+        self.modified = True
+
+        self.search(self.search_text)
+
+        return True
+
     def insert_row(self, index: int | None = None) -> bool:
         """
         Insert a new row into the active document.
@@ -885,6 +932,70 @@ class Document:
         self.modified = True
         return True
 
+    def set_appearance(
+        self,
+        values: dict[str, Any] | None = None,
+        reset: list[str] | None = None,
+    ) -> bool:
+        """
+        Set or clear sheet-level display settings (grid color, banding).
+
+        These are settings rather than content edits: they are persisted
+        but are not part of undo history, and need no worksheet rebuild.
+
+        Returns:
+            True if the settings were updated, otherwise False.
+        """
+        if self.workbook is None:
+            return False
+
+        success = self.spreadsheet.set_appearance(values, reset)
+
+        if not success:
+            return False
+
+        active_sheet = self._active_sheet_model()
+
+        if active_sheet is not None and self.sheet is not None:
+            self._write_appearance(self.sheet, active_sheet)
+
+        self.modified = True
+        return True
+
+    def set_cell_style_ranges(
+        self,
+        ranges: list[tuple[int, int, int, int]],
+        values: dict[str, Any] | None = None,
+        reset: list[str] | None = None,
+    ) -> bool:
+        """
+        Set or clear text-style fields on several rectangles as ONE undoable change.
+
+        Args:
+            ranges: ``(start_row, start_column, end_row, end_column)`` tuples,
+                inclusive, in any corner order.
+
+        Returns:
+            True if the style was applied, otherwise False (nothing changed).
+        """
+        if self.workbook is None:
+            return False
+
+        history_entry = self._capture_history()
+        success = self.spreadsheet.set_cell_style_ranges(ranges, values, reset)
+
+        if not success:
+            return False
+
+        self._commit_history(history_entry)
+
+        # See set_cell_style: a style change can also REMOVE a font/fill, so
+        # the worksheet is rebuilt rather than patched in place.
+        self._sync_active_sheet()
+
+        self.modified = True
+        return True
+
     def set_text_defaults(
         self,
         values: dict[str, Any] | None = None,
@@ -1072,6 +1183,27 @@ class Document:
     # ==========================================================
     # File Management
     # ==========================================================
+
+    def last_document(self) -> str | None:
+        """
+        The document that was open most recently, if it can still be opened.
+
+        Returns None when nothing has been opened yet, or when the
+        remembered file has since been deleted/moved - callers then fall
+        back to their default rather than trying to open a file that isn't
+        there.
+        """
+        filename = self.app_state.get_last_document()
+
+        if filename is None:
+            return None
+
+        resolved = self._resolve_path(filename)
+
+        if resolved is None or not os.path.isfile(resolved):
+            return None
+
+        return filename
 
     def list_documents(self, folder: str = "") -> list[str]:
         """
@@ -1421,30 +1553,73 @@ class Document:
             color=("FF" + style.color) if style.color else None,
         )
 
+    def _fill_for_style(self, style: CellStyle) -> PatternFill | None:
+        """The solid fill for an effective style, or None for no fill."""
+        if style.background is None or style.background == NO_FILL:
+            return None
+
+        color = "FF" + style.background
+        return PatternFill(fill_type="solid", start_color=color, end_color=color)
+
+    @staticmethod
+    def _has_font_fields(style: CellStyle) -> bool:
+        return any(
+            getattr(style, name) is not None
+            for name in (
+                "bold", "italic", "underline", "strikethrough",
+                "font_family", "font_size", "color",
+            )
+        )
+
+    def _write_hidden_json(self, worksheet: Any, name: str, payload: dict | None) -> None:
+        """Store (or, for an empty payload, remove) a hidden worksheet-scoped JSON value."""
+        if not payload:
+            if name in worksheet.defined_names:
+                del worksheet.defined_names[name]
+            return
+
+        text = json.dumps(payload, separators=(",", ":"))
+        worksheet.defined_names[name] = DefinedName(
+            name,
+            attr_text='"' + text.replace('"', '""') + '"',
+            hidden=True,
+        )
+
+    def _read_hidden_json(self, worksheet: Any, name: str) -> Any:
+        """Read a value stored by _write_hidden_json; None if absent or unreadable."""
+        marker = worksheet.defined_names.get(name)
+
+        if marker is None or not isinstance(marker.attr_text, str):
+            return None
+
+        text = marker.attr_text.strip()
+
+        if len(text) < 2 or text[0] != '"' or text[-1] != '"':
+            return None
+
+        try:
+            return json.loads(text[1:-1].replace('""', '"'))
+        except ValueError:
+            return None
+
+    def _write_appearance(self, worksheet: Any, sheet_model: Sheet) -> None:
+        self._write_hidden_json(worksheet, _APPEARANCE_NAME, sheet_model.appearance.to_dict())
+
     def _write_text_styles(self, worksheet: Any, dataframe: pd.DataFrame, sheet_model: Sheet) -> None:
         """
-        Write a sheet's text styles onto its worksheet.
+        Write a sheet's cell styles (fonts and fills) onto its worksheet.
 
         Must run AFTER the worksheet's rows have been (re)written, since
         write_sheet clears every cell - and its styles - first. The sheet
-        default is stored in a hidden defined name (so a fresh
-        ``Excelence`` load can tell default from override) AND applied to
-        every data cell, merged under any per-cell override, so the file
-        also looks right when opened in real Excel. The header row is
-        left untouched.
+        default is stored in a hidden defined name (so a load can tell
+        default from override) AND applied to every data cell, merged
+        under any per-cell override, so the file also looks right when
+        opened in real Excel. The header row is left untouched. Sheet
+        appearance (grid color, banding) is written alongside.
         """
         defaults = sheet_model.text_defaults
-
-        if defaults.is_empty():
-            if _TEXT_DEFAULTS_NAME in worksheet.defined_names:
-                del worksheet.defined_names[_TEXT_DEFAULTS_NAME]
-        else:
-            payload = json.dumps(defaults.to_dict(), separators=(",", ":"))
-            worksheet.defined_names[_TEXT_DEFAULTS_NAME] = DefinedName(
-                _TEXT_DEFAULTS_NAME,
-                attr_text='"' + payload.replace('"', '""') + '"',
-                hidden=True,
-            )
+        self._write_hidden_json(worksheet, _TEXT_DEFAULTS_NAME, defaults.to_dict())
+        self._write_appearance(worksheet, sheet_model)
 
         overrides = sheet_model.cell_styles
 
@@ -1455,6 +1630,7 @@ class Document:
         column_index = {name: index + 1 for index, name in enumerate(columns)}
         row_count = len(dataframe)
         fonts: dict[tuple, Font] = {}
+        fills: dict[str, PatternFill | None] = {}
 
         def font_for(style: CellStyle) -> Font:
             key = tuple(sorted(style.to_dict().items()))
@@ -1464,6 +1640,23 @@ class Document:
 
             return fonts[key]
 
+        def fill_for(style: CellStyle) -> PatternFill | None:
+            key = style.background or ""
+
+            if key not in fills:
+                fills[key] = self._fill_for_style(style)
+
+            return fills[key]
+
+        def apply(cell: Any, style: CellStyle) -> None:
+            if self._has_font_fields(style):
+                cell.font = font_for(style)
+
+            fill = fill_for(style)
+
+            if fill is not None:
+                cell.fill = fill
+
         if not defaults.is_empty():
             # Every data cell carries the default (plus its override, if any).
             for position in range(row_count):
@@ -1472,7 +1665,7 @@ class Document:
                 for name, column in column_index.items():
                     override = row_overrides.get(name)
                     style = override.merged_over(defaults) if override else defaults
-                    worksheet.cell(row=position + 2, column=column).font = font_for(style)
+                    apply(worksheet.cell(row=position + 2, column=column), style)
 
             return
 
@@ -1486,7 +1679,7 @@ class Document:
                 if column is None:
                     continue
 
-                worksheet.cell(row=position + 2, column=column).font = font_for(override)
+                apply(worksheet.cell(row=position + 2, column=column), override)
 
     def _read_text_styles(
         self,
@@ -1504,19 +1697,7 @@ class Document:
         elsewhere is picked up too. Never raises on odd input: a foreign
         or hand-edited file must still open.
         """
-        defaults = CellStyle()
-        marker = worksheet.defined_names.get(_TEXT_DEFAULTS_NAME)
-
-        if marker is not None and isinstance(marker.attr_text, str):
-            text = marker.attr_text.strip()
-
-            if len(text) >= 2 and text[0] == '"' and text[-1] == '"':
-                try:
-                    defaults = CellStyle.from_dict(
-                        json.loads(text[1:-1].replace('""', '"'))
-                    )
-                except ValueError:
-                    defaults = CellStyle()
+        defaults = CellStyle.from_dict(self._read_hidden_json(worksheet, _TEXT_DEFAULTS_NAME))
 
         columns = [str(header) for header in headers]
         overrides: dict[int, dict[str, CellStyle]] = {}
@@ -1537,9 +1718,17 @@ class Document:
         for row in worksheet.iter_rows(min_row=2, max_col=len(columns)):
             for cell in row:
                 if not cell.has_style:
+                    # With a default fill in force every ordinary cell
+                    # carries it, so a cell with no style at all can only
+                    # be one that was explicitly cleared to "no fill".
+                    if effective.background not in (None, NO_FILL):
+                        overrides.setdefault(cell.row - 2, {})[
+                            columns[cell.column - 1]
+                        ] = CellStyle(background=NO_FILL)
+
                     continue
 
-                override = self._font_override(cell.font, effective)
+                override = self._style_override(cell, effective)
 
                 if override.is_empty():
                     continue
@@ -1548,8 +1737,9 @@ class Document:
 
         return defaults, overrides
 
-    def _font_override(self, font: Any, effective: CellStyle) -> CellStyle:
-        """The fields in which ``font`` differs from the ``effective`` base."""
+    def _style_override(self, cell: Any, effective: CellStyle) -> CellStyle:
+        """The style fields in which ``cell`` differs from the ``effective`` base."""
+        font = cell.font
         found: dict[str, Any] = {}
 
         for field_name, value in (
@@ -1582,6 +1772,25 @@ class Document:
 
             if rgb != (effective.color or _BASE_FONT_COLOR):
                 found["color"] = rgb
+
+        # Fill: only solid RGB fills are understood (theme/indexed/pattern
+        # fills from other tools are ignored rather than guessed at).
+        fill = cell.fill
+        filled = None
+
+        if fill is not None and fill.fill_type == "solid":
+            start = fill.start_color
+
+            if start is not None and start.type == "rgb" and isinstance(start.rgb, str):
+                filled = start.rgb[-6:].upper()
+
+        if filled is not None:
+            if filled != effective.background:
+                found["background"] = filled
+        elif effective.background not in (None, NO_FILL):
+            # The sheet default has a fill but this cell has none: it was
+            # explicitly cleared.
+            found["background"] = NO_FILL
 
         # from_dict drops anything invalid (e.g. an out-of-range size)
         # instead of raising.

@@ -41,6 +41,9 @@ class SpreadsheetData:
     # The sheet-wide default text style (set fields only).
     text_defaults: dict[str, Any] = field(default_factory=dict)
 
+    # Sheet-level display settings (grid color, alternating rows).
+    appearance: dict[str, Any] = field(default_factory=dict)
+
     # How many undo / redo steps the backend currently holds. Clients keep
     # their own local history for instant feedback; comparing these counts
     # against it is how a client notices the two have drifted apart.
