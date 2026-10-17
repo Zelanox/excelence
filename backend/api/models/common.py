@@ -32,6 +32,8 @@ class DocumentResponse(ApiResponse):
 
     modified: bool = Field(default=False, description="Whether the document has unsaved changes.")
 
+    session: str | None = Field(default=None, description="Session id to send as the X-Document header on later requests. Null for a client that sent no identity (the legacy single-document mode).")
+
 
 class SpreadsheetResponse(ApiResponse):
 
@@ -50,6 +52,10 @@ class SpreadsheetResponse(ApiResponse):
     column_widths: dict[str, float] = Field(default_factory=dict, description="Column name to display width, for columns with an explicitly set width.")
 
     rtl: bool = Field(default=False, description="Whether the active worksheet is right-to-left.")
+
+    row_ids: list[str] = Field(default_factory=list, description="Stable ID of each visible row, in the same order as `rows`. Does not change when other rows are inserted or deleted; reassigned when the document is loaded.")
+
+    column_ids: list[str] = Field(default_factory=list, description="Stable ID of each visible column, in the same order as `headers`. Does not change when a column is renamed or others are inserted or deleted; reassigned when the document is loaded.")
 
     cell_styles: list[dict[str, Any]] = Field(default_factory=list, description="Per-cell text-style overrides: {row, column, style}, in the coordinates of the visible grid.")
 

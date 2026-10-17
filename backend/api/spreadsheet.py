@@ -37,6 +37,8 @@ def _grid_fields(controller: Controller) -> dict[str, Any]:
         "column_count": data.column_count,
         "column_widths": data.column_widths,
         "rtl": data.rtl,
+        "row_ids": data.row_ids,
+        "column_ids": data.column_ids,
         "cell_styles": data.cell_styles,
         "text_defaults": data.text_defaults,
         "appearance": data.appearance,

@@ -135,7 +135,13 @@ class SpreadsheetService {
 
   final ApiClient _api;
 
+  /// Opens (joins) [filename]. The server hands back a session id, which is
+  /// remembered on the API client so every later request is for this
+  /// document; a server without sessions returns none and nothing changes.
   Future<void> openDocument(String filename) async {
+    // A previous document's session must not ride along on this request.
+    _api.documentSession = null;
+
     final response = await _api.post(
       '/documents/open',
       body: {
@@ -159,9 +165,13 @@ class SpreadsheetService {
             : 'Failed to open document.',
       );
     }
+
+    _api.documentSession = json['session'] as String?;
   }
 
   Future<void> createDocument(String filename) async {
+    _api.documentSession = null;
+
     final response = await _api.post(
       '/documents/create',
       body: {
@@ -185,6 +195,8 @@ class SpreadsheetService {
             : 'Failed to create document.',
       );
     }
+
+    _api.documentSession = json['session'] as String?;
   }
 
   /// Uploads [bytes] (an already-complete .xlsx file's raw content,
@@ -376,7 +388,23 @@ class SpreadsheetService {
     }
   }
 
-  Future<void> closeDocument() async {}
+  /// Leaves the shared document this client is in (a no-op if it isn't in
+  /// one). When the last person leaves, the server saves and releases it.
+  /// Best effort: failing to say goodbye must never block what the user is
+  /// doing next - the server drops silent clients on its own.
+  Future<void> closeDocument() async {
+    if (_api.documentSession == null) {
+      return;
+    }
+
+    try {
+      await _api.post('/documents/close');
+    } catch (_) {
+      // Ignored on purpose; see above.
+    } finally {
+      _api.documentSession = null;
+    }
+  }
 
   Future<void> reloadDocument() async {}
 

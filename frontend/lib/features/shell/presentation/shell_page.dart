@@ -48,6 +48,7 @@ class _ShellPageState extends State<ShellPage> with WidgetsBindingObserver {
     final api = ApiClient(
       baseUrl: ApiConfig.baseUrl,
       accessToken: ApiConfig.accessToken.isEmpty ? null : ApiConfig.accessToken,
+      clientName: ApiConfig.clientName.isEmpty ? null : ApiConfig.clientName,
     );
     final service = SpreadsheetService(api);
 

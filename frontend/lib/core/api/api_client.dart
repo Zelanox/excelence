@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:http/http.dart' as http;
 
@@ -6,9 +7,39 @@ class ApiClient {
   ApiClient({
     required this.baseUrl,
     this.accessToken,
-  });
+    this.clientName,
+    String? clientId,
+  }) : clientId = clientId ?? _newClientId();
 
   final String baseUrl;
+
+  /// Identifies THIS running copy of the app to the server (a fresh random
+  /// id each launch, so two tabs are two clients). Sent on every request as
+  /// `X-Client-Id`; it is what lets the server put several people in one
+  /// shared document and tell them apart. 24 hex characters, which fits the
+  /// server's 8-64 letters/digits/-/_ rule.
+  final String clientId;
+
+  /// How this client is shown to others in a shared document. Sent
+  /// percent-encoded (HTTP headers are ASCII; names may not be) as
+  /// `X-Client-Name`. Null/blank means the server shows "Guest".
+  String? clientName;
+
+  /// The id of the shared document session this client is in, handed back
+  /// by the server when a document is opened. Sent as `X-Document` so every
+  /// later request runs against that document. Null before a document is
+  /// open - and always null against a server that doesn't have sessions,
+  /// which then simply behaves as it always did.
+  String? documentSession;
+
+  static String _newClientId() {
+    final random = Random.secure();
+
+    return List.generate(
+      12,
+      (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0'),
+    ).join();
+  }
 
   /// Sent as `Authorization: Bearer <token>` on every request when set -
   /// needed when the server was started with EXCELENCE_ACCESS_TOKEN.
@@ -22,9 +53,16 @@ class ApiClient {
   Map<String, String> _headers({bool json = false}) {
     final token = accessToken;
 
+    final name = clientName?.trim();
+    final session = documentSession;
+
     return {
       if (json) 'Content-Type': 'application/json',
       if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+      'X-Client-Id': clientId,
+      if (name != null && name.isNotEmpty)
+        'X-Client-Name': Uri.encodeComponent(name),
+      if (session != null && session.isNotEmpty) 'X-Document': session,
     };
   }
 

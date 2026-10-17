@@ -1,12 +1,17 @@
+from contextlib import asynccontextmanager
+
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
 
 from backend.api.status import router as status_router
 from backend.api.documents import router as documents_router
 from backend.api.spreadsheet import router as spreadsheet_router
 from backend.api.app_state import router as app_state_router
+from backend.api.sessions import router as sessions_router
+from backend.dependencies import registry
 from backend.api.models.common import ErrorResponse
 from backend.utils.logger import get_logger
 from backend.utils.settings import LOCALHOST_ORIGIN_REGEX, load_settings, token_matches
@@ -26,7 +31,22 @@ def require_access_token(request: Request) -> None:
         )
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Run code around the server's life: nothing at start, a save at stop.
+
+    Replaces app.add_event_handler("shutdown", ...), which newer versions of
+    Starlette (the library FastAPI is built on) no longer provide.
+    """
+    yield
+
+    # Save any unsaved work when the server stops, so a shutdown can't lose
+    # what autosave hadn't written yet.
+    await run_in_threadpool(registry.save_all)
+
+
 app = FastAPI(
+    lifespan=lifespan,
     dependencies=[Depends(require_access_token)],
     title="Excelence Backend",
     version="1.0.0",
@@ -55,6 +75,7 @@ app.include_router(status_router)
 app.include_router(documents_router)
 app.include_router(spreadsheet_router)
 app.include_router(app_state_router)
+app.include_router(sessions_router)
 
 
 @app.exception_handler(RequestValidationError)

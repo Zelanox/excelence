@@ -242,6 +242,11 @@ class SpreadsheetController extends ChangeNotifier {
       // yet written to disk would be lost - save it first.
       await flushPendingChanges();
 
+      // Leave the document we were in (if any) before joining another, so
+      // the server can release it once nobody is left. Opening the SAME
+      // document again therefore reloads it from disk, as it always did.
+      await _service.closeDocument();
+
       // 1. Ask the backend to open the workbook.
       await _service.openDocument(filename);
 

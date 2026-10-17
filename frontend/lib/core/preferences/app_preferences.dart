@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api/api_client.dart';
@@ -36,6 +37,29 @@ class AppPreferences {
   /// storage only.
   static void useBackend(ApiClient client) {
     _backend = client;
+  }
+
+  /// Runs a read against local storage, treating ANY failure as "nothing
+  /// stored". Local storage is only a fallback and a convenience: if the
+  /// platform has no implementation (as in widget tests), or the browser
+  /// blocks storage, startup must carry on rather than crash.
+  Future<T?> _read<T>(Future<T?> Function(SharedPreferencesAsync prefs) read) async {
+    try {
+      return await read(_prefs);
+    } catch (error) {
+      debugPrint('[AppPreferences] local storage unavailable: $error');
+      return null;
+    }
+  }
+
+  /// The write counterpart of [_read]: failing to REMEMBER something must
+  /// never break the action that triggered it.
+  Future<void> _write(Future<void> Function(SharedPreferencesAsync prefs) write) async {
+    try {
+      await write(_prefs);
+    } catch (error) {
+      debugPrint('[AppPreferences] could not save to local storage: $error');
+    }
   }
 
   /// The backend's saved state, or null if it can't be reached - callers
@@ -88,7 +112,7 @@ class AppPreferences {
       return remembered;
     }
 
-    return _prefs.getString(_lastOpenedDocumentKey);
+    return _read<String>((prefs) => prefs.getString(_lastOpenedDocumentKey));
   }
 
   /// Whether adding a row from the status bar should then filter the
@@ -104,11 +128,11 @@ class AppPreferences {
       return preferences[_autoSearchAfterAddRowKey] as bool;
     }
 
-    return (await _prefs.getBool(_autoSearchAfterAddRowKey)) ?? true;
+    return (await _read<bool>((prefs) => prefs.getBool(_autoSearchAfterAddRowKey))) ?? true;
   }
 
   Future<void> setAutoSearchAfterAddRow(bool enabled) async {
-    await _prefs.setBool(_autoSearchAfterAddRowKey, enabled);
+    await _write((prefs) => prefs.setBool(_autoSearchAfterAddRowKey, enabled));
     await _writeBackendPreference(_autoSearchAfterAddRowKey, enabled);
   }
 
@@ -118,6 +142,6 @@ class AppPreferences {
   /// failure, since a failed open shouldn't become "the" document to
   /// retry on next launch.
   Future<void> setLastOpenedDocument(String filename) {
-    return _prefs.setString(_lastOpenedDocumentKey, filename);
+    return _write((prefs) => prefs.setString(_lastOpenedDocumentKey, filename));
   }
 }

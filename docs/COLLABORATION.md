@@ -226,11 +226,79 @@ Each phase is useful on its own and can be checked before the next starts.
 | 0 | Run as two apps: configurable address, CORS, optional shared token | **done** |
 | 1 | **Client-side sort/filter.** The client keeps the full ("canonical") rows and derives its own view; the server no longer sorts or filters for it. Every edit, paste, clear, format, insert and delete converts the *shown* row to the *data* row first. The row gutter shows data row numbers. | **done** (server verified; Flutter side needs a manual test) |
 | 2 | **Formulas stored as text.** The cell's input (`=SUM(A1:A3)`) is what is saved, written to the `.xlsx` as a real Excel formula, and re-evaluated by every client on load. The server rewrites stored formulas when rows/columns are inserted or deleted. | **done** (same note) |
-| 3 | **Document sessions**: one in-memory session per open document, per-session locks, client identity | next |
-| 4 | **Stable row IDs and an operation log** (revision-numbered, canonical operations) | |
+| 3 | **Document sessions**: one in-memory session per open document, per-session locks, client identity | **done** (server verified; Flutter side needs a manual test) |
+| 4a | **Stable row and column IDs** in the server model and the grid payload | **done on the server** (Sheet-level tests pass; Document-level tests and the Flutter side still to be run by hand) |
+| 4b | **Operation log**: revision-numbered canonical operations addressed by those IDs | |
 | 5 | **WebSocket broadcast**, optimistic apply, reconnect catch-up, presence ("who is here") | |
 | 6 | **Per-user undo** via inverse operations (replaces snapshot undo) | |
 | 7 | Accounts, permissions, share links, HTTPS hosting (not needed for a small trusted team) | later |
+
+### Phase 3 in detail: sessions
+
+A **session** is one open document together with its own lock and the list of clients in it.
+
+* Everyone who opens the same file **joins the same in-memory document** (it is loaded from disk
+  only if nobody has it open), so people see each other's unsaved changes and never overwrite
+  each other. Different files are independent sessions with independent locks.
+* The server now knows who is in each document: `GET /sessions` lists every open document and
+  its clients (the data behind "who is here").
+* A client announces itself with headers on every request:
+
+  | Header | Meaning |
+  |---|---|
+  | `X-Client-Id` | random id for this running copy of the app (a new one each launch) |
+  | `X-Client-Name` | display name, percent-encoded (headers are ASCII; names may be Arabic) |
+  | `X-Document` | the **session id** the server returned when the document was opened |
+
+  The session id is opaque rather than the file name, again because file names can be non-ASCII.
+* **Leaving:** closing/opening another document leaves the session. When the last client leaves,
+  the document is saved and released. A client silent for 2 minutes counts as gone.
+* **Idle clients are re-attached transparently.** If a session was released while its client was
+  idle, the next request re-opens it from disk (it was saved on release) - nothing is lost and
+  no error is shown. Only a *server restart* produces a `409 SESSION_NOT_OPEN`; reopen the
+  document (reload the page).
+* **Safety rules:** a file open in a shared session can't be deleted, renamed or overwritten by
+  an upload; creating a document won't replace an existing one (and must end in `.xlsx`, or it
+  would never appear in the document list); a failed save keeps the session open instead of
+  discarding work; shutting the server down saves every modified session.
+* **Old clients keep working.** A request with no identity uses a single "default" session that
+  behaves exactly like the old global document. Mixing old and new clients on the *same file* is
+  refused, so two in-memory copies can't drift apart.
+
+Known limits until later phases: the last-opened document and preferences are still stored
+server-wide (so with several people they are shared - they need a per-user identity); autosave
+is still done by every client (harmless, wasteful); the session id is not a secret, and the
+shared token remains the only protection.
+
+### Phase 4a in detail: stable row and column IDs
+
+Every grid payload (`/spreadsheet/data` and every response that returns the grid) now carries
+`row_ids` (one per row in `rows`) and `column_ids` (one per column in `headers`). Nothing in the
+Flutter client reads them yet, so this phase changes no behaviour.
+
+* **What an ID is.** A string such as `r17` or `c3`, unique within its sheet. A row's ID does not
+  change when rows are inserted or deleted above it, or when the sheet is sorted or searched. A column's
+  ID does not change when it is renamed or when columns are inserted or deleted before it.
+* **Never reused.** Counters only go up, and undo does not rewind them, so a deleted row's or
+  column's ID is never given to a new one in the same session. Undo of a delete brings back the
+  same row with the same ID.
+* **Reassigned on load.** IDs are not saved in the `.xlsx`. After a server restart, or when a
+  document is reopened from disk, every row and column gets a fresh ID, and clients reload the
+  document. (Decided: this is simpler and enough for a small trusted team.)
+* **Where they live.** `Sheet.row_ids` (parallel to the dataframe rows) and `Sheet.column_ids`
+  (column name to ID). Cell styles, column widths and formulas are still stored by position and
+  by name, exactly as before: the IDs are a translation layer, so the server can turn an ID into a
+  position or a name at the moment it applies a change. `Sheet.row_position`, `row_id_at`,
+  `column_name` and `column_id` do that translation.
+* **Repair rule.** `Sheet.ensure_ids()` runs before every structural edit and whenever IDs are
+  read. If the number of IDs no longer matches the number of rows (a dataframe replaced from
+  outside the structural methods), every row gets a fresh ID, because there is no way to know which
+  row is which. Any new structural operation on `Sheet` must keep `row_ids` and `column_ids` in step.
+* **Known limit.** `Document.dataframe_to_spreadsheet()` re-reads sheets from the worksheet when
+  switching sheets. If a sheet has trailing blank rows (which openpyxl drops on save), its row
+  count differs after the re-read and that sheet's row IDs are reassigned. Phase 4b has to settle
+  this, because live sync of all sheets needs stable IDs on every sheet, not just the active one.
+* **Sheet IDs** are not part of 4a; they come with the operation log in 4b.
 
 ### Why the order changed
 

@@ -28,6 +28,10 @@ class SheetSnapshot:
     dataframe: pd.DataFrame
     cell_styles: dict[int, dict[str, CellStyle]]
     column_widths: dict[str, float]
+    # Row and column IDs travel with the content they name, so undoing a
+    # delete brings the same row (and the same ID) back.
+    row_ids: list[str] = field(default_factory=list)
+    column_ids: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -72,12 +76,31 @@ class Sheet:
     # cell content, not part of undo. See SheetAppearance.
     appearance: SheetAppearance = field(default_factory=SheetAppearance)
     cell_styles: dict[int, dict[str, CellStyle]] = field(default_factory=dict)
+    # Stable identifiers, assigned by the server, so that a change can name
+    # a row or column independently of where it currently sits.
+    #
+    # row_ids is parallel to the dataframe: row_ids[n] names dataframe row
+    # POSITION n. column_ids maps a column NAME to its ID. Storage stays
+    # keyed by position / name (cell_styles, column_widths, formulas); the
+    # IDs are a translation layer on top, and every structural edit below
+    # keeps them in step. This is one more parallel representation, so
+    # any new structural operation must update it too (see ensure_ids).
+    #
+    # IDs are reassigned every time a document is loaded and are never
+    # reused within a session: the counters below only go up and are
+    # deliberately NOT part of a snapshot, so undo cannot rewind them.
+    row_ids: list[str] = field(default_factory=list)
+    column_ids: dict[str, str] = field(default_factory=dict)
+    next_row_number: int = field(default=1, repr=False, compare=False)
+    next_column_number: int = field(default=1, repr=False, compare=False)
     search_service: SearchService = field(default_factory=SearchService, repr=False, compare=False)
     sort_service: SortService = field(default_factory=SortService, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         if self.active_view is None:
             self.active_view = self.dataframe
+
+        self.ensure_ids()
 
     @property
     def row_count(self) -> int:
@@ -114,9 +137,13 @@ class Sheet:
         if view is None:
             view = self.dataframe
 
+        self.ensure_ids()
+
         return SpreadsheetData(
             headers=self.headers,
             rows=view.fillna("").to_dict("records"),
+            row_ids=self._row_ids_for(view),
+            column_ids=[self.column_ids.get(name, "") for name in view.columns],
             row_count=len(view),
             column_count=self.column_count,
             column_widths=dict(self.column_widths),
@@ -125,6 +152,97 @@ class Sheet:
             text_defaults=self.text_defaults.to_dict(),
             appearance=self.appearance.to_dict(),
         )
+
+    # ------------------------------------------------------------------
+    # Stable row / column IDs
+    # ------------------------------------------------------------------
+
+    def _new_row_id(self) -> str:
+        identifier = f"r{self.next_row_number}"
+        self.next_row_number += 1
+        return identifier
+
+    def _new_column_id(self) -> str:
+        identifier = f"c{self.next_column_number}"
+        self.next_column_number += 1
+        return identifier
+
+    def ensure_ids(self) -> None:
+        """
+        Make sure every row and column has an ID.
+
+        Called before any structural edit and whenever IDs are read. If the
+        number of IDs no longer matches the number of rows (a new sheet,
+        or a dataframe replaced from outside the structural methods below)
+        there is no way to know which row is which, so every row gets a
+        fresh ID. Columns are matched by name: known names keep their ID,
+        new names get one, names that are gone are forgotten.
+        """
+        if len(self.row_ids) != len(self.dataframe):
+            self.row_ids = [self._new_row_id() for _ in range(len(self.dataframe))]
+
+        self.column_ids = {
+            name: self.column_ids.get(name) or self._new_column_id()
+            for name in self.dataframe.columns
+        }
+
+    def _row_ids_for(self, view: pd.DataFrame) -> list[str]:
+        """The row IDs of ``view``'s rows, in view order.
+
+        A search or sort keeps each row's dataframe position as its index
+        label (see _view_positions), which is how a shown row is traced
+        back to its ID.
+        """
+        labels = list(view.index)
+
+        if all(
+            pd.api.types.is_integer(label) and 0 <= int(label) < len(self.row_ids)
+            for label in labels
+        ):
+            return [self.row_ids[int(label)] for label in labels]
+
+        # Index labels are not positions (should not happen): only an
+        # unfiltered, unsorted view can be matched row for row.
+        if len(labels) == len(self.row_ids):
+            return list(self.row_ids)
+
+        return ["" for _ in labels]
+
+    def row_position(self, row_id: str) -> int | None:
+        """The dataframe row position currently holding ``row_id``, or None."""
+        self.ensure_ids()
+
+        try:
+            return self.row_ids.index(row_id)
+        except ValueError:
+            return None
+
+    def row_id_at(self, position: int) -> str | None:
+        """The ID of the row at dataframe position ``position``, or None."""
+        self.ensure_ids()
+
+        if isinstance(position, bool) or not isinstance(position, int):
+            return None
+
+        if position < 0 or position >= len(self.row_ids):
+            return None
+
+        return self.row_ids[position]
+
+    def column_name(self, column_id: str) -> str | None:
+        """The name of the column with ``column_id``, or None if there is none."""
+        self.ensure_ids()
+
+        for name, identifier in self.column_ids.items():
+            if identifier == column_id:
+                return name
+
+        return None
+
+    def column_id(self, name: str) -> str | None:
+        """The ID of the column called ``name``, or None if there is none."""
+        self.ensure_ids()
+        return self.column_ids.get(name)
 
     def _style_entries(self, view: pd.DataFrame) -> list[dict[str, Any]]:
         """Per-cell overrides translated into the given view's coordinates."""
@@ -486,6 +604,8 @@ class Sheet:
                 for position, styles in self.cell_styles.items()
             },
             column_widths=dict(self.column_widths),
+            row_ids=list(self.row_ids),
+            column_ids=dict(self.column_ids),
         )
 
     def restore(self, snapshot: "SheetSnapshot") -> None:
@@ -497,6 +617,9 @@ class Sheet:
             for position, styles in snapshot.cell_styles.items()
         }
         self.column_widths = dict(snapshot.column_widths)
+        self.row_ids = list(snapshot.row_ids)
+        self.column_ids = dict(snapshot.column_ids)
+        self.ensure_ids()
 
     def _row_position(self, view_row: int | None) -> int | None:
         """
@@ -541,6 +664,8 @@ class Sheet:
 
         index = position
 
+        self.ensure_ids()
+
         empty = {column: "" for column in self.dataframe.columns}
         top = self.dataframe.iloc[:index]
         bottom = self.dataframe.iloc[index:]
@@ -549,6 +674,7 @@ class Sheet:
             [top, pd.DataFrame([empty]), bottom],
             ignore_index=True
         )
+        self.row_ids.insert(index, self._new_row_id())
         self.active_view = self.dataframe.copy()
         self.cell_styles = {
             (position + 1 if position >= index else position): styles
@@ -613,6 +739,9 @@ class Sheet:
 
         index = position
 
+        self.ensure_ids()
+        del self.row_ids[index]
+
         self.dataframe = self.dataframe.drop(index)
         self.dataframe.reset_index(drop=True, inplace=True)
         self.active_view = self.dataframe.copy()
@@ -637,7 +766,9 @@ class Sheet:
         if index < 0 or index > len(self.dataframe.columns):
             return False
 
+        self.ensure_ids()
         self.dataframe.insert(index, name, "")
+        self.column_ids[name] = self._new_column_id()
         self.active_view = self.dataframe.copy()
         self._rewrite_formulas(RefChange("column", "insert", index))
         return True
@@ -659,6 +790,8 @@ class Sheet:
 
         position = list(self.dataframe.columns).index(name)
 
+        self.ensure_ids()
+        self.column_ids.pop(name, None)
         self.dataframe.drop(columns=[name], inplace=True)
         self.active_view = self.dataframe.copy()
         self.column_widths.pop(name, None)
@@ -682,8 +815,13 @@ class Sheet:
         if new_name != old_name and new_name in self.dataframe.columns:
             return False
 
+        self.ensure_ids()
         self.dataframe.rename(columns={old_name: new_name}, inplace=True)
         self.active_view = self.dataframe.copy()
+
+        # The column keeps its ID: that is the point of having one.
+        if new_name != old_name:
+            self.column_ids[new_name] = self.column_ids.pop(old_name)
 
         if new_name != old_name and old_name in self.column_widths:
             self.column_widths[new_name] = self.column_widths.pop(old_name)

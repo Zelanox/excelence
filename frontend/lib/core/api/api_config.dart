@@ -22,4 +22,10 @@ class ApiConfig {
   /// so anyone who can load the app can read it. It keeps strangers on the
   /// network out of a trusted team's server; it is not per-user login.
   static const String accessToken = String.fromEnvironment('API_TOKEN');
+
+  /// The name other people see for this client when several share a
+  /// document (`--dart-define=CLIENT_NAME=Sara`). Empty means "Guest".
+  /// Shown by the server's /sessions listing today; a name-entry field in
+  /// Settings can replace this later.
+  static const String clientName = String.fromEnvironment('CLIENT_NAME');
 }

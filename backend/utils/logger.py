@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 from pathlib import Path
 
 
@@ -14,7 +15,13 @@ def get_logger(name: str | None = None) -> logging.Logger:
             "%(asctime)s - %(levelname)s - %(name)s - %(message)s"
         )
 
-        log_dir = Path(__file__).resolve().parent.parent / "logs"
+        if getattr(sys, "frozen", False):
+            # Packaged with PyInstaller: __file__ points inside the bundle
+            # (a temporary folder for a one-file build), so keep the logs
+            # next to the executable where they can actually be found.
+            log_dir = Path(sys.executable).resolve().parent / "logs"
+        else:
+            log_dir = Path(__file__).resolve().parent.parent / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
 
         file_handler = logging.FileHandler(log_dir / "backend.log", encoding="utf-8")

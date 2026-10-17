@@ -33,6 +33,13 @@ class SpreadsheetData:
 
     rtl: bool = False
 
+    # Stable IDs, parallel to ``rows`` and ``headers``: row_ids[n] names
+    # rows[n], column_ids[n] names headers[n]. Unlike a row number or a
+    # column name they do not change when other rows are inserted or
+    # deleted, or when a column is renamed.
+    row_ids: list[str] = field(default_factory=list)
+    column_ids: list[str] = field(default_factory=list)
+
     # Per-cell text-style overrides, in VIEW coordinates (the row/column a
     # client sees in the current filtered/sorted grid): a list of
     # {"row": int, "column": int, "style": {...set fields only...}}.
