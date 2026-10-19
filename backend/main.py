@@ -11,6 +11,7 @@ from backend.api.documents import router as documents_router
 from backend.api.spreadsheet import router as spreadsheet_router
 from backend.api.app_state import router as app_state_router
 from backend.api.sessions import router as sessions_router
+from backend.api.collab import router as collab_router
 from backend.dependencies import registry
 from backend.api.models.common import ErrorResponse
 from backend.utils.logger import get_logger
@@ -74,6 +75,7 @@ app.add_middleware(
 app.include_router(status_router)
 app.include_router(documents_router)
 app.include_router(spreadsheet_router)
+app.include_router(collab_router)
 app.include_router(app_state_router)
 app.include_router(sessions_router)
 

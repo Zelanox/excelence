@@ -37,6 +37,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from urllib.parse import unquote
 
+from backend.collab.op_log import OpLog
 from backend.controller.controller import Controller
 from backend.utils.logger import get_logger
 
@@ -135,6 +136,19 @@ class Session:
     controller: Controller
     lock: threading.Lock = field(default_factory=threading.Lock)
     clients: dict[str, ClientInfo] = field(default_factory=dict)
+
+    # Numbered record of the changes made through the operation path, so
+    # clients can catch up (see backend/collab).
+    oplog: OpLog = field(default_factory=OpLog)
+
+    # The document's change count (Document.change_count) as of the last
+    # change the log accounted for. A difference means somebody changed the
+    # document through a route that doesn't write to the log (see
+    # collab.service.account_for_untracked_changes).
+    accounted_changes: int = 0
+
+    def __post_init__(self) -> None:
+        self.accounted_changes = self.controller.document.change_count
 
     @property
     def is_default(self) -> bool:

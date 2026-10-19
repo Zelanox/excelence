@@ -49,6 +49,10 @@ class SpreadsheetResponse(ApiResponse):
 
     current_sheet: str = Field(default="", description="Active worksheet name.")
 
+    sheet_ids: list[str] = Field(default_factory=list, description="Stable ID of each worksheet, in the same order as `sheets`. Does not change when a worksheet is renamed; reassigned when the document is loaded.")
+
+    current_sheet_id: str = Field(default="", description="ID of the active worksheet.")
+
     column_widths: dict[str, float] = Field(default_factory=dict, description="Column name to display width, for columns with an explicitly set width.")
 
     rtl: bool = Field(default=False, description="Whether the active worksheet is right-to-left.")

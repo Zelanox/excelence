@@ -4,7 +4,8 @@ from fastapi import APIRouter, Depends
 
 from backend.utils.logger import get_logger
 
-from backend.dependencies import get_controller
+from backend.dependencies import get_controller, get_session
+from backend.sessions import Session
 from backend.controller.controller import Controller
 
 from backend.api.models import *
@@ -39,11 +40,26 @@ def _grid_fields(controller: Controller) -> dict[str, Any]:
         "rtl": data.rtl,
         "row_ids": data.row_ids,
         "column_ids": data.column_ids,
+        "current_sheet_id": data.sheet_id,
         "cell_styles": data.cell_styles,
         "text_defaults": data.text_defaults,
         "appearance": data.appearance,
         "undo_depth": data.undo_depth,
         "redo_depth": data.redo_depth,
+    }
+
+
+UNDO_UNAVAILABLE = "Undo is unavailable while others are editing."
+
+
+def _sheet_fields(controller: Controller) -> dict[str, Any]:
+    """The worksheet list shared by every response that returns it: names,
+    the active one, and the stable ID of each (an ID survives a rename)."""
+    return {
+        "sheets": controller.sheets(),
+        "current_sheet": controller.current_sheet(),
+        "sheet_ids": controller.sheet_ids(),
+        "current_sheet_id": controller.current_sheet_id(),
     }
 
 
@@ -90,8 +106,7 @@ def sheets(
     return SpreadsheetSheetsResponse(
         success=True,
         message="Sheets loaded.",
-        sheets=controller.sheets(),
-        current_sheet=controller.current_sheet()
+        **_sheet_fields(controller)
     )
 
 
@@ -131,8 +146,7 @@ def set_sheet(
     return SpreadsheetSheetsResponse(
         success=success,
         message=message,
-        sheets=controller.sheets(),
-        current_sheet=controller.current_sheet()
+        **_sheet_fields(controller)
     )
 
 
@@ -410,8 +424,21 @@ def edit_cells(
     "/undo",
     response_model=SpreadsheetEditResponse
 )
-def undo(controller: Controller = Depends(get_controller)):
-    """Undo the last content change (cell edits, styles, row/column changes)."""
+def undo(session: Session = Depends(get_session)):
+    """Undo the last content change (cell edits, styles, row/column changes).
+
+    Refused while other people are in the document: undo restores a snapshot
+    of the whole sheet and would erase their work too.
+    """
+    controller = session.controller
+
+    if len(session.clients) > 1:
+        return SpreadsheetEditResponse(
+            success=False,
+            message=UNDO_UNAVAILABLE,
+            **_grid_fields(controller)
+        )
+
     success = controller.undo()
 
     message = "Undone." if success else "Nothing to undo."
@@ -426,8 +453,17 @@ def undo(controller: Controller = Depends(get_controller)):
     "/redo",
     response_model=SpreadsheetEditResponse
 )
-def redo(controller: Controller = Depends(get_controller)):
-    """Redo the last undone change."""
+def redo(session: Session = Depends(get_session)):
+    """Redo the last undone change (refused while others are in the document, like undo)."""
+    controller = session.controller
+
+    if len(session.clients) > 1:
+        return SpreadsheetEditResponse(
+            success=False,
+            message=UNDO_UNAVAILABLE,
+            **_grid_fields(controller)
+        )
+
     success = controller.redo()
 
     message = "Redone." if success else "Nothing to redo."
@@ -546,8 +582,7 @@ def add_sheet(
     return SpreadsheetSheetsResponse(
         success=success,
         message=message,
-        sheets=controller.sheets(),
-        current_sheet=controller.current_sheet()
+        **_sheet_fields(controller)
     )
 
 
@@ -566,8 +601,7 @@ def delete_sheet(
     return SpreadsheetSheetsResponse(
         success=success,
         message=message,
-        sheets=controller.sheets(),
-        current_sheet=controller.current_sheet()
+        **_sheet_fields(controller)
     )
 
 
@@ -586,6 +620,5 @@ def rename_sheet(
     return SpreadsheetSheetsResponse(
         success=success,
         message=message,
-        sheets=controller.sheets(),
-        current_sheet=controller.current_sheet()
+        **_sheet_fields(controller)
     )

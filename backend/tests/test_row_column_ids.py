@@ -344,3 +344,11 @@ def test_ids_stay_attached_to_their_rows_through_random_edits():
         assert sheet.row_ids == [row_id for row_id, _ in model]
         assert list(sheet.dataframe.iloc[:, 0]) == [label for _, label in model]
         assert len(set(sheet.row_ids)) == len(sheet.row_ids)
+
+
+def test_the_sheet_id_travels_in_the_data_payload():
+    sheet = make_sheet()
+    sheet.sheet_id = "s7"
+
+    assert sheet.data().sheet_id == "s7"
+    assert make_sheet().data().sheet_id == ""        # not assigned until a Document does it

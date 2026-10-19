@@ -103,3 +103,87 @@ def test_ids_are_reassigned_when_the_document_is_reopened():
         assert len(data.row_ids) == len(data.rows) == 3
         assert len(set(data.row_ids)) == 3
         assert len(data.column_ids) == len(set(data.column_ids)) == 3
+
+
+# ----------------------------------------------------------------------
+# Sheet IDs, and renaming
+# ----------------------------------------------------------------------
+
+def test_every_sheet_has_a_unique_id_listed_in_the_same_order():
+    with tempfile.TemporaryDirectory() as folder:
+        c = make_controller(folder)
+        assert c.add_sheet("Other") is True
+
+        ids = c.sheet_ids()
+
+        assert len(ids) == len(c.sheets()) == 2
+        assert len(set(ids)) == 2 and all(ids)
+        assert c.current_sheet_id() == ids[c.sheets().index(c.current_sheet())]
+        assert c.grid_data().sheet_id == c.current_sheet_id()
+
+
+def test_a_renamed_sheet_keeps_its_sheet_row_and_column_ids():
+    with tempfile.TemporaryDirectory() as folder:
+        c = make_controller(folder)
+        sheet_id = c.current_sheet_id()
+        rows, columns = c.grid_data().row_ids, c.grid_data().column_ids
+
+        assert c.rename_sheet("Sheet1", "Renamed") is True
+
+        assert c.current_sheet() == "Renamed"
+        assert c.current_sheet_id() == sheet_id
+        assert c.grid_data().row_ids == rows
+        assert c.grid_data().column_ids == columns
+
+
+def test_renaming_a_sheet_that_is_not_open_keeps_its_data_and_ids():
+    """Renaming Sheet1 while another sheet is open used to overwrite Sheet1's
+    contents with the open sheet's (data loss)."""
+    with tempfile.TemporaryDirectory() as folder:
+        c = make_controller(folder)
+        first_id = c.current_sheet_id()
+        first_rows = c.grid_data().row_ids
+
+        assert c.add_sheet("Other") is True          # "Other" is now the open sheet
+        other_id = c.current_sheet_id()
+        other_rows = c.grid_data().row_ids
+
+        assert c.rename_sheet("Sheet1", "Renamed") is True
+
+        # the open sheet is untouched
+        assert c.current_sheet() == "Other"
+        assert c.current_sheet_id() == other_id
+        assert c.grid_data().row_ids == other_rows
+
+        # the renamed sheet still holds its own rows, under the same IDs
+        assert c.set_sheet("Renamed") is True
+        assert c.current_sheet_id() == first_id
+        assert c.grid_data().row_ids == first_rows
+        assert [row["Name"] for row in c.grid_data().rows] == ["Alice", "Bob", "Charlie", "Dana"]
+
+
+def test_a_deleted_sheets_id_is_never_given_to_a_new_sheet():
+    with tempfile.TemporaryDirectory() as folder:
+        c = make_controller(folder)
+        assert c.add_sheet("Other") is True
+        gone = c.current_sheet_id()
+
+        assert c.delete_sheet("Other") is True
+        assert c.add_sheet("Third") is True
+
+        assert c.current_sheet_id() != gone
+        assert gone not in c.sheet_ids()
+
+
+def test_deleting_another_sheet_does_not_change_the_open_sheets_ids():
+    with tempfile.TemporaryDirectory() as folder:
+        c = make_controller(folder)
+        sheet_id = c.current_sheet_id()
+        rows = c.grid_data().row_ids
+
+        assert c.add_sheet("Other") is True
+        assert c.set_sheet("Sheet1") is True
+        assert c.delete_sheet("Other") is True
+
+        assert c.current_sheet_id() == sheet_id
+        assert c.grid_data().row_ids == rows

@@ -34,6 +34,19 @@ class SheetSnapshot:
     column_ids: dict[str, str] = field(default_factory=dict)
 
 
+def _issued(identifier: object, prefix: str, next_number: int) -> bool:
+    """Whether ``identifier`` looks like "<prefix><n>" with n already handed out."""
+    if not isinstance(identifier, str) or not identifier.startswith(prefix):
+        return False
+
+    digits = identifier[len(prefix):]
+
+    if not digits.isascii() or not digits.isdigit():
+        return False
+
+    return 1 <= int(digits) < next_number
+
+
 @dataclass(slots=True)
 class Sheet:
 
@@ -93,6 +106,10 @@ class Sheet:
     column_ids: dict[str, str] = field(default_factory=dict)
     next_row_number: int = field(default=1, repr=False, compare=False)
     next_column_number: int = field(default=1, repr=False, compare=False)
+    # Stable identity of the sheet itself (such as "s2"). Renaming a sheet
+    # changes its name but not this. Assigned by Document, which owns the
+    # counter so an ID is never reused in a session; "" until then.
+    sheet_id: str = ""
     search_service: SearchService = field(default_factory=SearchService, repr=False, compare=False)
     sort_service: SortService = field(default_factory=SortService, repr=False, compare=False)
 
@@ -144,6 +161,7 @@ class Sheet:
             rows=view.fillna("").to_dict("records"),
             row_ids=self._row_ids_for(view),
             column_ids=[self.column_ids.get(name, "") for name in view.columns],
+            sheet_id=self.sheet_id,
             row_count=len(view),
             column_count=self.column_count,
             column_widths=dict(self.column_widths),
@@ -216,6 +234,30 @@ class Sheet:
             return self.row_ids.index(row_id)
         except ValueError:
             return None
+
+    def row_positions(self) -> dict[str, int]:
+        """Every row ID with its current dataframe position, built in one pass.
+
+        Use this instead of row_position() when looking up many rows: that
+        searches the whole list each time.
+        """
+        self.ensure_ids()
+        return {row_id: position for position, row_id in enumerate(self.row_ids)}
+
+    def row_id_was_issued(self, row_id: str) -> bool:
+        """True if ``row_id`` was handed out by this sheet at some point.
+
+        Counters only go up and IDs are never reused, so an ID that is
+        well-formed, lower than the next number to hand out, and not in use
+        belonged to a row that has since been deleted. That is how a change
+        to a row somebody else just deleted is told apart from a change to
+        a row that never existed.
+        """
+        return _issued(row_id, "r", self.next_row_number)
+
+    def column_id_was_issued(self, column_id: str) -> bool:
+        """The same for column IDs (see row_id_was_issued)."""
+        return _issued(column_id, "c", self.next_column_number)
 
     def row_id_at(self, position: int) -> str | None:
         """The ID of the row at dataframe position ``position``, or None."""

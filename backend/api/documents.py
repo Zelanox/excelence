@@ -287,10 +287,16 @@ def save_document(
     response_model=ReloadDocumentResponse
 )
 def reload_document(
-    controller: Controller = Depends(get_controller)
+    session: Session = Depends(get_session)
 ):
 
+    controller = session.controller
+
     success = controller.reload_document()
+
+    # The document was replaced by what is on disk, so nothing in the log
+    # applies to it any more: every client must load it again.
+    session.oplog.reset()
 
     return ReloadDocumentResponse(
 

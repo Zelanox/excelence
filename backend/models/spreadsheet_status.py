@@ -40,6 +40,9 @@ class SpreadsheetData:
     row_ids: list[str] = field(default_factory=list)
     column_ids: list[str] = field(default_factory=list)
 
+    # ID of the sheet this grid belongs to (see Sheet.sheet_id).
+    sheet_id: str = ""
+
     # Per-cell text-style overrides, in VIEW coordinates (the row/column a
     # client sees in the current filtered/sorted grid): a list of
     # {"row": int, "column": int, "style": {...set fields only...}}.

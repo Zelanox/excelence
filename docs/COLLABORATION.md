@@ -228,7 +228,8 @@ Each phase is useful on its own and can be checked before the next starts.
 | 2 | **Formulas stored as text.** The cell's input (`=SUM(A1:A3)`) is what is saved, written to the `.xlsx` as a real Excel formula, and re-evaluated by every client on load. The server rewrites stored formulas when rows/columns are inserted or deleted. | **done** (same note) |
 | 3 | **Document sessions**: one in-memory session per open document, per-session locks, client identity | **done** (server verified; Flutter side needs a manual test) |
 | 4a | **Stable row and column IDs** in the server model and the grid payload | **done on the server** (Sheet-level tests pass; Document-level tests and the Flutter side still to be run by hand) |
-| 4b | **Operation log**: revision-numbered canonical operations addressed by those IDs | |
+| 4b | **Operation log**: revision-numbered canonical operations addressed by those IDs | **done for the first operation set** (cells, rows, columns, column width, RTL, sheets); text/cell styles, appearance and text defaults still to add |
+| 4c | **Nothing slips past the log**: old routes, undo while shared, reload | **done** |
 | 5 | **WebSocket broadcast**, optimistic apply, reconnect catch-up, presence ("who is here") | |
 | 6 | **Per-user undo** via inverse operations (replaces snapshot undo) | |
 | 7 | Accounts, permissions, share links, HTTPS hosting (not needed for a small trusted team) | later |
@@ -294,11 +295,77 @@ Flutter client reads them yet, so this phase changes no behaviour.
   read. If the number of IDs no longer matches the number of rows (a dataframe replaced from
   outside the structural methods), every row gets a fresh ID, because there is no way to know which
   row is which. Any new structural operation on `Sheet` must keep `row_ids` and `column_ids` in step.
-* **Known limit.** `Document.dataframe_to_spreadsheet()` re-reads sheets from the worksheet when
-  switching sheets. If a sheet has trailing blank rows (which openpyxl drops on save), its row
-  count differs after the re-read and that sheet's row IDs are reassigned. Phase 4b has to settle
-  this, because live sync of all sheets needs stable IDs on every sheet, not just the active one.
-* **Sheet IDs** are not part of 4a; they come with the operation log in 4b.
+* **Switching sheets keeps IDs.** Checked on the real Document: IDs of the sheet you leave and of
+  the sheet you open are unchanged after switching back and forth, including with blank rows.
+  (An earlier note here guessed that trailing blank rows would cause reassignment; that did not
+  reproduce.)
+
+### Phase 4b, step 1: stable sheet IDs, and a rename fix
+
+* **Sheet IDs.** Every worksheet has an ID such as `s2`, unique within the document and never reused in
+  a session (`Document` owns the counter; `Spreadsheet` is rebuilt too often to hold it). The grid
+  payload carries `current_sheet_id`; every sheet-list response carries `sheet_ids` (parallel to
+  `sheets`) and `current_sheet_id`. A rename changes the name, not the ID.
+* **Why it mattered.** Sheet models are matched to worksheets by name when the spreadsheet is rebuilt, so
+  renaming a sheet used to throw its model away: every row and column ID was reassigned and its
+  text styles were re-read.
+* **Bug fixed along the way (data loss).** Renaming a sheet that was not the open one wrote the open
+  sheet's contents over it. `Document.rename_sheet` now only renames an inactive sheet and
+  leaves the open sheet's data alone.
+
+### Phase 4b in detail: operations, the revision log, and two routes
+
+Code lives in `backend/collab/` (no web-framework dependency) and `backend/api/collab.py`.
+
+* **`POST /spreadsheet/ops`** takes a batch: `{"client_batch_id", "base_revision", "sheet_id", "ops": [...]}`
+  with the headers `X-Client-Id` and `X-Document` (the session). It always answers HTTP 200 with
+  either `{"accepted": true, "revision", "duplicate", "applied", "dropped"}` or
+  `{"accepted": false, "code", "message", "index", "resync_required"}`.
+* **`GET /spreadsheet/ops?since=N`** returns the batches after revision N, or `resync_required: true`
+  if the client is too far behind or something that can't be replayed happened in between.
+* **Operations** (all by ID, see the module doc in `collab/operations.py`): `set_cells`, `insert_row`,
+  `delete_row`, `insert_column`, `delete_column`, `rename_column`, `set_column_width`, `set_rtl`,
+  `add_sheet`, `delete_sheet`, `rename_sheet`. `applied` is the batch as the server applied it, with the
+  `id` it gave to any new row, column or sheet. Cell values are text or `null` (the document turns "7"
+  into a number in a numeric column); raw numbers and booleans are refused.
+* **Rules.** One sheet per batch (sheet operations alone in theirs); at most 500 changes per batch.
+  Everything checkable up front (shape, IDs that never existed, column-name clashes) is checked before
+  anything is applied. An ID that existed and was deleted by someone else is not an error: that change
+  is *dropped*, the rest applies, and the sender gets a `dropped` list with the reason
+  (`ROW_DELETED`, `COLUMN_DELETED`, `SHEET_DELETED`). A batch where everything was dropped uses no revision.
+* **Revisions and resends.** Each accepted batch gets the next revision; a refused one uses none. A
+  resent `client_batch_id` from the same client returns the original answer with `duplicate: true` and
+  is not applied again. The log keeps at least 1,000 batches and everything from the last 10 minutes.
+* **Error codes:** `BAD_REQUEST`, `EMPTY_BATCH`, `BATCH_TOO_LARGE`, `UNKNOWN_SHEET`, `UNKNOWN_ROW`,
+  `UNKNOWN_COLUMN`, `NAME_TAKEN`, `INVALID_VALUE`, `REVISION_FROM_FUTURE`, `APPLY_FAILED`.
+* **Verified by test:** replaying the log of 250 random batches onto a second copy of the document gives
+  the same rows, headers, row/column IDs, widths and direction (and the second copy hands out the same
+  new IDs).
+
+Known limits, on purpose, to be dealt with in the next steps:
+
+* **Applying to a sheet that is not the open one switches sheets** and back (the server still has one open
+  sheet per session). That re-reads the workbook, so two people working on different sheets of a large
+  document will make each other slow. Making the sheet-level methods independent of the open sheet is a
+  larger change.
+* **A batch that fails part-way** (the up-front checks are meant to make this impossible) is not rolled
+  back; the server records a `resync` entry so every client reloads.
+* Applying changes clears any server-side search or sort left by an older client, because the controller
+  edits by position in the server's view.
+* **Operations still to add:** text and cell styles, appearance, text defaults.
+
+### Phase 4c: nothing slips past the log
+
+* **Old routes.** `Document.change_count` goes up whenever the document is modified (it rides on the
+  `modified` flag every editing path already sets, so no path can be missed). After every request for a
+  session, `get_session` calls `collab.service.account_for_untracked_changes`: if the count moved
+  without a batch going through `/spreadsheet/ops`, a `resync` entry is added to the log, so clients
+  using the log reload instead of silently falling behind. Batches through the operation path are
+  accounted for as they are applied, so they don't produce a second entry.
+* **Undo and redo** are refused (`success: false`, "Undo is unavailable while others are editing.")
+  while more than one client is in the session. They still work for one person. Per-user undo
+  (phase 6) will replace this.
+* **Reloading a document** resets the log, so every client must load the document again.
 
 ### Why the order changed
 

@@ -20,6 +20,7 @@ of undo history would depend on thread scheduling).
 
 from fastapi import Depends, HTTPException, Request
 
+from backend.collab.service import account_for_untracked_changes
 from backend.controller.controller import Controller
 from backend.sessions import Session, SessionNotOpen, SessionRegistry
 
@@ -53,7 +54,12 @@ def get_session(request: Request):
         ) from None
 
     with session.lock:
-        yield session
+        try:
+            yield session
+        finally:
+            # A change made by a route that doesn't write to the operation
+            # log must still reach the other clients (as a "reload" entry).
+            account_for_untracked_changes(session)
 
 
 def get_controller(session: Session = Depends(get_session)) -> Controller:

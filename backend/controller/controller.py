@@ -258,6 +258,14 @@ class Controller:
         """
         return self.document.sheet_name
 
+    def sheet_ids(self) -> list[str]:
+        """Return the stable ID of each worksheet, in the order of sheets()."""
+        return self.document.list_sheet_ids()
+
+    def current_sheet_id(self) -> str:
+        """Return the stable ID of the active worksheet."""
+        return self.document.current_sheet_id()
+
     def set_sheet(self, sheet: str) -> bool:
         """
         Switch to a different worksheet.

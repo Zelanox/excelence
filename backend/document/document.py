@@ -81,10 +81,20 @@ class Document:
         # Domain Model
         self.spreadsheet = Spreadsheet()
 
+        # Source of worksheet IDs. It lives here, not on Spreadsheet,
+        # because Spreadsheet is rebuilt on every sheet change; a counter
+        # that only goes up is what keeps an ID from being reused.
+        self._next_sheet_number = 1
+
         self.search_text = ""
         self.sort_rules: list[dict[str, Any]] = []
 
         self.loaded = False
+
+        # Counts every change to the document. It rides on the "modified"
+        # flag (below), which every editing path already sets, so it can't
+        # miss one: see the modified property.
+        self.change_count = 0
         self.modified = False
 
         # Which document was open last, and user preferences - kept on disk
@@ -252,6 +262,23 @@ class Document:
     # Domain Model
     # ==========================================================
 
+    def sheet_id_was_issued(self, sheet_id: object) -> bool:
+        """True if ``sheet_id`` was handed out in this session (it may since have been deleted)."""
+        if not isinstance(sheet_id, str) or not sheet_id.startswith("s"):
+            return False
+
+        digits = sheet_id[1:]
+
+        if not digits.isascii() or not digits.isdigit():
+            return False
+
+        return 1 <= int(digits) < self._next_sheet_number
+
+    def _new_sheet_id(self) -> str:
+        identifier = f"s{self._next_sheet_number}"
+        self._next_sheet_number += 1
+        return identifier
+
     def dataframe_to_spreadsheet(self) -> None:
 
         if self.workbook is None:
@@ -273,7 +300,7 @@ class Document:
             sheet_model = existing_sheets.get(worksheet_name)
 
             if sheet_model is None:
-                sheet_model = Sheet(name=worksheet_name)
+                sheet_model = Sheet(name=worksheet_name, sheet_id=self._new_sheet_id())
 
                 # Only a brand-new model reads text styles back from the
                 # worksheet. An existing model is already authoritative
@@ -473,6 +500,22 @@ class Document:
     # ==========================================================
     # Editing
     # ==========================================================
+
+    @property
+    def modified(self) -> bool:
+        """Whether there are changes not yet saved to disk."""
+        return self._modified
+
+    @modified.setter
+    def modified(self, value: bool) -> None:
+        # Every editing path sets this to True, so counting here counts every
+        # change, including ones made through routes written before the
+        # collaboration code existed. Collaboration uses the count to notice
+        # a change that did not come through its own operation path.
+        if value:
+            self.change_count += 1
+
+        self._modified = value
 
     def _sync_active_sheet(self) -> None:
         """Write the current DataFrame to the active worksheet."""
@@ -1043,10 +1086,28 @@ class Document:
         if new_name in self.workbook.sheetnames and new_name != old_name:
             return False
 
+        renaming_active_sheet = old_name == self.sheet_name
+
         self.workbook[old_name].title = new_name
-        self.sheet_name = new_name
-        self.sheet = self.workbook[new_name]
-        self._sync_active_sheet()
+
+        # Models are matched to worksheets by name when the spreadsheet is
+        # rebuilt, so give the model its new name first; otherwise the
+        # sheet would come back as a brand-new model and lose its IDs
+        # (sheet, row and column) and its styles.
+        renamed_model = self.spreadsheet.get_sheet(old_name)
+
+        if renamed_model is not None:
+            renamed_model.name = new_name
+
+        # Only the active sheet's data is held in self.df. Writing self.df
+        # to a worksheet that is NOT the active one would overwrite that
+        # sheet's contents with the active sheet's, so an inactive sheet is
+        # only renamed.
+        if renaming_active_sheet:
+            self.sheet_name = new_name
+            self.sheet = self.workbook[new_name]
+            self._sync_active_sheet()
+
         self.dataframe_to_spreadsheet()
         self.clear_history()
         self.modified = True
@@ -1150,6 +1211,20 @@ class Document:
             return []
 
         return self.spreadsheet.sheet_names()
+
+    def list_sheet_ids(self) -> list[str]:
+        """Return the stable worksheet IDs, in the same order as list_sheets()."""
+        if self.workbook is None:
+            return []
+
+        return self.spreadsheet.sheet_ids()
+
+    def current_sheet_id(self) -> str:
+        """Return the stable ID of the active worksheet ("" if none)."""
+        if self.workbook is None:
+            return ""
+
+        return self.spreadsheet.current_sheet_id()
 
     def set_sheet(self, sheet_name: str) -> bool:
         """

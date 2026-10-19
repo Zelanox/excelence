@@ -38,6 +38,27 @@ class Spreadsheet:
         ]
 
 
+    def sheet_ids(self):
+
+        return [
+
+            sheet.sheet_id
+
+            for sheet in self.sheets
+
+        ]
+
+
+    def current_sheet_id(self):
+
+        sheet = self.current_sheet()
+
+        if sheet is None:
+            return ""
+
+        return sheet.sheet_id
+
+
     def get_sheet(self, name):
 
         for sheet in self.sheets:
