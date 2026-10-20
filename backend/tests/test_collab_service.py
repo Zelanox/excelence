@@ -353,3 +353,17 @@ def test_a_refused_batch_leaves_nothing_unaccounted():
 
         assert service.account_for_untracked_changes(session) is False
         assert session.oplog.revision == 0
+
+
+def test_restarting_the_log_makes_even_an_up_to_date_client_reload():
+    with tempfile.TemporaryDirectory() as folder:
+        session = make_session(folder)
+        service.submit(session, CLIENT, payload(session, first_cell(session, "one"), batch_id="b1"))
+        service.submit(session, CLIENT, payload(session, first_cell(session, "two"), batch_id="b2", base=1))
+
+        marker = service.restart_log(session)
+
+        assert marker == 3
+        assert service.changes_since(session, 0)["resync_required"] is True
+        assert service.changes_since(session, 2)["resync_required"] is True      # was fully up to date
+        assert service.changes_since(session, 3) == {"accepted": True, "revision": 3, "resync_required": False, "batches": []}

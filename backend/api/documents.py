@@ -2,6 +2,7 @@ import os
 
 from fastapi import APIRouter, Depends, File, Request, UploadFile
 
+from backend.collab.service import restart_log
 from backend.dependencies import get_controller, get_registry, get_session
 from backend.controller.controller import Controller
 from backend.sessions import DocumentBusy, Session, SessionRegistry
@@ -295,8 +296,9 @@ def reload_document(
     success = controller.reload_document()
 
     # The document was replaced by what is on disk, so nothing in the log
-    # applies to it any more: every client must load it again.
-    session.oplog.reset()
+    # applies to it any more: every client must load it again, even one that
+    # was fully up to date.
+    restart_log(session)
 
     return ReloadDocumentResponse(
 

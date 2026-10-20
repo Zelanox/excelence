@@ -166,6 +166,17 @@ def account_for_untracked_changes(session) -> bool:
     return True
 
 
+def restart_log(session) -> int:
+    """The document was replaced (reloaded from disk): every client must load it again.
+
+    Forgets the log, then records a resync entry. The entry matters: a client
+    that was fully up to date is not "behind" as far as the log can tell, yet
+    what it holds is the OLD document. Returns the new revision.
+    """
+    session.oplog.reset()
+    return mark_resync(session)
+
+
 def mark_resync(session, client_id: str = "") -> int:
     """Record that the document changed in a way the log can't describe.
 
