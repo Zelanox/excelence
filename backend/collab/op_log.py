@@ -8,6 +8,9 @@ up without reloading the whole document.
 The log is in memory only and is NOT thread-safe on its own: it belongs to a
 Session, and every request for a session already runs under that session's
 lock (see dependencies.get_session).
+
+Subscribers (see ``subscribe``) are told about every new entry, which is how
+live connections get changes pushed to them (see collab/hub.py).
 """
 
 from __future__ import annotations
@@ -17,6 +20,10 @@ from collections import OrderedDict, deque
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
+
+from backend.utils.logger import get_logger
+
+logger = get_logger("collab")
 
 # R3: keep at least this many batches, and anything younger than this many
 # seconds, whichever is more.
@@ -71,6 +78,7 @@ class OpLog:
 
     _entries: deque[LogEntry] = field(default_factory=deque, repr=False)
     _by_batch: "OrderedDict[tuple[str, str], LogEntry]" = field(default_factory=OrderedDict, repr=False)
+    _subscribers: list[Callable[[LogEntry], None]] = field(default_factory=list, repr=False)
 
     def append(
         self,
@@ -101,7 +109,34 @@ class OpLog:
             self._by_batch[(client_id, client_batch_id)] = entry
 
         self._trim()
+        self._notify(entry)
         return entry
+
+    def subscribe(self, callback: Callable[[LogEntry], None]) -> None:
+        """Call ``callback(entry)`` for every entry appended from now on.
+
+        The callback runs in the thread that appended, while that thread holds
+        the session's lock. It must be quick, must not wait for anything, and
+        must not take the session's lock or touch this log. Subscribing the
+        same callback twice has no effect. Like everything here, call it with
+        the session's lock held.
+        """
+        if callback not in self._subscribers:
+            self._subscribers.append(callback)
+
+    def unsubscribe(self, callback: Callable[[LogEntry], None]) -> None:
+        """Stop calling ``callback``. Unknown callbacks are ignored."""
+        if callback in self._subscribers:
+            self._subscribers.remove(callback)
+
+    def _notify(self, entry: LogEntry) -> None:
+        # The change is already applied and numbered, so a failing subscriber
+        # must neither undo that nor stop the others from hearing about it.
+        for callback in tuple(self._subscribers):
+            try:
+                callback(entry)
+            except Exception:
+                logger.exception("A log subscriber failed on revision %s", entry.revision)
 
     def find_batch(self, client_id: str, client_batch_id: str) -> LogEntry | None:
         """The entry for a batch this client already sent, if still remembered.

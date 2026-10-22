@@ -4560,3 +4560,754 @@ re.PatternError: bad escape (end of pattern) at position 3
 2026-10-20 19:45:24,470 - INFO - document - Opened document t.xlsx
 2026-10-20 19:45:24,506 - INFO - document - Opened document t.xlsx
 2026-10-20 19:45:24,546 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:41,769 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-10-21 16:14:42,531 - WARNING - main - Validation error for /spreadsheet/edit-cell: 1 validation error:
+  {'type': 'greater_than_equal', 'loc': ('body', 'row'), 'msg': 'Input should be greater than or equal to 0', 'input': -1, 'ctx': {'ge': 0}}
+
+  File "E:\Projects\excelence\backend\api\spreadsheet.py", line 231, in edit_cell
+    POST /spreadsheet/edit-cell
+2026-10-21 16:14:42,590 - INFO - document - Opened document api.xlsx
+2026-10-21 16:14:42,641 - INFO - document - Opened document ids.xlsx
+2026-10-21 16:14:42,791 - INFO - document - Opened document a.xlsx
+2026-10-21 16:14:42,792 - INFO - sessions - Opened session 90e06ba3f9855932 for a.xlsx
+2026-10-21 16:14:42,858 - INFO - document - Opened document a.xlsx
+2026-10-21 16:14:42,895 - INFO - document - Opened document a.xlsx
+2026-10-21 16:14:42,920 - INFO - document - Opened document a.xlsx
+2026-10-21 16:14:42,921 - INFO - sessions - Opened session 90e06ba3f9855932 for a.xlsx
+2026-10-21 16:14:42,926 - WARNING - document - Failed to open workbook: missing.xlsx
+2026-10-21 16:14:42,956 - INFO - document - Created document new.xlsx
+2026-10-21 16:14:42,978 - INFO - document - Saved document new.xlsx
+2026-10-21 16:14:42,980 - INFO - sessions - Opened session f0fa32a1f97273e2 for new.xlsx
+2026-10-21 16:14:43,016 - INFO - document - Opened document a.xlsx
+2026-10-21 16:14:43,016 - INFO - sessions - Opened session 90e06ba3f9855932 for a.xlsx
+2026-10-21 16:14:43,039 - INFO - document - Saved document a.xlsx
+2026-10-21 16:14:43,040 - INFO - sessions - Released session 90e06ba3f9855932 (a.xlsx)
+2026-10-21 16:14:43,048 - INFO - document - Opened document a.xlsx
+2026-10-21 16:14:43,049 - INFO - sessions - Opened session 90e06ba3f9855932 for a.xlsx
+2026-10-21 16:14:43,082 - INFO - document - Opened document a.xlsx
+2026-10-21 16:14:43,138 - INFO - document - Opened document busy.xlsx
+2026-10-21 16:14:43,138 - INFO - sessions - Opened session 3e805abc9e90000e for busy.xlsx
+2026-10-21 16:14:43,141 - INFO - document - Deleted document free.xlsx
+2026-10-21 16:14:43,170 - INFO - document - Opened document a.xlsx
+2026-10-21 16:14:43,171 - INFO - sessions - Opened session 90e06ba3f9855932 for a.xlsx
+2026-10-21 16:14:43,232 - INFO - document - Opened document a.xlsx
+2026-10-21 16:14:43,233 - INFO - sessions - Opened session 90e06ba3f9855932 for a.xlsx
+2026-10-21 16:14:43,258 - INFO - document - Saved document a.xlsx
+2026-10-21 16:14:43,259 - INFO - sessions - Released session 90e06ba3f9855932 (a.xlsx)
+2026-10-21 16:14:43,268 - INFO - document - Opened document a.xlsx
+2026-10-21 16:14:43,269 - INFO - sessions - Opened session 90e06ba3f9855932 for a.xlsx
+2026-10-21 16:14:43,269 - INFO - sessions - Re-opened released session 90e06ba3f9855932
+2026-10-21 16:14:43,328 - INFO - document - Opened document a.xlsx
+2026-10-21 16:14:43,329 - INFO - sessions - Opened session 90e06ba3f9855932 for a.xlsx
+2026-10-21 16:14:43,341 - INFO - document - Opened document b.xlsx
+2026-10-21 16:14:43,341 - INFO - sessions - Opened session e1184ff58f314f44 for b.xlsx
+2026-10-21 16:14:43,372 - INFO - document - Opened document report.xlsx
+2026-10-21 16:14:43,442 - INFO - document - Opened document a.xlsx
+2026-10-21 16:14:43,452 - INFO - document - Opened document c.xlsx
+2026-10-21 16:14:43,464 - INFO - document - Opened document b.xlsx
+2026-10-21 16:14:43,510 - INFO - document - Opened document reports/q1.xlsx
+2026-10-21 16:14:43,557 - INFO - document - Opened document good.xlsx
+2026-10-21 16:14:43,558 - WARNING - document - Failed to open workbook: missing.xlsx
+2026-10-21 16:14:43,558 - WARNING - document - Open rejected for invalid filename: 
+2026-10-21 16:14:43,558 - WARNING - document - Failed to open workbook: ../escape.xlsx
+2026-10-21 16:14:43,605 - INFO - document - Opened document gone.xlsx
+2026-10-21 16:14:43,621 - INFO - document - Created document new.xlsx
+2026-10-21 16:14:43,644 - INFO - document - Saved document new.xlsx
+2026-10-21 16:14:43,671 - WARNING - app_state - Ignoring unreadable app state: Expecting property name enclosed in double quotes: line 1 column 3 (char 2)
+2026-10-21 16:14:43,689 - WARNING - app_state - Ignoring unreadable app state: Expecting property name enclosed in double quotes: line 1 column 3 (char 2)
+2026-10-21 16:14:43,693 - INFO - document - Opened document a.xlsx
+2026-10-21 16:14:43,734 - WARNING - app_state - Ignoring unreadable app state: [Errno 13] Permission denied: 'C:\\Users\\ELSALA~1\\AppData\\Local\\Temp\\tmpzedac2z0\\.excelence_state.json'
+2026-10-21 16:14:43,741 - WARNING - app_state - Could not save app state: [WinError 5] Access is denied: 'C:\\Users\\ELSALA~1\\AppData\\Local\\Temp\\tmpzedac2z0\\.excelence_state.fjfa8aag.tmp' -> 'C:\\Users\\ELSALA~1\\AppData\\Local\\Temp\\tmpzedac2z0\\.excelence_state.json'
+2026-10-21 16:14:43,741 - INFO - document - Opened document a.xlsx
+2026-10-21 16:14:43,742 - WARNING - app_state - Ignoring unreadable app state: [Errno 13] Permission denied: 'C:\\Users\\ELSALA~1\\AppData\\Local\\Temp\\tmpzedac2z0\\.excelence_state.json'
+2026-10-21 16:14:43,811 - INFO - document - Opened document a.xlsx
+2026-10-21 16:14:43,937 - INFO - document - Opened document a.xlsx
+2026-10-21 16:14:43,954 - INFO - document - Opened document b.xlsx
+2026-10-21 16:14:44,022 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:44,071 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:44,122 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:44,167 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:44,223 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:44,287 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:44,329 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:44,372 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:44,434 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:44,493 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:44,539 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:44,582 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:44,636 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:44,676 - INFO - document - Opened document u.xlsx
+2026-10-21 16:14:44,724 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:44,783 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:44,920 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:44,959 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:45,010 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:45,055 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:45,088 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:45,129 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:45,176 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:45,220 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:45,258 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:45,305 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:45,353 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:45,410 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:45,458 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:45,509 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:45,551 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:45,606 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:45,665 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:45,717 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:45,760 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:45,819 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:45,874 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:45,920 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:45,972 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:46,009 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:46,060 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:46,121 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:46,193 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:46,229 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:46,275 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:46,319 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:46,355 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:46,403 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:46,443 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:46,490 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:46,527 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:46,589 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:46,651 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:46,686 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:49,771 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:49,830 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:49,873 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:49,921 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:50,012 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:50,075 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:50,095 - INFO - document - Saved document t.xlsx
+2026-10-21 16:14:50,105 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:50,163 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:50,184 - INFO - document - Saved document t.xlsx
+2026-10-21 16:14:50,235 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:50,266 - INFO - document - Saved document t.xlsx
+2026-10-21 16:14:50,276 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:50,340 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:50,381 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:50,400 - INFO - document - Saved document t.xlsx
+2026-10-21 16:14:50,409 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:50,456 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:50,479 - INFO - document - Saved document t.xlsx
+2026-10-21 16:14:50,489 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:50,530 - INFO - document - Opened document ext.xlsx
+2026-10-21 16:14:50,568 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:50,610 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:50,641 - INFO - document - Saved document t.xlsx
+2026-10-21 16:14:50,652 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:50,701 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:50,720 - INFO - document - Saved document t.xlsx
+2026-10-21 16:14:50,770 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:50,822 - INFO - document - Opened document a.xlsx
+2026-10-21 16:14:50,850 - INFO - document - Opened document b.xlsx
+2026-10-21 16:14:50,887 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:50,904 - INFO - document - Saved document t.xlsx
+2026-10-21 16:14:50,930 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:50,967 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:51,015 - INFO - document - Opened document sample.xlsx
+2026-10-21 16:14:51,061 - INFO - document - Opened document search.xlsx
+2026-10-21 16:14:51,107 - INFO - document - Opened document editing.xlsx
+2026-10-21 16:14:51,158 - INFO - document - Opened document failures.xlsx
+2026-10-21 16:14:51,263 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:51,308 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:51,356 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:51,404 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:51,423 - INFO - document - Saved document t.xlsx
+2026-10-21 16:14:51,433 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:51,473 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:51,502 - INFO - document - Opened document t2.xlsx
+2026-10-21 16:14:51,541 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:51,584 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:51,625 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:51,661 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:51,707 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:55,187 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:56,680 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:56,736 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:56,803 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:56,851 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:56,881 - INFO - document - Saved document t.xlsx
+2026-10-21 16:14:56,921 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:56,966 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:57,006 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:57,051 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:57,108 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:57,232 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:57,281 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:57,323 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:57,524 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:57,579 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:57,622 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:57,672 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:57,706 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:57,731 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:57,756 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:57,785 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:57,815 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:57,853 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:57,898 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:57,925 - INFO - document - Saved document t.xlsx
+2026-10-21 16:14:57,934 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:57,973 - INFO - document - Opened document t.xlsx
+2026-10-21 16:14:57,991 - INFO - document - Saved document t.xlsx
+2026-10-21 16:14:58,001 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:02,329 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:15,764 - INFO - document - Created document test.xlsx
+2026-10-21 16:15:15,779 - INFO - document - Saved document test.xlsx
+2026-10-21 16:15:15,779 - INFO - run_server - Created starter document test.xlsx in C:\Users\ELSALA~1\AppData\Local\Temp\tmph75_rorf\does\not\exist\yet
+2026-10-21 16:15:15,798 - INFO - document - Opened document test.xlsx
+2026-10-21 16:15:15,864 - INFO - document - Created document test.xlsx
+2026-10-21 16:15:15,882 - INFO - document - Saved document test.xlsx
+2026-10-21 16:15:15,883 - INFO - run_server - Created starter document test.xlsx in C:\Users\ELSALA~1\AppData\Local\Temp\tmpet4xy3d4
+2026-10-21 16:15:17,048 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:17,080 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:17,145 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:17,206 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:17,258 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:17,321 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:17,337 - INFO - document - Saved document t.xlsx
+2026-10-21 16:15:17,346 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:17,384 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:17,425 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:17,461 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:17,516 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:17,565 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:17,682 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:17,778 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:17,832 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:17,882 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:17,943 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:18,015 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:18,074 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:18,126 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:18,166 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:18,212 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:18,266 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:18,340 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:18,365 - INFO - document - Saved document t.xlsx
+2026-10-21 16:15:18,377 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:18,430 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:18,518 - INFO - document - Opened document shared.xlsx
+2026-10-21 16:15:18,518 - INFO - sessions - Opened session 83afa746a13f9d5a for shared.xlsx
+2026-10-21 16:15:18,585 - INFO - document - Opened document a.xlsx
+2026-10-21 16:15:18,585 - INFO - sessions - Opened session 90e06ba3f9855932 for a.xlsx
+2026-10-21 16:15:18,599 - INFO - document - Opened document b.xlsx
+2026-10-21 16:15:18,600 - INFO - sessions - Opened session e1184ff58f314f44 for b.xlsx
+2026-10-21 16:15:18,634 - INFO - document - Opened document reports/q1.xlsx
+2026-10-21 16:15:18,635 - INFO - sessions - Opened session f76cf21bb251e1b9 for reports/q1.xlsx
+2026-10-21 16:15:18,663 - WARNING - document - Failed to open workbook: missing.xlsx
+2026-10-21 16:15:18,718 - INFO - document - Opened document a.xlsx
+2026-10-21 16:15:18,719 - INFO - sessions - Opened session 90e06ba3f9855932 for a.xlsx
+2026-10-21 16:15:18,788 - INFO - document - Opened document a.xlsx
+2026-10-21 16:15:18,789 - INFO - sessions - Opened session 90e06ba3f9855932 for a.xlsx
+2026-10-21 16:15:18,841 - INFO - document - Opened document a.xlsx
+2026-10-21 16:15:18,842 - INFO - sessions - Opened session 90e06ba3f9855932 for a.xlsx
+2026-10-21 16:15:18,865 - INFO - document - Saved document a.xlsx
+2026-10-21 16:15:18,866 - INFO - sessions - Released session 90e06ba3f9855932 (a.xlsx)
+2026-10-21 16:15:18,879 - INFO - document - Opened document a.xlsx
+2026-10-21 16:15:18,879 - INFO - sessions - Opened session 90e06ba3f9855932 for a.xlsx
+2026-10-21 16:15:18,921 - INFO - document - Opened document a.xlsx
+2026-10-21 16:15:18,922 - INFO - sessions - Opened session 90e06ba3f9855932 for a.xlsx
+2026-10-21 16:15:18,925 - ERROR - sessions - Could not save a.xlsx; keeping its session open
+2026-10-21 16:15:18,953 - INFO - document - Saved document a.xlsx
+2026-10-21 16:15:18,954 - INFO - sessions - Released session 90e06ba3f9855932 (a.xlsx)
+2026-10-21 16:15:19,007 - INFO - document - Opened document a.xlsx
+2026-10-21 16:15:19,007 - INFO - sessions - Opened session 90e06ba3f9855932 for a.xlsx
+2026-10-21 16:15:19,024 - INFO - document - Saved document a.xlsx
+2026-10-21 16:15:19,024 - INFO - sessions - Released session 90e06ba3f9855932 (a.xlsx)
+2026-10-21 16:15:19,057 - INFO - document - Opened document a.xlsx
+2026-10-21 16:15:19,058 - INFO - sessions - Opened session 90e06ba3f9855932 for a.xlsx
+2026-10-21 16:15:19,078 - INFO - document - Saved document a.xlsx
+2026-10-21 16:15:19,079 - INFO - sessions - Released session 90e06ba3f9855932 (a.xlsx)
+2026-10-21 16:15:19,089 - INFO - document - Opened document a.xlsx
+2026-10-21 16:15:19,089 - INFO - sessions - Opened session 90e06ba3f9855932 for a.xlsx
+2026-10-21 16:15:19,090 - INFO - sessions - Re-opened released session 90e06ba3f9855932
+2026-10-21 16:15:19,122 - INFO - document - Opened document a.xlsx
+2026-10-21 16:15:19,123 - INFO - sessions - Opened session 90e06ba3f9855932 for a.xlsx
+2026-10-21 16:15:19,124 - INFO - sessions - Released session 90e06ba3f9855932 (a.xlsx)
+2026-10-21 16:15:19,125 - WARNING - document - Failed to open workbook: a.xlsx
+2026-10-21 16:15:19,167 - INFO - document - Opened document a.xlsx
+2026-10-21 16:15:19,167 - INFO - sessions - Opened session 90e06ba3f9855932 for a.xlsx
+2026-10-21 16:15:19,168 - INFO - sessions - Released session 90e06ba3f9855932 (a.xlsx)
+2026-10-21 16:15:19,268 - INFO - document - Opened document d0.xlsx
+2026-10-21 16:15:19,268 - INFO - sessions - Opened session 4f7a917f10e90efa for d0.xlsx
+2026-10-21 16:15:19,283 - INFO - document - Opened document d1.xlsx
+2026-10-21 16:15:19,283 - INFO - sessions - Opened session 7ecc2607191b8dce for d1.xlsx
+2026-10-21 16:15:19,295 - INFO - document - Opened document d2.xlsx
+2026-10-21 16:15:19,295 - INFO - sessions - Opened session bd094f40384949cb for d2.xlsx
+2026-10-21 16:15:19,309 - INFO - document - Opened document d3.xlsx
+2026-10-21 16:15:19,309 - INFO - sessions - Opened session e96c2fa2de9783ff for d3.xlsx
+2026-10-21 16:15:19,322 - INFO - document - Opened document d4.xlsx
+2026-10-21 16:15:19,323 - INFO - sessions - Opened session f4b73a79ba48009e for d4.xlsx
+2026-10-21 16:15:19,323 - INFO - sessions - Released session 4f7a917f10e90efa (d0.xlsx)
+2026-10-21 16:15:19,323 - INFO - sessions - Released session 7ecc2607191b8dce (d1.xlsx)
+2026-10-21 16:15:19,324 - INFO - sessions - Released session bd094f40384949cb (d2.xlsx)
+2026-10-21 16:15:19,324 - INFO - sessions - Released session e96c2fa2de9783ff (d3.xlsx)
+2026-10-21 16:15:19,324 - INFO - sessions - Released session f4b73a79ba48009e (d4.xlsx)
+2026-10-21 16:15:19,365 - INFO - document - Opened document a.xlsx
+2026-10-21 16:15:19,421 - INFO - document - Opened document a.xlsx
+2026-10-21 16:15:19,431 - INFO - document - Opened document b.xlsx
+2026-10-21 16:15:19,432 - INFO - sessions - Opened session e1184ff58f314f44 for b.xlsx
+2026-10-21 16:15:19,443 - INFO - document - Created document new.xlsx
+2026-10-21 16:15:19,458 - INFO - document - Saved document new.xlsx
+2026-10-21 16:15:19,458 - INFO - sessions - Opened session f0fa32a1f97273e2 for new.xlsx
+2026-10-21 16:15:19,500 - INFO - document - Created document fresh.xlsx
+2026-10-21 16:15:19,516 - INFO - document - Saved document fresh.xlsx
+2026-10-21 16:15:19,516 - INFO - sessions - Opened session 24ed3f5034f2a899 for fresh.xlsx
+2026-10-21 16:15:19,527 - INFO - document - Created document Upper.XLSX
+2026-10-21 16:15:19,544 - INFO - document - Saved document Upper.XLSX
+2026-10-21 16:15:19,545 - INFO - sessions - Opened session 5df2e78d50923c4d for Upper.XLSX
+2026-10-21 16:15:19,616 - INFO - document - Opened document a.xlsx
+2026-10-21 16:15:19,617 - INFO - sessions - Opened session 90e06ba3f9855932 for a.xlsx
+2026-10-21 16:15:19,630 - INFO - document - Opened document b.xlsx
+2026-10-21 16:15:19,630 - INFO - sessions - Opened session e1184ff58f314f44 for b.xlsx
+2026-10-21 16:15:19,646 - INFO - document - Opened document c.xlsx
+2026-10-21 16:15:19,646 - INFO - sessions - Opened session 74bd8e5d06a50a12 for c.xlsx
+2026-10-21 16:15:19,666 - INFO - document - Saved document a.xlsx
+2026-10-21 16:15:19,685 - INFO - document - Saved document b.xlsx
+2026-10-21 16:15:19,706 - INFO - document - Saved document a.xlsx
+2026-10-21 16:15:19,762 - ERROR - sessions - Shutdown: b.xlsx was busy; not saved
+2026-10-21 16:15:19,813 - INFO - document - Opened document hot.xlsx
+2026-10-21 16:15:19,813 - INFO - sessions - Opened session cbe42d467ee49283 for hot.xlsx
+2026-10-21 16:15:19,945 - INFO - document - Opened document doc0.xlsx
+2026-10-21 16:15:19,945 - INFO - sessions - Opened session e4295d4fe994e5bd for doc0.xlsx
+2026-10-21 16:15:19,964 - INFO - document - Opened document doc1.xlsx
+2026-10-21 16:15:19,964 - INFO - sessions - Opened session d02701b159a5a3aa for doc1.xlsx
+2026-10-21 16:15:19,983 - INFO - document - Opened document doc2.xlsx
+2026-10-21 16:15:19,984 - INFO - sessions - Opened session c1b9b82a8768b73a for doc2.xlsx
+2026-10-21 16:15:20,000 - INFO - document - Opened document doc3.xlsx
+2026-10-21 16:15:20,001 - INFO - sessions - Opened session 2602bfad065862c8 for doc3.xlsx
+2026-10-21 16:15:20,708 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:20,767 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:20,815 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:20,858 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:20,878 - INFO - document - Saved document t.xlsx
+2026-10-21 16:15:20,889 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:20,935 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:20,955 - INFO - document - Saved document t.xlsx
+2026-10-21 16:15:21,002 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:21,029 - INFO - document - Saved document t.xlsx
+2026-10-21 16:15:21,044 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:21,109 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:21,132 - INFO - document - Saved document t.xlsx
+2026-10-21 16:15:21,188 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:21,232 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:21,255 - INFO - document - Saved document t.xlsx
+2026-10-21 16:15:21,268 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:21,314 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:21,374 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:21,404 - INFO - document - Saved document t.xlsx
+2026-10-21 16:15:21,414 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:21,455 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:21,505 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:21,548 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:21,605 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:21,666 - INFO - document - Saved document t.xlsx
+2026-10-21 16:15:21,683 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:21,734 - INFO - document - Opened document a.xlsx
+2026-10-21 16:15:21,762 - INFO - document - Opened document b.xlsx
+2026-10-21 16:15:21,802 - INFO - document - Opened document ext.xlsx
+2026-10-21 16:15:21,841 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:21,859 - INFO - document - Saved document t.xlsx
+2026-10-21 16:15:21,886 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:21,916 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:31,403 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:48,838 - INFO - document - Saved document t.xlsx
+2026-10-21 16:15:54,285 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:54,999 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:55,038 - INFO - document - Opened document t.xlsx
+2026-10-21 16:15:55,085 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:04,576 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-10-22 20:03:08,356 - WARNING - main - Validation error for /spreadsheet/edit-cell: 1 validation error:
+  {'type': 'greater_than_equal', 'loc': ('body', 'row'), 'msg': 'Input should be greater than or equal to 0', 'input': -1, 'ctx': {'ge': 0}}
+
+  File "E:\Projects\excelence\backend\api\spreadsheet.py", line 231, in edit_cell
+    POST /spreadsheet/edit-cell
+2026-10-22 20:03:11,409 - INFO - document - Opened document api.xlsx
+2026-10-22 20:03:11,800 - INFO - document - Opened document ids.xlsx
+2026-10-22 20:03:12,222 - INFO - document - Opened document a.xlsx
+2026-10-22 20:03:12,240 - INFO - sessions - Opened session 90e06ba3f9855932 for a.xlsx
+2026-10-22 20:03:12,326 - INFO - document - Opened document a.xlsx
+2026-10-22 20:03:12,490 - INFO - document - Opened document a.xlsx
+2026-10-22 20:03:12,577 - INFO - document - Opened document a.xlsx
+2026-10-22 20:03:12,578 - INFO - sessions - Opened session 90e06ba3f9855932 for a.xlsx
+2026-10-22 20:03:12,602 - WARNING - document - Failed to open workbook: missing.xlsx
+2026-10-22 20:03:12,707 - INFO - document - Created document new.xlsx
+2026-10-22 20:03:12,749 - INFO - document - Saved document new.xlsx
+2026-10-22 20:03:12,750 - INFO - sessions - Opened session f0fa32a1f97273e2 for new.xlsx
+2026-10-22 20:03:12,806 - INFO - document - Opened document a.xlsx
+2026-10-22 20:03:12,807 - INFO - sessions - Opened session 90e06ba3f9855932 for a.xlsx
+2026-10-22 20:03:12,852 - INFO - document - Saved document a.xlsx
+2026-10-22 20:03:12,854 - INFO - sessions - Released session 90e06ba3f9855932 (a.xlsx)
+2026-10-22 20:03:12,869 - INFO - document - Opened document a.xlsx
+2026-10-22 20:03:12,870 - INFO - sessions - Opened session 90e06ba3f9855932 for a.xlsx
+2026-10-22 20:03:12,917 - INFO - document - Opened document a.xlsx
+2026-10-22 20:03:13,012 - INFO - document - Opened document busy.xlsx
+2026-10-22 20:03:13,013 - INFO - sessions - Opened session 3e805abc9e90000e for busy.xlsx
+2026-10-22 20:03:13,017 - INFO - document - Deleted document free.xlsx
+2026-10-22 20:03:13,647 - INFO - document - Opened document a.xlsx
+2026-10-22 20:03:13,648 - INFO - sessions - Opened session 90e06ba3f9855932 for a.xlsx
+2026-10-22 20:03:14,325 - INFO - document - Opened document a.xlsx
+2026-10-22 20:03:14,326 - INFO - sessions - Opened session 90e06ba3f9855932 for a.xlsx
+2026-10-22 20:03:14,405 - INFO - document - Saved document a.xlsx
+2026-10-22 20:03:14,405 - INFO - sessions - Released session 90e06ba3f9855932 (a.xlsx)
+2026-10-22 20:03:14,419 - INFO - document - Opened document a.xlsx
+2026-10-22 20:03:14,420 - INFO - sessions - Opened session 90e06ba3f9855932 for a.xlsx
+2026-10-22 20:03:14,420 - INFO - sessions - Re-opened released session 90e06ba3f9855932
+2026-10-22 20:03:14,575 - INFO - document - Opened document a.xlsx
+2026-10-22 20:03:14,576 - INFO - sessions - Opened session 90e06ba3f9855932 for a.xlsx
+2026-10-22 20:03:14,598 - INFO - document - Opened document b.xlsx
+2026-10-22 20:03:14,598 - INFO - sessions - Opened session e1184ff58f314f44 for b.xlsx
+2026-10-22 20:03:14,708 - INFO - document - Opened document report.xlsx
+2026-10-22 20:03:15,002 - INFO - document - Opened document a.xlsx
+2026-10-22 20:03:15,046 - INFO - document - Opened document c.xlsx
+2026-10-22 20:03:15,092 - INFO - document - Opened document b.xlsx
+2026-10-22 20:03:15,335 - INFO - document - Opened document reports/q1.xlsx
+2026-10-22 20:03:15,554 - INFO - document - Opened document good.xlsx
+2026-10-22 20:03:15,554 - WARNING - document - Failed to open workbook: missing.xlsx
+2026-10-22 20:03:15,555 - WARNING - document - Open rejected for invalid filename: 
+2026-10-22 20:03:15,555 - WARNING - document - Failed to open workbook: ../escape.xlsx
+2026-10-22 20:03:15,693 - INFO - document - Opened document gone.xlsx
+2026-10-22 20:03:15,720 - INFO - document - Created document new.xlsx
+2026-10-22 20:03:15,879 - INFO - document - Saved document new.xlsx
+2026-10-22 20:03:16,007 - WARNING - app_state - Ignoring unreadable app state: Expecting property name enclosed in double quotes: line 1 column 3 (char 2)
+2026-10-22 20:03:16,022 - WARNING - app_state - Ignoring unreadable app state: Expecting property name enclosed in double quotes: line 1 column 3 (char 2)
+2026-10-22 20:03:16,026 - INFO - document - Opened document a.xlsx
+2026-10-22 20:03:16,094 - WARNING - app_state - Ignoring unreadable app state: [Errno 13] Permission denied: 'C:\\Users\\ELSALA~1\\AppData\\Local\\Temp\\tmpf30_p2re\\.excelence_state.json'
+2026-10-22 20:03:16,097 - WARNING - app_state - Could not save app state: [WinError 5] Access is denied: 'C:\\Users\\ELSALA~1\\AppData\\Local\\Temp\\tmpf30_p2re\\.excelence_state.tbmc_h4y.tmp' -> 'C:\\Users\\ELSALA~1\\AppData\\Local\\Temp\\tmpf30_p2re\\.excelence_state.json'
+2026-10-22 20:03:16,099 - INFO - document - Opened document a.xlsx
+2026-10-22 20:03:16,099 - WARNING - app_state - Ignoring unreadable app state: [Errno 13] Permission denied: 'C:\\Users\\ELSALA~1\\AppData\\Local\\Temp\\tmpf30_p2re\\.excelence_state.json'
+2026-10-22 20:03:16,178 - INFO - document - Opened document a.xlsx
+2026-10-22 20:03:16,290 - INFO - document - Opened document a.xlsx
+2026-10-22 20:03:16,308 - INFO - document - Opened document b.xlsx
+2026-10-22 20:03:16,475 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:16,532 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:16,589 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:16,640 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:16,841 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:17,010 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:17,122 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:17,220 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:17,437 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:17,503 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:17,599 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:17,662 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:17,878 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:17,930 - INFO - document - Opened document u.xlsx
+2026-10-22 20:03:17,995 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:18,119 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:18,376 - ERROR - collab - Could not deliver a batch message to client client-alice-0001
+Traceback (most recent call last):
+  File "E:\Projects\excelence\backend\collab\hub.py", line 249, in _deliver
+    conn.deliver(message)
+    ~~~~~~~~~~~~^^^^^^^^^
+  File "E:\Projects\excelence\backend\tests\test_collab_hub.py", line 197, in explode
+    raise RuntimeError("socket gone")
+RuntimeError: socket gone
+2026-10-22 20:03:18,544 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:18,610 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:18,644 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:18,682 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:18,727 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:18,771 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:18,812 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:19,204 - ERROR - collab - A log subscriber failed on revision 1
+Traceback (most recent call last):
+  File "E:\Projects\excelence\backend\collab\op_log.py", line 137, in _notify
+    callback(entry)
+    ~~~~~~~~^^^^^^^
+  File "E:\Projects\excelence\backend\tests\test_collab_log.py", line 202, in broken
+    raise RuntimeError("boom")
+RuntimeError: boom
+2026-10-22 20:03:19,332 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:19,377 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:19,424 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:19,476 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:19,516 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:19,559 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:19,596 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:19,659 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:19,720 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:19,774 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:19,834 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:19,895 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:19,953 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:20,002 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:20,040 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:20,090 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:20,138 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:20,205 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:20,253 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:20,332 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:20,402 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:20,454 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:20,513 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:20,563 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:20,600 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:20,667 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:20,721 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:20,775 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:20,825 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:20,867 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:20,918 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:20,962 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:20,997 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:21,049 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:21,098 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:21,151 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:21,218 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:21,253 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:24,634 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:24,708 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:24,754 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:24,798 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:24,836 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:24,904 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:24,924 - INFO - document - Saved document t.xlsx
+2026-10-22 20:03:24,939 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:25,066 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:25,133 - INFO - document - Saved document t.xlsx
+2026-10-22 20:03:25,245 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:25,269 - INFO - document - Saved document t.xlsx
+2026-10-22 20:03:25,281 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:25,351 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:25,392 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:25,421 - INFO - document - Saved document t.xlsx
+2026-10-22 20:03:25,430 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:25,483 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:25,513 - INFO - document - Saved document t.xlsx
+2026-10-22 20:03:25,527 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:25,572 - INFO - document - Opened document ext.xlsx
+2026-10-22 20:03:25,619 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:25,660 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:25,690 - INFO - document - Saved document t.xlsx
+2026-10-22 20:03:25,703 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:25,738 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:25,759 - INFO - document - Saved document t.xlsx
+2026-10-22 20:03:25,800 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:25,848 - INFO - document - Opened document a.xlsx
+2026-10-22 20:03:25,876 - INFO - document - Opened document b.xlsx
+2026-10-22 20:03:25,908 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:25,929 - INFO - document - Saved document t.xlsx
+2026-10-22 20:03:25,956 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:25,991 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:26,050 - INFO - document - Opened document sample.xlsx
+2026-10-22 20:03:26,099 - INFO - document - Opened document search.xlsx
+2026-10-22 20:03:26,167 - INFO - document - Opened document editing.xlsx
+2026-10-22 20:03:26,225 - INFO - document - Opened document failures.xlsx
+2026-10-22 20:03:26,322 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:26,373 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:26,439 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:26,484 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:26,509 - INFO - document - Saved document t.xlsx
+2026-10-22 20:03:26,518 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:26,553 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:26,588 - INFO - document - Opened document t2.xlsx
+2026-10-22 20:03:26,628 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:26,667 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:26,724 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:26,774 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:26,832 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:30,583 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:32,134 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:32,184 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:32,229 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:32,270 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:32,299 - INFO - document - Saved document t.xlsx
+2026-10-22 20:03:32,336 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:32,383 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:32,419 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:32,469 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:32,513 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:32,682 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:32,753 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:32,790 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:32,956 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:33,001 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:33,052 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:33,090 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:33,124 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:33,149 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:33,174 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:33,208 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:33,231 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:33,260 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:33,321 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:33,347 - INFO - document - Saved document t.xlsx
+2026-10-22 20:03:33,355 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:33,391 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:33,414 - INFO - document - Saved document t.xlsx
+2026-10-22 20:03:33,422 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:37,518 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:51,234 - INFO - document - Created document test.xlsx
+2026-10-22 20:03:51,251 - INFO - document - Saved document test.xlsx
+2026-10-22 20:03:51,251 - INFO - run_server - Created starter document test.xlsx in C:\Users\ELSALA~1\AppData\Local\Temp\tmpk686lvdz\does\not\exist\yet
+2026-10-22 20:03:51,271 - INFO - document - Opened document test.xlsx
+2026-10-22 20:03:51,345 - INFO - document - Created document test.xlsx
+2026-10-22 20:03:51,374 - INFO - document - Saved document test.xlsx
+2026-10-22 20:03:51,374 - INFO - run_server - Created starter document test.xlsx in C:\Users\ELSALA~1\AppData\Local\Temp\tmphxvez5nv
+2026-10-22 20:03:52,418 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:52,480 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:52,566 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:52,618 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:52,672 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:52,718 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:52,741 - INFO - document - Saved document t.xlsx
+2026-10-22 20:03:52,755 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:52,804 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:52,841 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:52,885 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:52,929 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:52,978 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:53,022 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:53,071 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:53,126 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:53,185 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:53,230 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:53,285 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:53,337 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:53,401 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:53,452 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:53,501 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:53,540 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:53,610 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:53,632 - INFO - document - Saved document t.xlsx
+2026-10-22 20:03:53,644 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:53,687 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:53,763 - INFO - document - Opened document shared.xlsx
+2026-10-22 20:03:53,763 - INFO - sessions - Opened session 83afa746a13f9d5a for shared.xlsx
+2026-10-22 20:03:53,824 - INFO - document - Opened document a.xlsx
+2026-10-22 20:03:53,824 - INFO - sessions - Opened session 90e06ba3f9855932 for a.xlsx
+2026-10-22 20:03:53,837 - INFO - document - Opened document b.xlsx
+2026-10-22 20:03:53,837 - INFO - sessions - Opened session e1184ff58f314f44 for b.xlsx
+2026-10-22 20:03:53,865 - INFO - document - Opened document reports/q1.xlsx
+2026-10-22 20:03:53,866 - INFO - sessions - Opened session f76cf21bb251e1b9 for reports/q1.xlsx
+2026-10-22 20:03:53,891 - WARNING - document - Failed to open workbook: missing.xlsx
+2026-10-22 20:03:53,932 - INFO - document - Opened document a.xlsx
+2026-10-22 20:03:53,933 - INFO - sessions - Opened session 90e06ba3f9855932 for a.xlsx
+2026-10-22 20:03:53,984 - INFO - document - Opened document a.xlsx
+2026-10-22 20:03:53,984 - INFO - sessions - Opened session 90e06ba3f9855932 for a.xlsx
+2026-10-22 20:03:54,041 - INFO - document - Opened document a.xlsx
+2026-10-22 20:03:54,041 - INFO - sessions - Opened session 90e06ba3f9855932 for a.xlsx
+2026-10-22 20:03:54,069 - INFO - document - Saved document a.xlsx
+2026-10-22 20:03:54,070 - INFO - sessions - Released session 90e06ba3f9855932 (a.xlsx)
+2026-10-22 20:03:54,082 - INFO - document - Opened document a.xlsx
+2026-10-22 20:03:54,083 - INFO - sessions - Opened session 90e06ba3f9855932 for a.xlsx
+2026-10-22 20:03:54,131 - INFO - document - Opened document a.xlsx
+2026-10-22 20:03:54,131 - INFO - sessions - Opened session 90e06ba3f9855932 for a.xlsx
+2026-10-22 20:03:54,133 - ERROR - sessions - Could not save a.xlsx; keeping its session open
+2026-10-22 20:03:54,150 - INFO - document - Saved document a.xlsx
+2026-10-22 20:03:54,151 - INFO - sessions - Released session 90e06ba3f9855932 (a.xlsx)
+2026-10-22 20:03:54,185 - INFO - document - Opened document a.xlsx
+2026-10-22 20:03:54,185 - INFO - sessions - Opened session 90e06ba3f9855932 for a.xlsx
+2026-10-22 20:03:54,207 - INFO - document - Saved document a.xlsx
+2026-10-22 20:03:54,208 - INFO - sessions - Released session 90e06ba3f9855932 (a.xlsx)
+2026-10-22 20:03:54,244 - INFO - document - Opened document a.xlsx
+2026-10-22 20:03:54,245 - INFO - sessions - Opened session 90e06ba3f9855932 for a.xlsx
+2026-10-22 20:03:54,264 - INFO - document - Saved document a.xlsx
+2026-10-22 20:03:54,265 - INFO - sessions - Released session 90e06ba3f9855932 (a.xlsx)
+2026-10-22 20:03:54,277 - INFO - document - Opened document a.xlsx
+2026-10-22 20:03:54,277 - INFO - sessions - Opened session 90e06ba3f9855932 for a.xlsx
+2026-10-22 20:03:54,277 - INFO - sessions - Re-opened released session 90e06ba3f9855932
+2026-10-22 20:03:54,311 - INFO - document - Opened document a.xlsx
+2026-10-22 20:03:54,313 - INFO - sessions - Opened session 90e06ba3f9855932 for a.xlsx
+2026-10-22 20:03:54,313 - INFO - sessions - Released session 90e06ba3f9855932 (a.xlsx)
+2026-10-22 20:03:54,315 - WARNING - document - Failed to open workbook: a.xlsx
+2026-10-22 20:03:54,362 - INFO - document - Opened document a.xlsx
+2026-10-22 20:03:54,363 - INFO - sessions - Opened session 90e06ba3f9855932 for a.xlsx
+2026-10-22 20:03:54,363 - INFO - sessions - Released session 90e06ba3f9855932 (a.xlsx)
+2026-10-22 20:03:54,480 - INFO - document - Opened document d0.xlsx
+2026-10-22 20:03:54,480 - INFO - sessions - Opened session 4f7a917f10e90efa for d0.xlsx
+2026-10-22 20:03:54,495 - INFO - document - Opened document d1.xlsx
+2026-10-22 20:03:54,495 - INFO - sessions - Opened session 7ecc2607191b8dce for d1.xlsx
+2026-10-22 20:03:54,511 - INFO - document - Opened document d2.xlsx
+2026-10-22 20:03:54,511 - INFO - sessions - Opened session bd094f40384949cb for d2.xlsx
+2026-10-22 20:03:54,525 - INFO - document - Opened document d3.xlsx
+2026-10-22 20:03:54,525 - INFO - sessions - Opened session e96c2fa2de9783ff for d3.xlsx
+2026-10-22 20:03:54,539 - INFO - document - Opened document d4.xlsx
+2026-10-22 20:03:54,540 - INFO - sessions - Opened session f4b73a79ba48009e for d4.xlsx
+2026-10-22 20:03:54,540 - INFO - sessions - Released session 4f7a917f10e90efa (d0.xlsx)
+2026-10-22 20:03:54,541 - INFO - sessions - Released session 7ecc2607191b8dce (d1.xlsx)
+2026-10-22 20:03:54,541 - INFO - sessions - Released session bd094f40384949cb (d2.xlsx)
+2026-10-22 20:03:54,542 - INFO - sessions - Released session e96c2fa2de9783ff (d3.xlsx)
+2026-10-22 20:03:54,542 - INFO - sessions - Released session f4b73a79ba48009e (d4.xlsx)
+2026-10-22 20:03:54,580 - INFO - document - Opened document a.xlsx
+2026-10-22 20:03:54,640 - INFO - document - Opened document a.xlsx
+2026-10-22 20:03:54,652 - INFO - document - Opened document b.xlsx
+2026-10-22 20:03:54,652 - INFO - sessions - Opened session e1184ff58f314f44 for b.xlsx
+2026-10-22 20:03:54,662 - INFO - document - Created document new.xlsx
+2026-10-22 20:03:54,685 - INFO - document - Saved document new.xlsx
+2026-10-22 20:03:54,685 - INFO - sessions - Opened session f0fa32a1f97273e2 for new.xlsx
+2026-10-22 20:03:54,724 - INFO - document - Created document fresh.xlsx
+2026-10-22 20:03:54,746 - INFO - document - Saved document fresh.xlsx
+2026-10-22 20:03:54,746 - INFO - sessions - Opened session 24ed3f5034f2a899 for fresh.xlsx
+2026-10-22 20:03:54,764 - INFO - document - Created document Upper.XLSX
+2026-10-22 20:03:54,794 - INFO - document - Saved document Upper.XLSX
+2026-10-22 20:03:54,794 - INFO - sessions - Opened session 5df2e78d50923c4d for Upper.XLSX
+2026-10-22 20:03:54,868 - INFO - document - Opened document a.xlsx
+2026-10-22 20:03:54,868 - INFO - sessions - Opened session 90e06ba3f9855932 for a.xlsx
+2026-10-22 20:03:54,879 - INFO - document - Opened document b.xlsx
+2026-10-22 20:03:54,879 - INFO - sessions - Opened session e1184ff58f314f44 for b.xlsx
+2026-10-22 20:03:54,891 - INFO - document - Opened document c.xlsx
+2026-10-22 20:03:54,891 - INFO - sessions - Opened session 74bd8e5d06a50a12 for c.xlsx
+2026-10-22 20:03:54,907 - INFO - document - Saved document a.xlsx
+2026-10-22 20:03:54,922 - INFO - document - Saved document b.xlsx
+2026-10-22 20:03:54,938 - INFO - document - Saved document a.xlsx
+2026-10-22 20:03:55,000 - ERROR - sessions - Shutdown: b.xlsx was busy; not saved
+2026-10-22 20:03:55,041 - INFO - document - Opened document hot.xlsx
+2026-10-22 20:03:55,042 - INFO - sessions - Opened session cbe42d467ee49283 for hot.xlsx
+2026-10-22 20:03:55,146 - INFO - document - Opened document doc0.xlsx
+2026-10-22 20:03:55,147 - INFO - sessions - Opened session e4295d4fe994e5bd for doc0.xlsx
+2026-10-22 20:03:55,163 - INFO - document - Opened document doc1.xlsx
+2026-10-22 20:03:55,163 - INFO - sessions - Opened session d02701b159a5a3aa for doc1.xlsx
+2026-10-22 20:03:55,178 - INFO - document - Opened document doc2.xlsx
+2026-10-22 20:03:55,179 - INFO - sessions - Opened session c1b9b82a8768b73a for doc2.xlsx
+2026-10-22 20:03:55,194 - INFO - document - Opened document doc3.xlsx
+2026-10-22 20:03:55,194 - INFO - sessions - Opened session 2602bfad065862c8 for doc3.xlsx
+2026-10-22 20:03:55,580 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:55,626 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:55,688 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:55,736 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:55,757 - INFO - document - Saved document t.xlsx
+2026-10-22 20:03:55,767 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:55,818 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:55,842 - INFO - document - Saved document t.xlsx
+2026-10-22 20:03:55,880 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:55,908 - INFO - document - Saved document t.xlsx
+2026-10-22 20:03:55,919 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:55,969 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:55,988 - INFO - document - Saved document t.xlsx
+2026-10-22 20:03:56,025 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:56,063 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:56,084 - INFO - document - Saved document t.xlsx
+2026-10-22 20:03:56,094 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:56,130 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:56,184 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:56,209 - INFO - document - Saved document t.xlsx
+2026-10-22 20:03:56,219 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:56,255 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:56,324 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:56,381 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:56,432 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:56,478 - INFO - document - Saved document t.xlsx
+2026-10-22 20:03:56,491 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:56,531 - INFO - document - Opened document a.xlsx
+2026-10-22 20:03:56,562 - INFO - document - Opened document b.xlsx
+2026-10-22 20:03:56,594 - INFO - document - Opened document ext.xlsx
+2026-10-22 20:03:56,642 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:56,663 - INFO - document - Saved document t.xlsx
+2026-10-22 20:03:56,692 - INFO - document - Opened document t.xlsx
+2026-10-22 20:03:56,735 - INFO - document - Opened document t.xlsx
+2026-10-22 20:04:06,101 - INFO - document - Opened document t.xlsx
+2026-10-22 20:04:27,300 - INFO - document - Saved document t.xlsx
+2026-10-22 20:04:33,728 - INFO - document - Opened document t.xlsx
+2026-10-22 20:04:34,482 - INFO - document - Opened document t.xlsx
+2026-10-22 20:04:34,537 - INFO - document - Opened document t.xlsx
+2026-10-22 20:04:34,590 - INFO - document - Opened document t.xlsx

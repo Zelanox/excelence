@@ -129,3 +129,96 @@ def test_a_resync_entry_is_recorded_like_any_other():
     entry = log.append(KIND_RESYNC)
 
     assert entry.revision == 1 and entry.kind == KIND_RESYNC and entry.ops == ()
+
+
+# ----------------------------------------------------------------------
+# Subscribers: how live connections hear about new entries
+# ----------------------------------------------------------------------
+
+
+def test_a_subscriber_hears_every_new_entry_in_order():
+    log = OpLog()
+    heard = []
+    log.subscribe(heard.append)
+
+    add(log, 3)
+
+    assert [e.revision for e in heard] == [1, 2, 3]
+
+
+def test_a_subscriber_does_not_hear_entries_from_before_it_subscribed():
+    log = OpLog()
+    add(log, 2)
+    heard = []
+    log.subscribe(heard.append)
+
+    add(log, 1)
+
+    assert [e.revision for e in heard] == [3]
+
+
+def test_resync_entries_are_announced_too():
+    log = OpLog()
+    heard = []
+    log.subscribe(heard.append)
+
+    log.append(KIND_RESYNC)
+
+    assert [(e.revision, e.kind) for e in heard] == [(1, KIND_RESYNC)]
+
+
+def test_an_unsubscribed_callback_hears_nothing_more():
+    log = OpLog()
+    heard = []
+    log.subscribe(heard.append)
+    add(log, 1)
+
+    log.unsubscribe(heard.append)
+    add(log, 1)
+
+    assert [e.revision for e in heard] == [1]
+
+
+def test_unsubscribing_an_unknown_callback_is_harmless():
+    OpLog().unsubscribe(print)
+
+
+def test_subscribing_the_same_callback_twice_announces_once():
+    log = OpLog()
+    heard = []
+    log.subscribe(heard.append)
+    log.subscribe(heard.append)
+
+    add(log, 1)
+
+    assert len(heard) == 1
+
+
+def test_a_failing_subscriber_neither_loses_the_entry_nor_silences_the_others():
+    log = OpLog()
+    heard = []
+
+    def broken(entry):
+        raise RuntimeError("boom")
+
+    log.subscribe(broken)
+    log.subscribe(heard.append)
+
+    entry = add(log, 1)[0]
+
+    assert log.revision == 1 and log.since(0) == [entry]
+    assert heard == [entry]
+
+
+def test_a_subscriber_may_unsubscribe_itself_while_being_called():
+    log = OpLog()
+    heard = []
+
+    def once(entry):
+        heard.append(entry)
+        log.unsubscribe(once)
+
+    log.subscribe(once)
+    add(log, 3)
+
+    assert len(heard) == 1

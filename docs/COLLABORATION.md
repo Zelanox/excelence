@@ -230,7 +230,9 @@ Each phase is useful on its own and can be checked before the next starts.
 | 4a | **Stable row and column IDs** in the server model and the grid payload | **done on the server** (Sheet-level tests pass; Document-level tests and the Flutter side still to be run by hand) |
 | 4b | **Operation log**: revision-numbered canonical operations addressed by those IDs | **done for the first operation set** (cells, rows, columns, column width, RTL, sheets); text/cell styles, appearance and text defaults still to add |
 | 4c | **Nothing slips past the log**: old routes, undo while shared, reload | **done** |
-| 5 | **WebSocket broadcast**, optimistic apply, reconnect catch-up, presence ("who is here") | |
+| 5a | **Server: live broadcast and presence.** Step 1 (the hub and log subscribers) is built; the WebSocket route is next | **in progress** |
+| 5b | Flutter: send operations, optimistic apply, apply incoming changes, reconnect, loading screen | |
+| 5c | "Who is here" list in the UI | |
 | 6 | **Per-user undo** via inverse operations (replaces snapshot undo) | |
 | 7 | Accounts, permissions, share links, HTTPS hosting (not needed for a small trusted team) | later |
 
@@ -366,6 +368,38 @@ Known limits, on purpose, to be dealt with in the next steps:
   while more than one client is in the session. They still work for one person. Per-user undo
   (phase 6) will replace this.
 * **Reloading a document** resets the log, so every client must load the document again.
+
+### Phase 5a, step 1: log subscribers and the hub (built; the WebSocket route is not)
+
+Code: `backend/collab/op_log.py` (subscribers) and `backend/collab/hub.py` (no web-framework dependency).
+
+* **The log announces itself.** `OpLog.subscribe(callback)` / `unsubscribe(callback)`: every appended
+  entry is passed to each subscriber, in the appending thread, under the session's lock. A subscriber that
+  raises is logged and ignored: the change is already applied and numbered. Because *every* entry goes
+  through `append`, changes made over HTTP, changes made over a live connection and `resync` entries
+  (old routes, reload) all reach live clients without any route having to remember to broadcast.
+* **The hub** keeps one *room* per session with live connections: client id → connection, in join order.
+  `join(session, conn, since)` sends the catch-up first and registers for live messages second, under the
+  session's lock, so nothing is missed and nothing is sent twice. A connection of a client id that is
+  already in the room *replaces* the old one (the old one is closed with reason `replaced`), so presence
+  never shows a client twice. `leave(session, conn)` ignores a connection that was already replaced.
+  When the last connection leaves, the room unsubscribes from the log and disappears.
+* **Messages to a client** (JSON, with a `type`): `catch_up {revision, batches}`, `resync {revision, reason}`,
+  `batch {batch}` (the entry as `GET /spreadsheet/ops` returns it), `presence {clients: [{id, name}]}`,
+  `result {client_batch_id, accepted, ...}` (the answer to the sender's own batch, with the `dropped`
+  notices or the refusal), `error {code, message}`. The sender receives its own batch through `batch`
+  (that is its acknowledgement) and then the `result`. `resync` reasons: `BEHIND` (too far behind, or
+  something unreplayable in between), `AHEAD_OF_SERVER` (the client saw a revision this server never
+  reached, so it was talking to an earlier run: reload), `CHANGED` (the document changed in a way the log
+  can't describe).
+* **A slow client can't slow anyone else.** `deliver` never waits. `QueueConnection` (for the asyncio
+  server) schedules the message on the event loop with `call_soon_threadsafe` and keeps a bounded queue
+  (256 messages). If the client falls further behind than that, its queue is dropped, the connection closes
+  with reason `overflow`, and the client reconnects and catches up from the log.
+* **Presence is the set of live connections**, nothing else (not the HTTP "last seen" list).
+* **Still to do in the route (next step):** a connected client sends nothing over HTTP, so the route must
+  refresh its entry in the session registry (on `ping` and on every message), or the registry's 120-second
+  expiry would drop it and release the session under it.
 
 ### Why the order changed
 
