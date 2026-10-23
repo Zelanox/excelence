@@ -1,10 +1,11 @@
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi import Depends, FastAPI, HTTPException, Request, WebSocketException, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
+from starlette.requests import HTTPConnection
 
 from backend.api.status import router as status_router
 from backend.api.documents import router as documents_router
@@ -12,6 +13,7 @@ from backend.api.spreadsheet import router as spreadsheet_router
 from backend.api.app_state import router as app_state_router
 from backend.api.sessions import router as sessions_router
 from backend.api.collab import router as collab_router
+from backend.api.live import router as live_router
 from backend.dependencies import registry
 from backend.api.models.common import ErrorResponse
 from backend.utils.logger import get_logger
@@ -22,14 +24,41 @@ logger = get_logger("main")
 settings = load_settings()
 
 
-def require_access_token(request: Request) -> None:
-    """Reject requests without the shared access token, when one is configured."""
-    if not token_matches(request.headers.get("authorization"), settings.access_token):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing or invalid access token.",
-            headers={"WWW-Authenticate": "Bearer"},
+def require_access_token(connection: HTTPConnection) -> None:
+    """Reject connections without the shared access token, when one is configured.
+
+    Works for ordinary requests and for WebSocket connections (``connection``
+    is whichever it is). The token is read from the ``Authorization`` header.
+    Browsers cannot set headers on a WebSocket, so a WebSocket may instead
+    carry it as a ``token`` query parameter; ordinary requests may not (a
+    token in a URL ends up in logs and browser history, so it is accepted
+    only where there is no alternative).
+
+    A refused WebSocket is turned away at the handshake, before it is accepted.
+    """
+    supplied = connection.headers.get("authorization")
+    is_websocket = connection.scope["type"] == "websocket"
+
+    if supplied is None and is_websocket:
+        query_token = connection.query_params.get("token")
+
+        if query_token:
+            supplied = f"Bearer {query_token}"
+
+    if token_matches(supplied, settings.access_token):
+        return
+
+    if is_websocket:
+        raise WebSocketException(
+            code=status.WS_1008_POLICY_VIOLATION,
+            reason="Missing or invalid access token.",
         )
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Missing or invalid access token.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
 
 
 @asynccontextmanager
@@ -76,6 +105,7 @@ app.include_router(status_router)
 app.include_router(documents_router)
 app.include_router(spreadsheet_router)
 app.include_router(collab_router)
+app.include_router(live_router)
 app.include_router(app_state_router)
 app.include_router(sessions_router)
 

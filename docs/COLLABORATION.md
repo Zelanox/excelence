@@ -230,7 +230,7 @@ Each phase is useful on its own and can be checked before the next starts.
 | 4a | **Stable row and column IDs** in the server model and the grid payload | **done on the server** (Sheet-level tests pass; Document-level tests and the Flutter side still to be run by hand) |
 | 4b | **Operation log**: revision-numbered canonical operations addressed by those IDs | **done for the first operation set** (cells, rows, columns, column width, RTL, sheets); text/cell styles, appearance and text defaults still to add |
 | 4c | **Nothing slips past the log**: old routes, undo while shared, reload | **done** |
-| 5a | **Server: live broadcast and presence.** Step 1 (the hub and log subscribers) is built; the WebSocket route is next | **in progress** |
+| 5a | **Server: live broadcast and presence** (log subscribers, hub, `/spreadsheet/live`, token on WebSockets) | **done**, once the route tests pass on a real machine |
 | 5b | Flutter: send operations, optimistic apply, apply incoming changes, reconnect, loading screen | |
 | 5c | "Who is here" list in the UI | |
 | 6 | **Per-user undo** via inverse operations (replaces snapshot undo) | |
@@ -369,7 +369,7 @@ Known limits, on purpose, to be dealt with in the next steps:
   (phase 6) will replace this.
 * **Reloading a document** resets the log, so every client must load the document again.
 
-### Phase 5a, step 1: log subscribers and the hub (built; the WebSocket route is not)
+### Phase 5a, step 1: log subscribers and the hub
 
 Code: `backend/collab/op_log.py` (subscribers) and `backend/collab/hub.py` (no web-framework dependency).
 
@@ -397,9 +397,74 @@ Code: `backend/collab/op_log.py` (subscribers) and `backend/collab/hub.py` (no w
   (256 messages). If the client falls further behind than that, its queue is dropped, the connection closes
   with reason `overflow`, and the client reconnects and catches up from the log.
 * **Presence is the set of live connections**, nothing else (not the HTTP "last seen" list).
-* **Still to do in the route (next step):** a connected client sends nothing over HTTP, so the route must
-  refresh its entry in the session registry (on `ping` and on every message), or the registry's 120-second
-  expiry would drop it and release the session under it.
+* A connected client sends nothing over HTTP, so the route refreshes its entry in the session registry
+  on every message (see step 2).
+
+### Phase 5a, step 2: the WebSocket route
+
+Code: `backend/collab/live.py` (the rules, no web framework), `backend/api/live.py` (the route),
+`require_access_token` in `backend/main.py`, `hub` / `get_hub` in `backend/dependencies.py`.
+
+**Address:** `ws://<server>/spreadsheet/live?document=<session id>&client=<client id>&name=<name>&since=<revision>&token=<token>`
+
+| Parameter | Rule |
+|---|---|
+| `document` | required: the session id the server returned when the document was opened (the same value as the `X-Document` header) |
+| `client` | required: 8-64 letters, digits, `-` or `_` (same as `X-Client-Id`) |
+| `name` | optional (default `Guest`); 1-40 characters after control characters are removed; Arabic is fine; longer or empty is refused (not cut) |
+| `since` | optional (default 0): the last revision the client applied; a whole number, 0 or more |
+| `token` | the shared access token, when the server has one (see below) |
+
+**Messages from the client:** `{"type":"ping"}` (answered with `{"type":"pong"}`) and
+`{"type":"ops","payload":{...}}` where `payload` is exactly the body of `POST /spreadsheet/ops`.
+Anything else, or anything that is not JSON, gets an `error` (`BAD_REQUEST`) and the connection stays open.
+A message over 1,000,000 characters gets `MESSAGE_TOO_LARGE`. (Uvicorn itself drops connections that send more than 16 MB.)
+
+**Messages from the server:** see step 1. On connecting: `catch_up` (or `resync`) and then `presence`.
+Problems with the parameters or the document come as an `error` followed by a close with code 1008.
+
+**Keeping the session open:** clients should send a `ping` about every 30 seconds. Every message refreshes the
+client in the session registry, whose idle limit is 120 seconds; without it the server would drop the client,
+save and close the document, and re-open it as a new session with an empty log. If that happens anyway, the
+next message gets `error SESSION_REPLACED` (or `SESSION_NOT_OPEN` if the server forgot the document) and the
+connection is closed with 1012: reconnect, and the catch-up will say `resync`.
+
+**Disconnecting does not leave the session.** Presence changes at once, but the client stays in the registry
+until the normal idle limit, so a phone that loses Wi-Fi for a moment comes back to the same open document
+(no save, close and re-open). The "Close" route still leaves at once.
+
+**Close codes the server uses:**
+
+| Code | Meaning | What the client should do |
+|---|---|---|
+| 1008 | Refused: bad parameters, document not open, or wrong/missing token | Don't retry blindly: fix the cause (or open the document again) |
+| 1012 | Session closed or forgotten on the server | Reconnect (with `since`); expect `resync` |
+| 1013 | The client fell more than 256 messages behind | Reconnect and catch up |
+| 1011 | Unexpected error on the server | Reconnect |
+| 4001 | Another connection with the same client id took over | **Do not auto-reconnect** (two would keep replacing each other) |
+| 1000 | Normal | |
+
+Suggested reconnect delays: 1, 2, 4, ... up to 15 seconds.
+
+**The access token on a WebSocket.** Browsers cannot set headers on a WebSocket, so the token may travel as
+`?token=`; a non-browser client may use the `Authorization: Bearer` header instead (the header wins if both are
+sent). It is checked before the connection is accepted: a refused connection is turned away at the handshake
+(HTTP 403 / close 1008). Ordinary HTTP requests do **not** accept `?token=`. Two things to know:
+* A token in a URL can end up in logs: Uvicorn's access log prints the full address, query included. On a
+  trusted LAN with a shared token this is acceptable; do not share those logs, and change the token if they
+  leak. (An "authenticate with the first message" scheme would avoid it; not done yet.)
+* Browsers do not apply CORS rules to WebSockets, so the allowed-origins setting does not protect this route;
+  the token does.
+
+**Decisions made in this step:**
+* One connection per client id; a new one replaces the old one (close code 4001).
+* The default (legacy, no-document) session has no live connection: `document` is required.
+* A client ahead of the server gets `resync` / `AHEAD_OF_SERVER` rather than an error.
+
+**Tests:** `test_collab_live.py` (the rules, runs anywhere), `test_collab_hub.py` (hub and queue),
+`test_api_live.py` (the real route through Starlette's `TestClient`, including the token rules). The last one
+can only run where FastAPI is installed, and a bug that stops a message from arriving shows up as a test that
+hangs, not one that fails.
 
 ### Why the order changed
 

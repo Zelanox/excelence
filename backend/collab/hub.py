@@ -290,7 +290,15 @@ class QueueConnection:
         self._schedule(self._enqueue, message)
 
     def close(self, reason: str) -> None:
+        """Disconnect now: messages still waiting are dropped."""
         self._schedule(self._shut, reason)
+
+    def end(self, reason: str) -> None:
+        """Disconnect after the messages already waiting have been sent.
+
+        Used to say something last ("your session was replaced") and then hang up.
+        """
+        self._schedule(self._finish, reason)
 
     async def next_message(self) -> dict[str, Any] | None:
         """The next message, or None once the connection is closed."""
@@ -320,6 +328,13 @@ class QueueConnection:
             return
 
         self._queue.put_nowait(message)
+
+    def _finish(self, reason: str) -> None:
+        if self.closed:
+            return
+
+        self.close_reason = reason
+        self._queue.put_nowait(_CLOSE)      # there is always room: _enqueue stops one short
 
     def _shut(self, reason: str) -> None:
         if self.closed:

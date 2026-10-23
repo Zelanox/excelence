@@ -470,6 +470,44 @@ def test_closing_ends_the_stream_and_later_messages_are_ignored():
     assert run(scenario) == ("replaced", None, None)
 
 
+def test_ending_sends_what_is_waiting_first_and_then_closes():
+    async def scenario():
+        conn = QueueConnection(ALICE, "Alice", asyncio.get_running_loop())
+        conn.deliver({"n": 1})
+        conn.deliver({"n": 2})
+        await asyncio.to_thread(conn.end, "session closed")
+        conn.deliver({"n": 3})                          # after the end: ignored
+        await asyncio.sleep(0.01)
+
+        first, second = await conn.next_message(), await conn.next_message()
+        return first, second, await conn.next_message(), await conn.next_message(), conn.close_reason
+
+    assert run(scenario) == ({"n": 1}, {"n": 2}, None, None, "session closed")
+
+
+def test_ending_a_connection_that_already_closed_changes_nothing():
+    async def scenario():
+        conn = QueueConnection(ALICE, "Alice", asyncio.get_running_loop())
+        conn.close("overflow")
+        conn.end("session closed")
+        await asyncio.sleep(0.01)
+        return conn.close_reason, await conn.next_message()
+
+    assert run(scenario) == ("overflow", None)
+
+
+def test_ending_a_connection_with_a_full_queue_still_works():
+    async def scenario():
+        conn = QueueConnection(ALICE, "Alice", asyncio.get_running_loop(), max_queue=2)
+        conn.deliver({"n": 1})
+        conn.deliver({"n": 2})
+        conn.end("session closed")
+        await asyncio.sleep(0.01)
+        return [await conn.next_message(), await conn.next_message(), await conn.next_message()]
+
+    assert run(scenario) == [{"n": 1}, {"n": 2}, None]
+
+
 def test_the_first_close_reason_wins():
     async def scenario():
         conn = QueueConnection(ALICE, "Alice", asyncio.get_running_loop())

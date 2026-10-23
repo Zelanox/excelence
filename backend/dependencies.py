@@ -20,11 +20,15 @@ of undo history would depend on thread scheduling).
 
 from fastapi import Depends, HTTPException, Request
 
+from backend.collab.hub import Hub
 from backend.collab.service import account_for_untracked_changes
 from backend.controller.controller import Controller
 from backend.sessions import Session, SessionNotOpen, SessionRegistry
 
 registry = SessionRegistry()
+
+# The live connections (see backend/collab/hub.py), shared by the whole server.
+hub = Hub()
 
 # The default session's controller, kept under its old name for anything that
 # still imports it.
@@ -33,6 +37,10 @@ controller = registry.default.controller
 
 def get_registry() -> SessionRegistry:
     return registry
+
+
+def get_hub() -> Hub:
+    return hub
 
 
 def get_session(request: Request):
