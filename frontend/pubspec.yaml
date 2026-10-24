@@ -33,6 +33,9 @@ dependencies:
 
   http: ^1.5.0
 
+  # Live collaboration: the WebSocket connection to the server.
+  web_socket_channel: ^3.0.1
+
   file_picker: ^8.1.4
 
   two_dimensional_scrollables: ^0.4.2

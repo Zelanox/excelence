@@ -46,6 +46,7 @@ def _grid_fields(controller: Controller) -> dict[str, Any]:
         "appearance": data.appearance,
         "undo_depth": data.undo_depth,
         "redo_depth": data.redo_depth,
+        "revision": controller.revision(),
     }
 
 

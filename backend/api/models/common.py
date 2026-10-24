@@ -71,6 +71,8 @@ class SpreadsheetResponse(ApiResponse):
 
     redo_depth: int = Field(default=0, description="Redo steps the backend currently holds.")
 
+    revision: int = Field(default=0, description="The revision of the operation log that this data corresponds to. A client that then listens for live changes asks for everything after this revision.")
+
 
 class StatusResponse(ApiResponse):
 

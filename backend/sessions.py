@@ -149,6 +149,19 @@ class Session:
 
     def __post_init__(self) -> None:
         self.accounted_changes = self.controller.document.change_count
+        self.controller.revision_source = self.revision
+
+    def revision(self) -> int:
+        """The log revision that the document's current contents correspond to.
+
+        First brings the log up to date with any change that did not go through
+        it (an old route), so the number returned is never behind the data it
+        is sent with. Call with the session's lock held, like everything else.
+        """
+        from backend.collab.service import account_for_untracked_changes     # (avoids a circular import)
+
+        account_for_untracked_changes(self)
+        return self.oplog.revision
 
     @property
     def is_default(self) -> bool:

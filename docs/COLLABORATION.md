@@ -231,8 +231,11 @@ Each phase is useful on its own and can be checked before the next starts.
 | 4b | **Operation log**: revision-numbered canonical operations addressed by those IDs | **done for the first operation set** (cells, rows, columns, column width, RTL, sheets); text/cell styles, appearance and text defaults still to add |
 | 4c | **Nothing slips past the log**: old routes, undo while shared, reload | **done** |
 | 5a | **Server: live broadcast and presence** (log subscribers, hub, `/spreadsheet/live`, token on WebSockets) | **done**, once the route tests pass on a real machine |
-| 5b | Flutter: send operations, optimistic apply, apply incoming changes, reconnect, loading screen | |
-| 5c | "Who is here" list in the UI | |
+| 5b-1 | **Client building blocks:** the server says which revision each grid payload matches; Flutter has the live connection (ping, reconnect), message parsing and the "is my copy out of date?" logic, all tested without a network | **in progress** (code written; Flutter tests to run) |
+| 5b-2 | Wire those into the app: connect when a document is open, **reload mode** (any change by someone else reloads the document), the connection state and the "who is here" count (this also covers 5c) | **in progress** (code written; needs a manual two-window test) |
+| 5b-3 | Apply incoming changes one by one by id instead of reloading | |
+| 5b-4 | Send edits as operations, with optimistic apply | |
+| 5c | "Who is here" in the UI | (in 5b-2: a count in the status bar, names in its tooltip) |
 | 6 | **Per-user undo** via inverse operations (replaces snapshot undo) | |
 | 7 | Accounts, permissions, share links, HTTPS hosting (not needed for a small trusted team) | later |
 
@@ -465,6 +468,73 @@ sent). It is checked before the connection is accepted: a refused connection is 
 `test_api_live.py` (the real route through Starlette's `TestClient`, including the token rules). The last one
 can only run where FastAPI is installed, and a bug that stops a message from arriving shows up as a test that
 hangs, not one that fails.
+
+### Phase 5b, step 1: what the client needs before it can go live
+
+**The revision comes with the data.** Every grid payload (`GET /spreadsheet/data` and every route that
+returns the grid) now has a `revision` field: the revision of the operation log that this data matches.
+A client that loads data and then opens `/spreadsheet/live?since=<that revision>` is told exactly what happened
+in between, nothing more and nothing less. Without it, a change made between "load" and "connect" is lost or
+applied twice.
+* `Session.revision()` brings the log up to date first: a change made through an old route (not an operation)
+  is logged as a "reload" entry *before* the number is read, so the number is never behind the data. Calling it
+  again adds nothing.
+* `Controller.revision()` reads it (0 when the controller is not in a session, such as in unit tests).
+
+**Flutter, `frontend/lib/core/live/` (no Flutter widgets in it; tests in `frontend/test/live_*_test.dart`):**
+* `live_messages.dart`: reads the server's messages into typed objects; skips anything it doesn't understand
+  (so a newer server can add message types).
+* `live_address.dart`: builds the `ws://` / `wss://` address from the server's base URL (name cut to 40 characters).
+* `live_channel.dart`: the only file that touches `web_socket_channel`; a small interface so tests use a fake.
+* `live_connection.dart`: opens the connection, pings every 30 s, reconnects with 1, 2, 4, 8, 15 s delays
+  (starting over after a connection that worked), asks each time from the newest revision it has applied,
+  and stops for good only on close code 1008 (refused) or 4001 (replaced).
+* `live_sync.dart`: decides when the local copy is out of date and must be reloaded. A message not newer than
+  the local copy is ignored (usually the echo of one's own change); nothing reloads while this client has a
+  request of its own in flight (its response usually settles it); messages in quick succession cause one
+  reload, and a message during a reload causes one more; a failed reload is reported and retried on the next
+  message, never in a loop.
+
+**Reload mode (next step).** At first every change by someone else is handled by reloading the document. It is
+simple and always correct, and it already works for everything the old routes change, because those produce
+a "reload" entry for everyone else. Applying changes one by one (5b-3) and sending edits as operations (5b-4)
+replace it piece by piece.
+
+### Phase 5b, step 2: reload mode in the app
+
+* `LiveCoordinator` (`core/live/live_coordinator.dart`) bundles the connection, the reload logic and the list of
+  people for one open document. `SpreadsheetController` creates one after a document has loaded (and stops it
+  before another is opened), through an optional `liveFactory`; without a factory nothing changes, which is how
+  all the existing tests run.
+* **Hooks, so no call site has to cooperate:** `ApiClient` tells the app when any `POST`/`PUT`/`DELETE`/upload
+  starts and finishes (nothing reloads while this client's own change is on its way), and
+  `SpreadsheetService` reports the `revision` of every response that carries grid data.
+* **What a reload does** (`_reloadFromLive`): wait for this client's own queued saves, fetch the sheet list and
+  the data; if the user edited in the meantime the answer is discarded and asked for again (up to 3 times), so
+  an edit never vanishes; then replace the grid.
+* **Known limits of reload mode (lifted in 5b-3 / 5b-4 / 6):**
+  * The server has ONE active sheet per document. A reload follows it: if someone switches sheets, everyone's
+    grid shows that sheet. Two people on different sheets is not possible until edits are addressed by sheet id.
+  * Any change by someone else clears your local undo history (it would otherwise undo over their work).
+  * The whole sheet is fetched on every change by someone else (debounced to one reload per 150 ms burst).
+* **Status bar:** a people icon with the count (names in the tooltip) while connected; "Connecting...",
+  "Reconnecting..." or "Live updates off" otherwise. "Live updates off" means the server refused this window
+  (for example the document is no longer open there) or another window with the same client id took over.
+
+* **When the server forgets the document** (it was restarted, or the id is unknown to it): every HTTP call
+  then answers `409 SESSION_NOT_OPEN`, and the live connection is refused with the same code. Before this
+  there was no handling at all, so autosave, resync and saving appearance failed in a loop. Now
+  `ApiClient.onSessionLost` (any such 409) and `LiveCoordinator.onSessionLost` (the live error) make the
+  controller open the document again from what the server last saved on disk
+  (`SpreadsheetController._sessionLost`). Edits made since that save are not on the server any more and are
+  replaced by the saved version. It does nothing while a document is already being opened, and at most once
+  every ten seconds, so it cannot loop.
+* **Manual two-window test:** start the backend and leave it running; start the app (`flutter run -d chrome`),
+  open a document; start a second instance (`flutter run -d edge`, or another `-d chrome`), open the same
+  document. Each app launch has its own random client id, so two instances never replace each other.
+  Expect the people icon to show 2 in both, an edit in one to appear in the other within about half a second,
+  and "Reconnecting..." followed by recovery if the backend is stopped and started again.
+
 
 ### Why the order changed
 

@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/api/api_config.dart';
+import '../../../core/live/live_channel.dart';
+import '../../../core/live/live_coordinator.dart';
 import '../../../core/preferences/app_preferences.dart';
 import '../../spreadsheet/controllers/spreadsheet_controller.dart';
 import '../../spreadsheet/controllers/viewport_controller.dart';
@@ -57,7 +59,26 @@ class _ShellPageState extends State<ShellPage> with WidgetsBindingObserver {
     // before _loadInitialDocument reads them.
     AppPreferences.useBackend(api);
 
-    spreadsheetController = SpreadsheetController(service);
+    spreadsheetController = SpreadsheetController(
+      service,
+      // Other people's changes to the open document arrive over a live
+      // (WebSocket) connection; the controller starts it once a document
+      // has been loaded.
+      liveFactory: ({
+        required reload,
+        required onChanged,
+        required onSessionLost,
+      }) =>
+          LiveCoordinator(
+        addressFor: (since) => api.liveUri(since: since),
+        connect: WebSocketLiveChannel.new,
+        reload: reload,
+        onChanged: onChanged,
+        onSessionLost: onSessionLost,
+        onReloadFailed: (error) =>
+            debugPrint('[Live] reload failed: $error'),
+      ),
+    );
     viewportController = ViewportController();
 
     // Keep the viewport's valid row/column range in sync with whatever

@@ -3,6 +3,8 @@ import 'dart:math';
 
 import 'package:http/http.dart' as http;
 
+import '../live/live_address.dart';
+
 class ApiClient {
   ApiClient({
     required this.baseUrl,
@@ -66,10 +68,62 @@ class ApiClient {
     };
   }
 
+  /// Called when a request that can change the document is sent, and when it
+  /// has finished (successfully or not). Live collaboration uses this to hold
+  /// off reloading the document while this client's own change is on its way.
+  void Function()? onWriteStarted;
+  void Function()? onWriteFinished;
+
+  Future<T> _tracked<T>(Future<T> Function() send) async {
+    onWriteStarted?.call();
+
+    try {
+      return await send();
+    } finally {
+      onWriteFinished?.call();
+    }
+  }
+
+  /// The address of the live (WebSocket) connection for the document this
+  /// client is in, catching up from [since]. Throws if no document is open.
+  Uri liveUri({required int since}) {
+    final session = documentSession;
+
+    if (session == null || session.isEmpty) {
+      throw StateError('No document is open.');
+    }
+
+    return liveAddress(
+      baseUrl: baseUrl,
+      document: session,
+      clientId: clientId,
+      name: clientName,
+      since: since,
+      token: accessToken,
+    );
+  }
+
+  /// Called when the server answers that it no longer has this client's
+  /// document open (it was restarted, or forgot it). The app should open the
+  /// document again.
+  void Function()? onSessionLost;
+
+  Future<http.Response> _checked(Future<http.Response> request) async {
+    final response = await request;
+
+    if (isSessionLostResponse(response.statusCode, response.body)) {
+      onSessionLost?.call();
+    }
+
+    return response;
+  }
+
   Future<http.Response> get(String endpoint) {
-    return http.get(
-      Uri.parse('$_root$endpoint'),
-      headers: _headers(),
+    return _checked(
+      http.get(
+        Uri.parse('$_root$endpoint'),
+        headers: _headers(),
+      ),
     );
   }
 
@@ -77,10 +131,14 @@ class ApiClient {
     String endpoint, {
     Object? body,
   }) {
-    return http.post(
-      Uri.parse('$_root$endpoint'),
-      headers: _headers(json: true),
-      body: body == null ? null : jsonEncode(body),
+    return _tracked(
+      () => _checked(
+        http.post(
+          Uri.parse('$_root$endpoint'),
+          headers: _headers(json: true),
+          body: body == null ? null : jsonEncode(body),
+        ),
+      ),
     );
   }
 
@@ -88,17 +146,25 @@ class ApiClient {
     String endpoint, {
     Object? body,
   }) {
-    return http.put(
-      Uri.parse('$_root$endpoint'),
-      headers: _headers(json: true),
-      body: body == null ? null : jsonEncode(body),
+    return _tracked(
+      () => _checked(
+        http.put(
+          Uri.parse('$_root$endpoint'),
+          headers: _headers(json: true),
+          body: body == null ? null : jsonEncode(body),
+        ),
+      ),
     );
   }
 
   Future<http.Response> delete(String endpoint) {
-    return http.delete(
-      Uri.parse('$_root$endpoint'),
-      headers: _headers(),
+    return _tracked(
+      () => _checked(
+        http.delete(
+          Uri.parse('$_root$endpoint'),
+          headers: _headers(),
+        ),
+      ),
     );
   }
 
@@ -126,7 +192,15 @@ class ApiClient {
         ),
       );
 
-    final streamedResponse = await request.send();
-    return http.Response.fromStream(streamedResponse);
+    return _tracked(() async {
+      final streamedResponse = await request.send();
+      return http.Response.fromStream(streamedResponse);
+    });
   }
+}
+
+/// Whether an answer from the server means "I no longer have your document
+/// open" (409 with the `SESSION_NOT_OPEN` code), as after a server restart.
+bool isSessionLostResponse(int statusCode, String body) {
+  return statusCode == 409 && body.contains('SESSION_NOT_OPEN');
 }

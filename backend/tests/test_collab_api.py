@@ -177,3 +177,32 @@ def test_the_per_request_dependency_logs_a_change_made_by_an_old_route():
             assert session.oplog.revision == 1
         finally:
             deps.registry = saved
+
+
+# ----------------------------------------------------------------------
+# The revision that comes with the grid data
+# ----------------------------------------------------------------------
+
+def test_the_grid_payload_carries_the_revision_it_matches():
+    if not AVAILABLE: return
+    from backend.api import spreadsheet as sheet_api
+
+    with tempfile.TemporaryDirectory() as folder:
+        session = make_session(folder)
+        assert sheet_api.data(session.controller).revision == 0
+
+        collab_api.submit_ops(FakeRequest(CLIENT), body(session, first_cell(session, "x")), session)
+
+        assert sheet_api.data(session.controller).revision == 1
+
+
+def test_data_built_after_an_old_route_change_already_includes_that_changes_reload_entry():
+    if not AVAILABLE: return
+    from backend.api import spreadsheet as sheet_api
+
+    with tempfile.TemporaryDirectory() as folder:
+        session = make_session(folder)
+
+        session.controller.edit_cell(0, 0, "old route")
+
+        assert sheet_api.data(session.controller).revision == 1

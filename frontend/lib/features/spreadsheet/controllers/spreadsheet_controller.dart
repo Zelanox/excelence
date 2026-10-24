@@ -3,6 +3,9 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/live/live_connection.dart';
+import '../../../core/live/live_coordinator.dart';
+import '../../../core/live/live_messages.dart';
 import '../../../core/preferences/app_preferences.dart';
 import '../models/cell_model.dart';
 import '../models/row_model.dart';
@@ -17,14 +20,46 @@ import '../services/spreadsheet_service.dart';
 import '../services/formula_engine.dart';
 import '../services/formula_dependency_graph.dart';
 
+/// Creates the live-collaboration coordinator for a document that has just
+/// been opened. [reload] reloads the document from the server; [onChanged]
+/// asks the UI to redraw (people or connection state changed).
+typedef LiveCoordinatorFactory = LiveCoordinator Function({
+  required Future<void> Function() reload,
+  required void Function() onChanged,
+  required void Function() onSessionLost,
+});
+
 class SpreadsheetController extends ChangeNotifier {
   SpreadsheetController(
     this._service, {
     AppPreferences preferences = const AppPreferences(),
-  }) : _preferences = preferences;
+    LiveCoordinatorFactory? liveFactory,
+  })  : _preferences = preferences,
+        _liveFactory = liveFactory {
+    // Live collaboration needs to know the log revision of every response
+    // that carries grid data, and when this client has a change on its way.
+    _service.trackLive(
+      onRevision: (revision) => _live?.dataLoaded(revision),
+      onWriteStarted: () => _live?.localRequestStarted(),
+      onWriteFinished: () => _live?.localRequestFinished(),
+      onSessionLost: _sessionLost,
+    );
+  }
 
   final SpreadsheetService _service;
   final AppPreferences _preferences;
+  final LiveCoordinatorFactory? _liveFactory;
+
+  // Live collaboration for the open document (null when it is switched off
+  // or no document is open). See _startLive.
+  LiveCoordinator? _live;
+  bool _disposed = false;
+
+  // The document that is open, and whether one is being opened right now
+  // (see _sessionLost).
+  String? _openFilename;
+  bool _loadingDocument = false;
+  DateTime? _lastRecovery;
   final FormulaEngine _formulaEngine = const FormulaEngine();
 
   SpreadsheetModel? _spreadsheet;
@@ -228,8 +263,159 @@ class SpreadsheetController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     _autosaveTimer?.cancel();
+    _live?.dispose();
+    _live = null;
     super.dispose();
+  }
+
+  // ============================================================
+  // Live collaboration
+  // ============================================================
+
+  /// Who is looking at this document right now (this client included),
+  /// oldest connection first. Empty when live updates are off or the
+  /// connection is down.
+  List<LivePerson> get livePeople => _live?.people ?? const [];
+
+  /// The state of the live connection, or null when live updates are not
+  /// available (switched off, or no document open).
+  LiveState? get liveState => _live?.state;
+
+  /// Why live updates stopped for good (the server refused this client or
+  /// another connection of it took over), or null.
+  LiveStopReason? get liveStopReason => _live?.stopReason;
+
+  /// The last problem the server reported over the live connection.
+  String? get liveError => _live?.lastError;
+
+  /// Starts listening for other people's changes to the document that was
+  /// just loaded, [revision] being the log revision that data matched.
+  void _startLive(int revision) {
+    final factory = _liveFactory;
+
+    if (factory == null || _disposed) {
+      return;
+    }
+
+    final live = factory(
+      reload: _reloadFromLive,
+      onChanged: () {
+        if (!_disposed) {
+          notifyListeners();
+        }
+      },
+      onSessionLost: _sessionLost,
+    );
+
+    _live = live;
+    live.dataLoaded(revision);
+    live.start();
+  }
+
+  /// The server told us it no longer has our document open: it was restarted,
+  /// or forgot the session. Open the document again, from what it last saved
+  /// to disk, instead of letting every save and reload fail from now on.
+  ///
+  /// Edits made since the server last saved are not on the server any more
+  /// and are replaced by the saved version. Nothing is done while a document
+  /// is already being opened, and at most once every ten seconds.
+  void _sessionLost() {
+    final filename = _openFilename;
+
+    if (_disposed || _loadingDocument || filename == null) {
+      return;
+    }
+
+    final now = DateTime.now();
+    final last = _lastRecovery;
+
+    if (last != null && now.difference(last) < const Duration(seconds: 10)) {
+      return;
+    }
+
+    _lastRecovery = now;
+
+    debugPrint(
+      '[SpreadsheetController] The server no longer has this document open '
+      '(it may have restarted); opening it again.',
+    );
+
+    unawaited(
+      loadDocument(filename).catchError((Object error) {
+        debugPrint('[SpreadsheetController] Could not reopen it: $error');
+      }),
+    );
+  }
+
+  void _stopLive() {
+    _live?.dispose();
+    _live = null;
+  }
+
+  /// Brings the grid up to date with what someone else changed.
+  ///
+  /// For now this reloads the whole document ("reload mode"). The shared
+  /// document has ONE active sheet on the server, so this follows it: if
+  /// somebody switches sheets, everyone's grid shows that sheet. Local undo
+  /// history is dropped, because it would otherwise undo over the others'
+  /// work (per-user undo is a later phase).
+  Future<void> _reloadFromLive() async {
+    if (_spreadsheet == null) {
+      return;
+    }
+
+    for (var attempt = 0; attempt < 3; attempt++) {
+      // Our own edits first: they may be about to change what the server holds.
+      await _flushPendingSaves();
+
+      final sheetsData = await _service.sheets();
+      final data = await _service.loadData();
+
+      // The user kept typing while we asked: this answer is older than what
+      // is on their screen, and applying it would make the edit vanish.
+      if (_pendingSaves.isNotEmpty) {
+        continue;
+      }
+
+      _applyLiveSnapshot(sheetsData, data);
+      return;
+    }
+
+    throw StateError('Still saving local edits; reload postponed.');
+  }
+
+  void _applyLiveSnapshot(SheetsData sheetsData, SpreadsheetData data) {
+    final current = _spreadsheet;
+
+    if (current == null || _disposed) {
+      return;
+    }
+
+    if (sheetsData.currentSheet == current.activeSheet.name) {
+      _replaceActiveSheet(data);
+
+      final replaced = _spreadsheet!;
+
+      _spreadsheet = SpreadsheetModel(
+        activeSheetIndex: replaced.activeSheetIndex,
+        sheets: replaced.sheets,
+        availableSheetNames: sheetsData.sheetNames,
+      );
+    } else {
+      _spreadsheet = SpreadsheetModel(
+        activeSheetIndex: 0,
+        sheets: [
+          _sheetFromApiData(name: sheetsData.currentSheet, data: data),
+        ],
+        availableSheetNames: sheetsData.sheetNames,
+      );
+    }
+
+    _undoStack.clear();
+    _redoStack.clear();
+    notifyListeners();
   }
 
   // ============================================================
@@ -237,10 +423,15 @@ class SpreadsheetController extends ChangeNotifier {
   // ============================================================
 
   Future<void> loadDocument(String filename) async {
+    _loadingDocument = true;
+
     try {
       // Opening replaces the backend's current document, so anything not
       // yet written to disk would be lost - save it first.
       await flushPendingChanges();
+
+      // Stop listening to the document we are leaving.
+      _stopLive();
 
       // Leave the document we were in (if any) before joining another, so
       // the server can release it once nobody is left. Opening the SAME
@@ -281,6 +472,10 @@ class SpreadsheetController extends ChangeNotifier {
       // and there's nothing actionable for the user to do about it.
       unawaited(_preferences.setLastOpenedDocument(filename));
 
+      // From here on, other people's changes to this document arrive live.
+      _openFilename = filename;
+      _startLive(data.revision);
+
       notifyListeners();
     } catch (error, stackTrace) {
       debugPrint(
@@ -289,6 +484,8 @@ class SpreadsheetController extends ChangeNotifier {
       debugPrintStack(stackTrace: stackTrace);
 
       rethrow;
+    } finally {
+      _loadingDocument = false;
     }
   }
 

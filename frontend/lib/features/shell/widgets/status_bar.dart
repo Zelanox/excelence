@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/live/live_connection.dart';
 import '../../../core/preferences/app_preferences.dart';
 import '../../spreadsheet/controllers/spreadsheet_controller.dart';
 import '../../spreadsheet/controllers/viewport_controller.dart';
@@ -67,12 +68,85 @@ class StatusBar extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 16),
+              _LiveIndicator(controller: spreadsheetController),
+              const SizedBox(width: 16),
               Text(sheet?.name ?? ''),
               const SizedBox(width: 20),
               Text('$zoomPercent%'),
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+/// Who is here, and whether live updates are working: the number of people
+/// connected to the document (names in the tooltip), or a note that the
+/// connection is being (re)established or has been stopped. Shows nothing
+/// when live updates are not in use.
+class _LiveIndicator extends StatelessWidget {
+  const _LiveIndicator({required this.controller});
+
+  final SpreadsheetController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final state = controller.liveState;
+
+    if (state == null || state == LiveState.idle) {
+      return const SizedBox.shrink();
+    }
+
+    if (state == LiveState.connected) {
+      final people = controller.livePeople;
+      final names = people
+          .map((person) => person.name.isEmpty ? person.id : person.name)
+          .join(', ');
+
+      return Tooltip(
+        message: names.isEmpty ? 'Live updates on' : 'Here now: $names',
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.people_outline, size: 16, color: Colors.grey.shade600),
+            const SizedBox(width: 4),
+            Text(
+              '${people.length}',
+              style: TextStyle(color: Colors.grey.shade600),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final stopped = state == LiveState.stopped;
+    final color = Colors.orange.shade800;
+
+    return Tooltip(
+      message: stopped
+          ? (controller.liveError ??
+              'The server stopped live updates for this window. '
+                  'Open the document again to resume.')
+          : 'Not connected to the server. Trying again...',
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            stopped ? Icons.sync_disabled : Icons.sync_problem,
+            size: 16,
+            color: color,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            stopped
+                ? 'Live updates off'
+                : state == LiveState.connecting
+                    ? 'Connecting...'
+                    : 'Reconnecting...',
+            style: TextStyle(color: color),
+          ),
+        ],
       ),
     );
   }

@@ -367,3 +367,37 @@ def test_restarting_the_log_makes_even_an_up_to_date_client_reload():
         assert service.changes_since(session, 0)["resync_required"] is True
         assert service.changes_since(session, 2)["resync_required"] is True      # was fully up to date
         assert service.changes_since(session, 3) == {"accepted": True, "revision": 3, "resync_required": False, "batches": []}
+
+
+# ----------------------------------------------------------------------
+# The revision a client's snapshot of the document matches
+# ----------------------------------------------------------------------
+
+
+def test_a_controller_outside_a_session_reports_revision_zero():
+    with tempfile.TemporaryDirectory() as folder:
+        assert make_controller(folder).revision() == 0
+
+
+def test_the_controller_reports_the_revision_of_its_sessions_log():
+    with tempfile.TemporaryDirectory() as folder:
+        session = make_session(folder)
+        assert session.controller.revision() == 0
+
+        service.submit(session, CLIENT, payload(session, first_cell(session, "A1"), batch_id="b1"))
+        service.submit(session, OTHER, payload(session, first_cell(session, "A2"), batch_id="b2", base=1))
+
+        assert session.controller.revision() == 2 == session.revision()
+
+
+def test_a_change_made_outside_the_log_is_counted_before_the_revision_is_read():
+    from backend.collab.op_log import KIND_RESYNC
+
+    with tempfile.TemporaryDirectory() as folder:
+        session = make_session(folder)
+
+        session.controller.edit_cell(0, 0, "old route")         # what an older route does
+
+        assert session.controller.revision() == 1               # the "reload" entry is already in
+        assert [entry.kind for entry in session.oplog.since(0)] == [KIND_RESYNC]
+        assert session.controller.revision() == 1               # asking again adds nothing

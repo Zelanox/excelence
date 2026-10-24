@@ -21,6 +21,11 @@ class Controller:
         self.document = document
         self.spreadsheet_service = spreadsheet_service
 
+        # Tells the controller which revision of the operation log the document
+        # is at (see Session.revision). None when the controller is not part of
+        # a session, e.g. in unit tests.
+        self.revision_source = None
+
     # ==========================================================
     # Document
     # ==========================================================
@@ -590,6 +595,14 @@ class Controller:
             True if the defaults were updated, otherwise False.
         """
         return self.spreadsheet_service.set_text_defaults(values, reset)
+
+    def revision(self) -> int:
+        """The revision of the operation log that the document's current contents match.
+
+        Sent with every grid payload so a client knows where to start listening
+        for live changes. 0 when this controller is not part of a session.
+        """
+        return self.revision_source() if self.revision_source is not None else 0
 
     def grid_data(self):
         """

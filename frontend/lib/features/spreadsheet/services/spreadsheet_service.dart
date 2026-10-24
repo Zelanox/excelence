@@ -29,6 +29,7 @@ class SpreadsheetData {
     this.cellStyles = const [],
     this.textDefaults = TextStyleSpec.empty,
     this.appearance = SheetAppearance.empty,
+    this.revision = 0,
   });
 
   final List<String> headers;
@@ -40,6 +41,11 @@ class SpreadsheetData {
   final List<CellStyleEntry> cellStyles;
   final TextStyleSpec textDefaults;
   final SheetAppearance appearance;
+
+  /// The server's operation-log revision this data matches (0 against a
+  /// server that has none). A client that goes on to listen for live changes
+  /// asks for everything after it.
+  final int revision;
 
   factory SpreadsheetData.fromJson(Map<String, dynamic> json) {
     final rawHeaders = json['headers'] as List<dynamic>? ?? [];
@@ -73,6 +79,7 @@ class SpreadsheetData {
       ],
       textDefaults: TextStyleSpec.fromJson(rawDefaults),
       appearance: SheetAppearance.fromJson(rawAppearance),
+      revision: json['revision'] as int? ?? 0,
     );
   }
 }
@@ -134,6 +141,23 @@ class SpreadsheetService {
   SpreadsheetService(this._api);
 
   final ApiClient _api;
+
+  void Function(int revision)? _onRevision;
+
+  /// Lets live collaboration see two things without every call site having
+  /// to cooperate: the log revision of each response that carries grid data,
+  /// and when a request that can change the document starts and finishes.
+  void trackLive({
+    void Function(int revision)? onRevision,
+    void Function()? onWriteStarted,
+    void Function()? onWriteFinished,
+    void Function()? onSessionLost,
+  }) {
+    _onRevision = onRevision;
+    _api.onSessionLost = onSessionLost;
+    _api.onWriteStarted = onWriteStarted;
+    _api.onWriteFinished = onWriteFinished;
+  }
 
   /// Opens (joins) [filename]. The server hands back a session id, which is
   /// remembered on the API client so every later request is for this
@@ -278,7 +302,13 @@ class SpreadsheetService {
       );
     }
 
-    return SpreadsheetData.fromJson(json);
+    return _parsed(json);
+  }
+
+  SpreadsheetData _parsed(Map<String, dynamic> json) {
+    final data = SpreadsheetData.fromJson(json);
+    _onRevision?.call(data.revision);
+    return data;
   }
 
   /// Fetches the workbook's available worksheet names and which one is
@@ -334,7 +364,7 @@ class SpreadsheetService {
       );
     }
 
-    return SpreadsheetData.fromJson(json);
+    return _parsed(json);
   }
 
   /// Shared POST + response handling for the sheet-management endpoints
