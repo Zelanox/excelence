@@ -16,6 +16,7 @@ import '../models/sheet_appearance.dart';
 import '../models/sheet_view.dart';
 import '../models/text_style_spec.dart';
 
+import '../services/ops_builder.dart';
 import '../services/spreadsheet_service.dart';
 import '../services/formula_engine.dart';
 import '../services/formula_dependency_graph.dart';
@@ -49,6 +50,9 @@ class SpreadsheetController extends ChangeNotifier {
   final SpreadsheetService _service;
   final AppPreferences _preferences;
   final LiveCoordinatorFactory? _liveFactory;
+
+  // Makes the ids of the operation batches this client sends.
+  final BatchIdGenerator _batchIds = BatchIdGenerator();
 
   // Live collaboration for the open document (null when it is switched off
   // or no document is open). See _startLive.
@@ -640,6 +644,9 @@ class SpreadsheetController extends ChangeNotifier {
         isRtl: data.isRtl,
         textDefaults: data.textDefaults,
         appearance: data.appearance,
+        sheetId: data.sheetId,
+        rowIds: data.rowIds,
+        columnIds: data.columnIds,
       ),
     );
   }
@@ -1833,13 +1840,42 @@ class SpreadsheetController extends ChangeNotifier {
       return;
     }
 
+    // Name the rows and columns by their stable IDs NOW, while the sheet is
+    // as the user saw it when they edited: the request itself may wait in
+    // the queue, and by then rows could have moved. Null (the sheet has no
+    // usable IDs, or the batch is too big) means: send the older request,
+    // which uses positions.
+    final sheet = _spreadsheet?.activeSheet;
+    final batch = sheet == null
+        ? null
+        : buildSetCellsBatch(
+            sheet: sheet,
+            edits: edits,
+            clientBatchId: _batchIds.next(),
+          );
+
     // ONE request for the whole batch (a paste or clear can touch many
     // cells): the backend applies it as a single undoable step, and
     // rewrites the worksheet once instead of once per cell.
     _enqueueBackendWrite(
       errorPrefix: 'Failed to save changes',
       job: () async {
-        await _service.editCells(edits);
+        if (batch == null) {
+          await _service.editCells(edits);
+          return;
+        }
+
+        final result = await _service.submitOps(batch);
+
+        if (!result.accepted) {
+          throw Exception('${result.code}: ${result.message}');
+        }
+
+        // Somebody deleted a row or column we were editing: our grid still
+        // shows the edit, so load what the server really has.
+        if (result.dropped.isNotEmpty) {
+          unawaited(_resyncFromBackend());
+        }
       },
     );
   }

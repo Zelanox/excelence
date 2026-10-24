@@ -30,6 +30,9 @@ class SpreadsheetData {
     this.textDefaults = TextStyleSpec.empty,
     this.appearance = SheetAppearance.empty,
     this.revision = 0,
+    this.sheetId = '',
+    this.rowIds = const [],
+    this.columnIds = const [],
   });
 
   final List<String> headers;
@@ -46,6 +49,12 @@ class SpreadsheetData {
   /// server that has none). A client that goes on to listen for live changes
   /// asks for everything after it.
   final int revision;
+
+  /// The server's stable IDs: of the worksheet, and of each row and column
+  /// (parallel to [rows] and [headers]). Empty against a server without them.
+  final String sheetId;
+  final List<String> rowIds;
+  final List<String> columnIds;
 
   factory SpreadsheetData.fromJson(Map<String, dynamic> json) {
     final rawHeaders = json['headers'] as List<dynamic>? ?? [];
@@ -80,6 +89,61 @@ class SpreadsheetData {
       textDefaults: TextStyleSpec.fromJson(rawDefaults),
       appearance: SheetAppearance.fromJson(rawAppearance),
       revision: json['revision'] as int? ?? 0,
+      sheetId: json['current_sheet_id']?.toString() ?? '',
+      rowIds: _strings(json['row_ids']),
+      columnIds: _strings(json['column_ids']),
+    );
+  }
+
+  static List<String> _strings(Object? value) {
+    if (value is! List<dynamic>) {
+      return const [];
+    }
+
+    return [for (final item in value) item.toString()];
+  }
+}
+
+/// The server's answer to a batch of operations (`POST /spreadsheet/ops`).
+class OpsResult {
+  const OpsResult({
+    required this.accepted,
+    this.revision = 0,
+    this.duplicate = false,
+    this.dropped = const [],
+    this.code = '',
+    this.message = '',
+  });
+
+  /// False when the whole batch was refused (see [code] and [message]).
+  final bool accepted;
+
+  /// The log revision the batch got (when accepted).
+  final int revision;
+
+  /// The same batch had been sent before; it was not applied again.
+  final bool duplicate;
+
+  /// Changes that were left out because somebody else had already deleted
+  /// the row, column or sheet they were about.
+  final List<Map<String, dynamic>> dropped;
+
+  final String code;
+  final String message;
+
+  factory OpsResult.fromJson(Map<String, dynamic> json) {
+    final rawDropped = json['dropped'] as List<dynamic>? ?? const [];
+
+    return OpsResult(
+      accepted: json['accepted'] == true,
+      revision: json['revision'] as int? ?? 0,
+      duplicate: json['duplicate'] == true,
+      dropped: [
+        for (final item in rawDropped)
+          if (item is Map<String, dynamic>) item,
+      ],
+      code: json['code']?.toString() ?? '',
+      message: json['message']?.toString() ?? '',
     );
   }
 }
@@ -581,6 +645,30 @@ class SpreadsheetService {
       body: {'name': name, 'width': width},
       failureMessage: 'Failed to update column width',
     );
+  }
+
+  /// Sends a batch of operations addressed by row, column and sheet IDs (see
+  /// docs/COLLABORATION.md). Always answers (a refusal is [OpsResult] with
+  /// `accepted` false); throws only when the server can't be reached or
+  /// answers with an HTTP error.
+  Future<OpsResult> submitOps(Map<String, dynamic> batch) async {
+    final response = await _api.post('/spreadsheet/ops', body: batch);
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Failed to send changes: ${response.statusCode} ${response.body}',
+      );
+    }
+
+    final result = OpsResult.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+
+    if (result.accepted) {
+      _onRevision?.call(result.revision);
+    }
+
+    return result;
   }
 
   /// Updates several cells in ONE request (applied as a single undoable

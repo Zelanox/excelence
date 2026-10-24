@@ -7693,3 +7693,12 @@ RuntimeError: boom
 2026-10-24 20:42:24,291 - INFO - document - Opened document test.xlsx
 2026-10-24 20:42:24,324 - INFO - sessions - Opened session 12f139bb8bf6c9d2 for test.xlsx
 2026-10-24 20:43:02,027 - INFO - document - Saved document test.xlsx
+2026-10-24 21:52:12,353 - INFO - config - Using config file E:\ZELANOX\Excelence\backend\utils\config.json
+2026-10-24 21:54:26,440 - INFO - document - Opened document test.xlsx
+2026-10-24 21:54:26,441 - INFO - sessions - Opened session 12f139bb8bf6c9d2 for test.xlsx
+2026-10-24 21:55:19,256 - INFO - document - Saved document test.xlsx
+2026-10-24 21:55:46,836 - INFO - document - Saved document test.xlsx
+2026-10-24 21:55:55,016 - INFO - document - Saved document test.xlsx
+2026-10-24 21:56:07,301 - INFO - document - Saved document test.xlsx
+2026-10-24 21:57:27,124 - INFO - document - Saved document test.xlsx
+2026-10-24 21:57:32,541 - INFO - document - Saved document test.xlsx

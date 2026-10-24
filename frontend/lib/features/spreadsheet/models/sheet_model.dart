@@ -30,6 +30,9 @@ class SheetModel {
     this.appearance = SheetAppearance.empty,
     this.view = SheetView.none,
     this.viewToSource,
+    this.sheetId = '',
+    this.rowIds = const [],
+    this.columnIds = const [],
   }) : assert(
           viewToSource == null ||
               viewToSource.every((index) => index >= 0 && index < allRows.length),
@@ -37,6 +40,26 @@ class SheetModel {
         );
 
   final String name;
+
+  /// The server's stable ID for this worksheet (it survives a rename), or ''
+  /// when the sheet did not come from the server.
+  final String sheetId;
+
+  /// The server's stable ID of each row of [allRows], in the same order, and
+  /// of each column of [headers]. Changes sent to the server name rows and
+  /// columns by these IDs, so they still land correctly when somebody else
+  /// inserts or deletes a row or column in the meantime. Empty for a sheet
+  /// that did not come from the server; check [hasIds] before relying on them.
+  final List<String> rowIds;
+  final List<String> columnIds;
+
+  /// Whether the IDs describe this sheet completely. When anything about the
+  /// shape was rebuilt locally without updating them, this is false and
+  /// callers must not use them (they fall back to positions).
+  bool get hasIds =>
+      sheetId.isNotEmpty &&
+      rowIds.length == allRows.length &&
+      columnIds.length == headers.length;
 
   /// Every row of the data, in the data's own order. See the class comment.
   final List<RowModel> allRows;
@@ -119,6 +142,9 @@ class SheetModel {
       appearance: appearance,
       view: newView,
       viewToSource: newView.apply(headers, allRows),
+      sheetId: sheetId,
+      rowIds: rowIds,
+      columnIds: columnIds,
     );
   }
 
@@ -147,6 +173,9 @@ class SheetModel {
       appearance: appearance,
       view: view,
       viewToSource: viewToSource,
+      sheetId: sheetId,
+      rowIds: rowIds,
+      columnIds: columnIds,
     );
   }
 
@@ -171,6 +200,9 @@ class SheetModel {
       appearance: appearance ?? this.appearance,
       view: view,
       viewToSource: viewToSource,
+      sheetId: sheetId,
+      rowIds: rowIds,
+      columnIds: columnIds,
     );
   }
 }

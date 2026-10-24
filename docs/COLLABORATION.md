@@ -232,9 +232,10 @@ Each phase is useful on its own and can be checked before the next starts.
 | 4c | **Nothing slips past the log**: old routes, undo while shared, reload | **done** |
 | 5a | **Server: live broadcast and presence** (log subscribers, hub, `/spreadsheet/live`, token on WebSockets) | **done**, once the route tests pass on a real machine |
 | 5b-1 | **Client building blocks:** the server says which revision each grid payload matches; Flutter has the live connection (ping, reconnect), message parsing and the "is my copy out of date?" logic, all tested without a network | **in progress** (code written; Flutter tests to run) |
-| 5b-2 | Wire those into the app: connect when a document is open, **reload mode** (any change by someone else reloads the document), the connection state and the "who is here" count (this also covers 5c) | **in progress** (code written; needs a manual two-window test) |
-| 5b-3 | Apply incoming changes one by one by id instead of reloading | |
-| 5b-4 | Send edits as operations, with optimistic apply | |
+| 5b-2 | Wire those into the app: connect when a document is open, **reload mode**, the connection state and "who is here" (this also covers 5c) | **done** (verified with two windows) |
+| 5b-3 | **Cell edits are sent as operations addressed by stable row, column and sheet IDs** (the client now keeps the IDs); receivers still reload | **in progress** |
+| 5b-4 | Apply incoming cell changes one by one instead of reloading (fast, no flicker) | |
+| 5b-5 | Row, column and sheet changes as operations too, applied incrementally; a sheet per person instead of one shared active sheet | |
 | 5c | "Who is here" in the UI | (in 5b-2: a count in the status bar, names in its tooltip) |
 | 6 | **Per-user undo** via inverse operations (replaces snapshot undo) | |
 | 7 | Accounts, permissions, share links, HTTPS hosting (not needed for a small trusted team) | later |
@@ -535,6 +536,27 @@ replace it piece by piece.
   Expect the people icon to show 2 in both, an edit in one to appear in the other within about half a second,
   and "Reconnecting..." followed by recovery if the backend is stopped and started again.
 
+
+### Phase 5b, step 3: cell edits as operations
+
+* **The client keeps the server's IDs.** `SpreadsheetData` reads `row_ids`, `column_ids` and `current_sheet_id`;
+  `SheetModel` carries `sheetId`, `rowIds` and `columnIds` (kept by every copy: a view, replaced rows, a
+  rename). `SheetModel.hasIds` is true only when the IDs describe the sheet completely (counts match rows and
+  columns); anything built locally without them simply reports false.
+* **A cell edit or paste is one batch of `set_cells`** (`buildSetCellsBatch`, `services/ops_builder.dart`), sent
+  with `POST /spreadsheet/ops` instead of the position-based `edit-cells`. The rows and columns are named by ID
+  *when the user edits*, not when the request leaves the queue, so an insert or delete by someone else in
+  between cannot make the edit land on the wrong cell. Same rules as before: one request, one undo step.
+* **Fallback to the old request** (positions) when the sheet has no usable IDs, an edit lies outside the sheet,
+  or there are more than 500 changes (a batch's limit).
+* **If the server dropped changes** (somebody deleted that row or column first) the grid is reloaded so it shows
+  what the server really has. A refused batch takes the same path as any failed save (message in
+  `lastSaveError`, then a reload).
+* **`base_revision` is sent as 0** for now: the server only checks that it is not newer than its own revision,
+  and a number from before a server restart would be refused for no good reason.
+* **Receivers are unchanged:** the batch reaches them as a live `batch` message and they reload (5b-4 makes this
+  incremental). What changes is that an edit no longer produces a "reload" entry, and the sender's own response
+  carries the revision, so the sender never reloads because of its own edit.
 
 ### Why the order changed
 
