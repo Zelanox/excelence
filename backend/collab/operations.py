@@ -22,7 +22,17 @@ Operations in this first set:
     delete_sheet     {"sheet": "s2"}
     rename_sheet     {"sheet": "s2", "name": "Renamed"}
 
-(Cell and text styles, appearance and text defaults follow in the next step.)
+    set_cell_style   {"ranges": [{"start_row": "r1", "end_row": "r3",
+                                  "start_column": "c1", "end_column": "c2"}],
+                      "style": {"bold": true, "color": "#FF0000"}, "reset": ["italic"]}
+    set_text_defaults {"style": {...}, "reset": [...]}   the sheet's default text style
+    set_appearance   {"style": {"banding": true, ...}, "reset": [...]}
+
+A style is the same set of fields the style routes accept (see models/cell_style.py
+and models/sheet_appearance.py); ``reset`` lists fields to return to "inherit". The
+style must not contain nulls (leave a field out instead) and needs at least one
+field or one reset. A range's corners are row and column IDs and may be given in
+any order; the rectangle between them is styled in the sheet's order at the time.
 
 Rules
 -----
@@ -47,6 +57,9 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 from typing import Any
+
+from backend.models.cell_style import CellStyle
+from backend.models.sheet_appearance import SheetAppearance
 
 MAX_BATCH_SIZE = 500
 MAX_ID_LENGTH = 64
@@ -134,6 +147,28 @@ def _only_keys(op: dict[str, Any], allowed: set[str], index: int) -> None:
         raise _bad(f"Unknown field(s) in {op.get('op')}: {', '.join(sorted(extra))}.", index)
 
 
+_RANGE_KEYS = {"start_row", "end_row", "start_column", "end_column"}
+
+
+def _check_style(op: dict[str, Any], model, index: int) -> None:
+    """Check an op's ``style`` and ``reset`` with the rules the style routes use."""
+    style = op.get("style", {})
+    reset = op.get("reset", [])
+
+    if not isinstance(style, dict) or not isinstance(reset, list):
+        raise _bad(f"{op['op']}: style must be an object and reset a list of field names.", index)
+
+    if not style and not reset:
+        raise _bad(f"{op['op']} needs a style or a reset.", index)
+
+    if model().apply_patch(style, reset) is None:
+        raise OpError(
+            INVALID_VALUE,
+            f"{op['op']}: a style field is unknown or invalid, or is both set and reset.",
+            index,
+        )
+
+
 def _check_op(op: Any, index: int) -> int:
     """Check one operation's shape. Returns how many changes it counts as."""
     if not isinstance(op, dict):
@@ -210,6 +245,31 @@ def _check_op(op: Any, index: int) -> int:
 
         if not isinstance(op.get("value"), bool):
             raise _bad("set_rtl needs true or false.", index)
+
+    elif kind == "set_cell_style":
+        _only_keys(op, {"ranges", "style", "reset"}, index)
+        ranges = op.get("ranges")
+
+        if not isinstance(ranges, list) or not ranges:
+            raise _bad("set_cell_style needs a non-empty list of ranges.", index)
+
+        for item in ranges:
+            if not isinstance(item, dict) or set(item) != _RANGE_KEYS:
+                raise _bad("Each range needs exactly start_row, end_row, start_column and end_column.", index)
+
+            if not all(_is_id(item[key]) for key in _RANGE_KEYS):
+                raise _bad("A range's rows and columns must be IDs.", index)
+
+        _check_style(op, CellStyle, index)
+        return len(ranges)
+
+    elif kind == "set_text_defaults":
+        _only_keys(op, {"style", "reset"}, index)
+        _check_style(op, CellStyle, index)
+
+    elif kind == "set_appearance":
+        _only_keys(op, {"style", "reset"}, index)
+        _check_style(op, SheetAppearance, index)
 
     elif kind == "add_sheet":
         _only_keys(op, {"name"}, index)
@@ -362,6 +422,12 @@ def _check_never_existed(sheet, ops: list[dict[str, Any]]) -> None:
             for cell in op["cells"]:
                 check_row(cell["row"], index)
                 check_column(cell["column"], index)
+        elif kind == "set_cell_style":
+            for item in op["ranges"]:
+                check_row(item["start_row"], index)
+                check_row(item["end_row"], index)
+                check_column(item["start_column"], index)
+                check_column(item["end_column"], index)
         elif kind == "insert_row" and op["before"] is not None:
             check_row(op["before"], index)
         elif kind == "delete_row":
@@ -597,7 +663,68 @@ def _apply_set_rtl(controller, sheet, op, index, outcome):
     return {"op": "set_rtl", "value": op["value"]}
 
 
+def _applied_style(model, op) -> dict[str, Any]:
+    """The style as the document stores it (colors normalized), for the log."""
+    return model().apply_patch(op.get("style", {}), op.get("reset", [])).to_dict()
+
+
+def _apply_set_cell_style(controller, sheet, op, index, outcome):
+    positions = sheet.row_positions()
+    headers = list(sheet.dataframe.columns)
+    rectangles, kept = [], []
+
+    for item in op["ranges"]:
+        start_row = positions.get(item["start_row"])
+        end_row = positions.get(item["end_row"])
+
+        if start_row is None or end_row is None:
+            gone = item["start_row"] if start_row is None else item["end_row"]
+            outcome.dropped.append(_drop(index, ROW_DELETED, {"row": gone}))
+            continue
+
+        start_name = sheet.column_name(item["start_column"])
+        end_name = sheet.column_name(item["end_column"])
+
+        if start_name is None or end_name is None:
+            gone = item["start_column"] if start_name is None else item["end_column"]
+            outcome.dropped.append(_drop(index, COLUMN_DELETED, {"column": gone}))
+            continue
+
+        rectangles.append((start_row, headers.index(start_name), end_row, headers.index(end_name)))
+        kept.append(item)
+
+    if not rectangles:
+        return None
+
+    if not controller.set_cell_style_ranges(rectangles, op.get("style", {}), op.get("reset", [])):
+        return False
+
+    return {
+        "op": "set_cell_style",
+        "ranges": kept,
+        "style": _applied_style(CellStyle, op),
+        "reset": list(op.get("reset", [])),
+    }
+
+
+def _apply_set_text_defaults(controller, sheet, op, index, outcome):
+    if not controller.set_text_defaults(op.get("style", {}), op.get("reset", [])):
+        return False
+
+    return {"op": "set_text_defaults", "style": _applied_style(CellStyle, op), "reset": list(op.get("reset", []))}
+
+
+def _apply_set_appearance(controller, sheet, op, index, outcome):
+    if not controller.set_appearance(op.get("style", {}), op.get("reset", [])):
+        return False
+
+    return {"op": "set_appearance", "style": _applied_style(SheetAppearance, op), "reset": list(op.get("reset", []))}
+
+
 _APPLY = {
+    "set_cell_style": _apply_set_cell_style,
+    "set_text_defaults": _apply_set_text_defaults,
+    "set_appearance": _apply_set_appearance,
     "set_cells": _apply_set_cells,
     "insert_row": _apply_insert_row,
     "delete_row": _apply_delete_row,

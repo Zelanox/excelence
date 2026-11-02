@@ -401,3 +401,29 @@ def test_a_change_made_outside_the_log_is_counted_before_the_revision_is_read():
         assert session.controller.revision() == 1               # the "reload" entry is already in
         assert [entry.kind for entry in session.oplog.since(0)] == [KIND_RESYNC]
         assert session.controller.revision() == 1               # asking again adds nothing
+
+
+def test_a_style_batch_is_logged_once_with_the_stored_form_of_the_style():
+    with tempfile.TemporaryDirectory() as folder:
+        session = make_session(folder)
+        data = session.controller.grid_data()
+
+        result = service.submit(session, CLIENT, {
+            "client_batch_id": "style-1",
+            "base_revision": 0,
+            "sheet_id": data.sheet_id,
+            "ops": [{
+                "op": "set_cell_style",
+                "ranges": [{
+                    "start_row": data.row_ids[0], "end_row": data.row_ids[1],
+                    "start_column": data.column_ids[0], "end_column": data.column_ids[0],
+                }],
+                "style": {"color": "#00ff00"},
+            }],
+        })
+
+        assert result["accepted"] is True and result["revision"] == 1
+        entries = session.oplog.since(0)
+        assert [e.kind for e in entries] == ["ops"]
+        assert entries[0].ops[0]["style"] == {"color": "00FF00"}
+        assert session.controller.revision() == 1                    # no extra "reload" entry

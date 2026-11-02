@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 
 import 'live_messages.dart';
 
@@ -7,9 +8,10 @@ Future<void> _realDelay(Duration duration) => Future<void>.delayed(duration);
 /// Decides when this client's copy of the document is out of date and must
 /// be loaded again, from what arrives on the live connection.
 ///
-/// For now every change by someone else is handled by reloading the document
-/// ("reload mode"): simple and always correct. Applying the changes one by
-/// one comes later and replaces only what [onMessage] does with a batch.
+/// Without [applyBatch] every change by someone else is handled by reloading
+/// the document ("reload mode"): simple and always correct. With it, a batch
+/// of changes is applied directly (see [applyBatch]) and the document is
+/// reloaded only when that is not possible.
 ///
 /// The bookkeeping that matters:
 ///
@@ -29,6 +31,7 @@ class LiveSync {
     this.debounce = const Duration(milliseconds: 150),
     Future<void> Function(Duration) delay = _realDelay,
     this.onReloadFailed,
+    this.applyBatch,
   })  : _reload = reload,
         _delay = delay;
 
@@ -41,6 +44,23 @@ class LiveSync {
   /// Called when a reload throws. The sync stays armed: the next message or
   /// finished local request tries again.
   final void Function(Object error)? onReloadFailed;
+
+  /// Applies one batch of someone else's changes to the local copy and says
+  /// whether it could (false: it can't be applied, so the document is
+  /// reloaded instead). Batches are offered strictly in order, each exactly
+  /// one revision after the previous, never one the local copy already
+  /// includes, and never while this client has a request of its own in
+  /// flight. Null turns this off (reload mode).
+  final bool Function(BatchMessage batch)? applyBatch;
+
+  // Batches that arrived but could not be applied yet, by revision (an
+  // earlier one is missing, or a request of our own is still in flight).
+  final SplayTreeMap<int, BatchMessage> _waiting =
+      SplayTreeMap<int, BatchMessage>();
+
+  // Revisions that are this client's own changes: already in the local copy
+  // (applied when the user made them), so they are stepped over, not applied.
+  final Set<int> _own = <int>{};
 
   int _known = 0;
   int _latestSeen = 0;
@@ -60,11 +80,30 @@ class LiveSync {
     }
   }
 
+  /// This client's own change was accepted by the server as [revision]. It is
+  /// already in the local copy, but that does NOT mean the copy is up to date
+  /// through [revision]: somebody else's change may have come just before it
+  /// (then it must still be applied, in order). So this only steps over the
+  /// revision when it directly follows what the copy has.
+  void ownBatch(int revision) {
+    if (revision <= _known) {
+      return;
+    }
+
+    _own.add(revision);
+    _see(revision);
+    _advanceOwn();
+    _applyWaiting();
+    _requestCheck();
+  }
+
   /// Forget everything: the document was closed or another one opened.
   void reset([int revision = 0]) {
     _known = revision;
     _latestSeen = revision;
     _force = false;
+    _waiting.clear();
+    _own.clear();
   }
 
   void localRequestStarted() {
@@ -83,11 +122,18 @@ class LiveSync {
 
   void onMessage(LiveMessage message) {
     switch (message) {
-      case CatchUpMessage(:final revision):
-        _see(revision);
+      case final CatchUpMessage catchUp:
+        _see(catchUp.revision);
 
-      case BatchMessage(:final revision):
-        _see(revision);
+        for (final entry in catchUp.batches) {
+          if (entry['revision'] is int) {
+            _keep(BatchMessage(batch: entry));
+          }
+        }
+
+      case final BatchMessage batch:
+        _see(batch.revision);
+        _keep(batch);
 
       case ResyncMessage(:final revision, :final reason, :final serverRestarted):
         if (serverRestarted) {
@@ -109,11 +155,78 @@ class LiveSync {
         return;
     }
 
+    _applyWaiting();
     _requestCheck();
   }
 
   void dispose() {
     _disposed = true;
+  }
+
+  void _keep(BatchMessage batch) {
+    if (applyBatch != null && batch.revision > _known) {
+      _waiting[batch.revision] = batch;
+    }
+  }
+
+  /// Applies, in order, every waiting batch that follows directly on what the
+  /// local copy has. Stops at a gap (something is missing: the check will
+  /// reload) or at a batch that can't be applied (reload as well).
+  void _applyWaiting() {
+    final apply = applyBatch;
+
+    _advanceOwn();
+
+    if (apply == null || _disposed || _reloading || _pendingLocal > 0) {
+      return;
+    }
+
+    while (true) {
+      _waiting.removeWhere((revision, _) => revision <= _known);
+
+      if (_advanceOwn()) {
+        continue;
+      }
+
+      final next = _waiting[_known + 1];
+
+      if (next == null) {
+        return;
+      }
+
+      bool applied;
+
+      try {
+        applied = apply(next);
+      } catch (error) {
+        applied = false;
+        onReloadFailed?.call(error);
+      }
+
+      if (!applied) {
+        _waiting.clear();
+        _force = true;
+        return;
+      }
+
+      _waiting.remove(next.revision);
+      _known = next.revision;
+    }
+  }
+
+  /// Steps over our own revisions that directly follow the local copy.
+  /// Returns whether it moved.
+  bool _advanceOwn() {
+    var moved = false;
+
+    _own.removeWhere((revision) => revision <= _known);
+
+    while (_own.remove(_known + 1)) {
+      _known++;
+      moved = true;
+    }
+
+    return moved;
   }
 
   void _see(int revision) {
@@ -140,12 +253,19 @@ class LiveSync {
   }
 
   Future<void> _check() async {
-    if (_disposed || _reloading || _pendingLocal > 0 || !_outOfDate) {
+    if (_disposed || _reloading || _pendingLocal > 0) {
+      return;
+    }
+
+    _applyWaiting();
+
+    if (!_outOfDate) {
       return;
     }
 
     _reloading = true;
     _force = false;
+    _waiting.clear();
     final seenAtStart = _latestSeen;
 
     try {

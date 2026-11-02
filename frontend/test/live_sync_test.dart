@@ -37,6 +37,8 @@ class Harness {
 }
 
 void main() {
+  incrementalTests();
+
   test('a newer batch from someone else reloads the document once', () async {
     final h = Harness();
     h.sync.dataLoaded(3);
@@ -229,5 +231,213 @@ void main() {
     await h.send(batch(1));
 
     expect(h.reloads, 0);
+  });
+}
+
+class ApplyHarness {
+  ApplyHarness() {
+    sync = LiveSync(
+      reload: () async {
+        reloads++;
+      },
+      debounce: Duration.zero,
+      delay: (_) async {},
+      onReloadFailed: failures.add,
+      applyBatch: (batch) {
+        applied.add(batch.revision);
+
+        if (throwOnApply) {
+          throw Exception('cannot apply');
+        }
+
+        return applyResult;
+      },
+    );
+  }
+
+  late final LiveSync sync;
+  int reloads = 0;
+  final List<int> applied = [];
+  final List<Object> failures = [];
+  bool applyResult = true;
+  bool throwOnApply = false;
+
+  Future<void> send(LiveMessage message) async {
+    sync.onMessage(message);
+    await pumpEventQueue();
+  }
+}
+
+void incrementalTests() {
+  group('applying changes directly', () {
+    test('the next batch is applied and nothing is reloaded', () async {
+      final h = ApplyHarness();
+      h.sync.dataLoaded(3);
+
+      await h.send(batch(4));
+
+      expect(h.applied, [4]);
+      expect(h.reloads, 0);
+      expect(h.sync.knownRevision, 4);
+    });
+
+    test('batches are applied in order, even when they arrive out of order', () async {
+      final h = ApplyHarness();
+      h.sync.dataLoaded(3);
+
+      h.sync.onMessage(batch(6));
+      h.sync.onMessage(batch(5));
+      h.sync.onMessage(batch(4));
+      await pumpEventQueue();
+
+      expect(h.applied, [4, 5, 6]);
+      expect(h.reloads, 0);
+      expect(h.sync.knownRevision, 6);
+    });
+
+    test('a batch the local copy already has is not applied', () async {
+      final h = ApplyHarness();
+      h.sync.dataLoaded(5);
+
+      await h.send(batch(5));
+      await h.send(batch(3));
+
+      expect(h.applied, isEmpty);
+      expect(h.reloads, 0);
+    });
+
+    test('a gap (something is missing) is answered with a reload', () async {
+      final h = ApplyHarness();
+      h.sync.dataLoaded(3);
+
+      await h.send(batch(6));
+
+      expect(h.applied, isEmpty);
+      expect(h.reloads, 1);
+      expect(h.sync.knownRevision, 6);
+    });
+
+    test('a batch that cannot be applied is answered with a reload', () async {
+      final h = ApplyHarness()..applyResult = false;
+      h.sync.dataLoaded(3);
+
+      await h.send(batch(4));
+
+      expect(h.applied, [4]);
+      expect(h.reloads, 1);
+      expect(h.sync.knownRevision, 4);
+    });
+
+    test('a failure while applying is reported and answered with a reload', () async {
+      final h = ApplyHarness()..throwOnApply = true;
+      h.sync.dataLoaded(3);
+
+      await h.send(batch(4));
+
+      expect(h.failures, hasLength(1));
+      expect(h.reloads, 1);
+    });
+
+    test('nothing is applied while a request of our own is in flight', () async {
+      final h = ApplyHarness();
+      h.sync.dataLoaded(3);
+
+      h.sync.localRequestStarted();
+      await h.send(batch(4));
+      expect(h.applied, isEmpty);
+
+      h.sync.localRequestFinished();
+      await pumpEventQueue();
+
+      expect(h.applied, [4]);
+      expect(h.reloads, 0);
+    });
+
+    test('our own change right after what we have is stepped over, not applied', () async {
+      final h = ApplyHarness();
+      h.sync.dataLoaded(3);
+
+      h.sync.ownBatch(4);
+      expect(h.sync.knownRevision, 4);
+
+      await h.send(batch(4));          // its echo from the server
+      await h.send(batch(5));          // then somebody else's change
+
+      expect(h.applied, [5]);
+      expect(h.sync.knownRevision, 5);
+      expect(h.reloads, 0);
+    });
+
+    test('somebody else\'s change that came just before ours is still applied', () async {
+      final h = ApplyHarness();
+      h.sync.dataLoaded(3);
+
+      h.sync.localRequestStarted();
+      await h.send(batch(4));          // theirs, arrives while our request is out
+      h.sync.ownBatch(5);              // ours was accepted as the next one
+      expect(h.sync.knownRevision, 3); // we must NOT claim to be up to date yet
+
+      h.sync.localRequestFinished();
+      await pumpEventQueue();
+
+      expect(h.applied, [4]);
+      expect(h.sync.knownRevision, 5);
+      expect(h.reloads, 0);
+    });
+
+    test('our own change with something missing before it is answered with a reload', () async {
+      final h = ApplyHarness();
+      h.sync.dataLoaded(3);
+
+      h.sync.ownBatch(5);              // 4 never arrives
+      await pumpEventQueue();
+
+      expect(h.reloads, 1);
+      expect(h.sync.knownRevision, 5);
+    });
+
+    test('without direct applying our own contiguous change is still stepped over', () async {
+      final h = Harness();
+      h.sync.dataLoaded(3);
+
+      h.sync.ownBatch(4);
+      await h.send(batch(4));
+
+      expect(h.sync.knownRevision, 4);
+      expect(h.reloads, 0);
+    });
+
+    test('the batches of a catch-up are applied', () async {
+      final h = ApplyHarness();
+      h.sync.dataLoaded(3);
+
+      await h.send(
+        CatchUpMessage(
+          revision: 5,
+          batches: [
+            {'revision': 4, 'kind': 'ops'},
+            {'revision': 5, 'kind': 'ops'},
+          ],
+        ),
+      );
+
+      expect(h.applied, [4, 5]);
+      expect(h.reloads, 0);
+      expect(h.sync.knownRevision, 5);
+    });
+
+    test('a reload entry in between stops the direct applying', () async {
+      final h = ApplyHarness();
+      h.sync.dataLoaded(3);
+
+      h.sync.onMessage(batch(4));
+      h.sync.onMessage(resync(5));
+      h.sync.onMessage(batch(6));
+      await pumpEventQueue();
+
+      expect(h.applied, [4]);
+      expect(h.reloads, 1);
+      expect(h.sync.knownRevision, 6);
+    });
   });
 }

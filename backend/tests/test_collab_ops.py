@@ -476,3 +476,230 @@ def test_a_sheet_operation_on_a_deleted_sheet_is_dropped():
         outcome = run(c, sheet_op({"op": "rename_sheet", "sheet": added, "name": "Late"}))
 
         assert outcome.applied == [] and outcome.dropped[0]["reason"] == SHEET_DELETED
+
+
+# ----------------------------------------------------------------------
+# Formatting: cell styles, text defaults, appearance
+# ----------------------------------------------------------------------
+
+def style_op(rows, columns, style=None, reset=None, start=0, end=-1):
+    """A set_cell_style over the rectangle from rows[start] / columns[0] to rows[end] / columns[-1]."""
+    op = {
+        "op": "set_cell_style",
+        "ranges": [{
+            "start_row": rows[start], "end_row": rows[end],
+            "start_column": columns[0], "end_column": columns[-1],
+        }],
+    }
+
+    if style is not None:
+        op["style"] = style
+
+    if reset is not None:
+        op["reset"] = reset
+
+    return op
+
+
+def styled_cells(controller):
+    return {(entry["row"], entry["column"]): entry["style"] for entry in controller.cell_styles()}
+
+
+def test_a_cell_style_covers_the_rectangle_between_its_corners_in_any_order():
+    with tempfile.TemporaryDirectory() as folder:
+        controller = make_controller(folder)
+        rows, columns, sheet = ids(controller)
+
+        outcome = run(controller, batch(sheet, style_op(rows[:2][::-1], columns[:2], {"bold": True}, end=-1)))
+
+        assert outcome.dropped == []
+        assert styled_cells(controller) == {
+            (0, 0): {"bold": True}, (0, 1): {"bold": True},
+            (1, 0): {"bold": True}, (1, 1): {"bold": True},
+        }
+
+
+def test_the_style_is_logged_the_way_the_document_stores_it():
+    with tempfile.TemporaryDirectory() as folder:
+        controller = make_controller(folder)
+        rows, columns, sheet = ids(controller)
+
+        outcome = run(controller, batch(sheet, style_op(rows, columns, {"color": "#ff0000", "font_size": 12}, ["italic"])))
+
+        applied = outcome.applied[0]
+        assert applied["style"] == {"color": "FF0000", "font_size": 12.0}
+        assert applied["reset"] == ["italic"]
+        assert applied["ranges"] == style_op(rows, columns)["ranges"]
+
+
+def test_reset_returns_fields_to_inherit():
+    with tempfile.TemporaryDirectory() as folder:
+        controller = make_controller(folder)
+        rows, columns, sheet = ids(controller)
+        run(controller, batch(sheet, style_op(rows, columns, {"bold": True, "italic": True})))
+
+        run(controller, batch(sheet, style_op(rows, columns, reset=["bold"]), batch_id="b2"))
+
+        assert set(map(tuple, (s.items() for s in styled_cells(controller).values()))) == {(("italic", True),)}
+
+
+def test_a_style_follows_its_rows_when_rows_are_inserted_in_the_same_batch():
+    with tempfile.TemporaryDirectory() as folder:
+        controller = make_controller(folder)
+        rows, columns, sheet = ids(controller)
+
+        run(controller, batch(
+            sheet,
+            {"op": "insert_row", "before": rows[0]},
+            style_op(rows[:2], columns[:1], {"bold": True}),
+        ))
+
+        assert sorted(styled_cells(controller)) == [(1, 0), (2, 0)]        # moved down by the new first row
+
+
+def test_a_range_whose_row_or_column_was_deleted_is_dropped_and_the_others_apply():
+    with tempfile.TemporaryDirectory() as folder:
+        controller = make_controller(folder)
+        rows, columns, sheet = ids(controller)
+        run(controller, batch(sheet, {"op": "delete_row", "row": rows[3]}, batch_id="gone"))
+        run(controller, batch(sheet, {"op": "delete_column", "column": columns[2]}, batch_id="gone2"))
+
+        outcome = run(controller, batch(sheet, {
+            "op": "set_cell_style",
+            "ranges": [
+                {"start_row": rows[0], "end_row": rows[1], "start_column": columns[0], "end_column": columns[0]},
+                {"start_row": rows[2], "end_row": rows[3], "start_column": columns[0], "end_column": columns[0]},
+                {"start_row": rows[0], "end_row": rows[0], "start_column": columns[1], "end_column": columns[2]},
+            ],
+            "style": {"bold": True},
+        }, batch_id="b3"))
+
+        assert [(d["reason"], d.get("row") or d.get("column")) for d in outcome.dropped] == [
+            (ROW_DELETED, rows[3]), (COLUMN_DELETED, columns[2]),
+        ]
+        assert len(outcome.applied[0]["ranges"]) == 1
+        assert sorted(styled_cells(controller)) == [(0, 0), (1, 0)]
+
+
+def test_a_batch_whose_ranges_are_all_gone_applies_nothing_and_is_not_an_error():
+    with tempfile.TemporaryDirectory() as folder:
+        controller = make_controller(folder)
+        rows, columns, sheet = ids(controller)
+        run(controller, batch(sheet, {"op": "delete_row", "row": rows[0]}, batch_id="gone"))
+
+        outcome = run(controller, batch(sheet, style_op(rows[:1], columns, {"bold": True}), batch_id="b2"))
+
+        assert outcome.applied == [] and len(outcome.dropped) == 1
+        assert styled_cells(controller) == {}
+
+
+def test_a_style_with_a_bad_field_value_or_shape_is_refused_before_anything_changes():
+    with tempfile.TemporaryDirectory() as folder:
+        controller = make_controller(folder)
+        rows, columns, sheet = ids(controller)
+
+        bad = [
+            {"nonsense": True},
+            {"bold": "yes"},
+            {"color": "red"},
+            {"font_size": True},
+            {"font_size": 0},
+            {"bold": None},
+        ]
+
+        for style in bad:
+            error = refused(lambda s=style: run(controller, batch(sheet, {"op": "set_rtl", "value": True}, style_op(rows, columns, s))))
+            assert error.code == INVALID_VALUE, style
+
+        both = refused(lambda: run(controller, batch(sheet, style_op(rows, columns, {"bold": True}, ["bold"]))))
+        assert both.code == INVALID_VALUE
+
+        assert styled_cells(controller) == {}
+        assert controller.rtl() is False                      # the set_rtl before the bad op was not applied either
+
+
+def test_a_style_op_needs_a_style_or_a_reset_and_well_formed_ranges():
+    with tempfile.TemporaryDirectory() as folder:
+        controller = make_controller(folder)
+        rows, columns, sheet = ids(controller)
+
+        malformed = [
+            style_op(rows, columns),                                    # neither style nor reset
+            style_op(rows, columns, {}),
+            style_op(rows, columns, {"bold": True}, "bold"),            # reset not a list
+            style_op(rows, columns, [("bold", True)]),                  # style not an object
+            {"op": "set_cell_style", "ranges": [], "style": {"bold": True}},
+            {"op": "set_cell_style", "ranges": [{"start_row": rows[0]}], "style": {"bold": True}},
+            {"op": "set_cell_style", "ranges": [{"start_row": 1, "end_row": 2, "start_column": 3, "end_column": 4}], "style": {"bold": True}},
+            {"op": "set_cell_style", "style": {"bold": True}},
+            {**style_op(rows, columns, {"bold": True}), "extra": 1},
+        ]
+
+        for op in malformed:
+            assert refused(lambda o=op: parse_batch(batch(sheet, o))).code == "BAD_REQUEST", op
+
+
+def test_a_range_naming_a_row_that_never_existed_is_refused():
+    with tempfile.TemporaryDirectory() as folder:
+        controller = make_controller(folder)
+        rows, columns, sheet = ids(controller)
+
+        error = refused(lambda: run(controller, batch(sheet, style_op(["r999", rows[0]], columns, {"bold": True}))))
+
+        assert error.code == UNKNOWN_ROW and styled_cells(controller) == {}
+
+
+def test_every_range_counts_towards_the_batch_limit():
+    with tempfile.TemporaryDirectory() as folder:
+        controller = make_controller(folder)
+        rows, columns, sheet = ids(controller)
+        one = style_op(rows, columns, {"bold": True})["ranges"][0]
+
+        error = refused(lambda: parse_batch(batch(sheet, {"op": "set_cell_style", "ranges": [one] * 501, "style": {"bold": True}})))
+
+        assert error.code == BATCH_TOO_LARGE
+
+
+def test_text_defaults_and_appearance_can_be_set_reset_and_set_again():
+    with tempfile.TemporaryDirectory() as folder:
+        controller = make_controller(folder)
+        rows, columns, sheet = ids(controller)
+
+        first = run(controller, batch(sheet,
+            {"op": "set_text_defaults", "style": {"font_size": 14, "background": "#eeeeee"}},
+            {"op": "set_appearance", "style": {"banding": True, "banding_color": "#ccddee"}},
+        ))
+
+        assert first.applied[0]["style"] == {"font_size": 14.0, "background": "EEEEEE"}
+        assert first.applied[1]["style"] == {"banding": True, "banding_color": "CCDDEE"}
+        assert controller.document.data().text_defaults == {"font_size": 14.0, "background": "EEEEEE"}
+        assert controller.appearance() == {"banding": True, "banding_color": "CCDDEE"}
+
+        run(controller, batch(sheet,
+            {"op": "set_text_defaults", "reset": ["background"]},
+            {"op": "set_appearance", "reset": ["banding_color"]},
+            batch_id="b2",
+        ))
+
+        assert controller.document.data().text_defaults == {"font_size": 14.0}
+        assert controller.appearance() == {"banding": True}
+
+        again = run(controller, batch(sheet, {"op": "set_appearance", "style": {"banding": True}}, batch_id="b3"))
+        assert again.applied[0]["op"] == "set_appearance"                       # setting what is already set is fine
+
+
+def test_bad_defaults_and_appearance_are_refused():
+    with tempfile.TemporaryDirectory() as folder:
+        controller = make_controller(folder)
+        rows, columns, sheet = ids(controller)
+
+        for op in (
+            {"op": "set_text_defaults", "style": {"italic": "no"}},
+            {"op": "set_appearance", "style": {"banding": "on"}},
+            {"op": "set_appearance", "style": {"grid_color": "nope"}},
+            {"op": "set_appearance", "style": {"bold": True}},                  # a cell field, not an appearance one
+        ):
+            assert refused(lambda o=op: run(controller, batch(sheet, o))).code == INVALID_VALUE, op
+
+        for op in ({"op": "set_text_defaults"}, {"op": "set_appearance", "style": {}}):
+            assert refused(lambda o=op: parse_batch(batch(sheet, o))).code == "BAD_REQUEST", op

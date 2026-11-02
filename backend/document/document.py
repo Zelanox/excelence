@@ -6,6 +6,7 @@ import pandas as pd
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
 from openpyxl.utils import get_column_letter
+from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.workbook.defined_name import DefinedName
 
 
@@ -78,6 +79,13 @@ class Document:
         self.df = pd.DataFrame()
         self.filtered_df = pd.DataFrame()
 
+        # What the active worksheet is known to hold: (worksheet, number of
+        # data rows, column names) as of the last time ALL of self.df was
+        # written to it (see _sync_active_sheet). While it still matches,
+        # an edit that only changes values can update just the changed rows
+        # (see _sync_changed_rows). None means "not known": rewrite it all.
+        self._worksheet_state = None
+
         # Domain Model
         self.spreadsheet = Spreadsheet()
 
@@ -95,6 +103,8 @@ class Document:
         # flag (below), which every editing path already sets, so it can't
         # miss one: see the modified property.
         self.change_count = 0
+        self._worksheet_current = False
+        self._fast_edit_pending = False
         self.modified = False
 
         # Which document was open last, and user preferences - kept on disk
@@ -389,14 +399,21 @@ class Document:
             logger.warning("Save rejected for invalid filename: %s", self.filename)
             return False
 
-        self.storage.write_sheet(self.sheet, self.df)
+        # Rewriting the whole worksheet is most of the cost of a save. It is
+        # skipped when the worksheet already holds everything: it was written
+        # in full by an earlier save and since then only value-only edits,
+        # which update it in place, have been made.
+        if not self._worksheet_known_current():
+            self.storage.write_sheet(self.sheet, self.df)
 
-        active_sheet = self._active_sheet_model()
+            active_sheet = self._active_sheet_model()
 
-        if active_sheet is not None:
-            self._write_column_widths(self.sheet, self.df.columns, active_sheet.column_widths)
-            self.sheet.sheet_view.rightToLeft = active_sheet.rtl
-            self._write_text_styles(self.sheet, self.df, active_sheet)
+            if active_sheet is not None:
+                self._write_column_widths(self.sheet, self.df.columns, active_sheet.column_widths)
+                self.sheet.sheet_view.rightToLeft = active_sheet.rtl
+                self._write_text_styles(self.sheet, self.df, active_sheet)
+                self._remember_worksheet_state()
+                self._worksheet_current = True
 
         saved = self.storage.save(self.workbook, resolved)
         self.modified = False
@@ -515,6 +532,12 @@ class Document:
         if value:
             self.change_count += 1
 
+            # The worksheet stays "current" (see save_local) only through a
+            # value-only edit that just updated it in place; every other kind
+            # of change leaves it for the next save to rewrite.
+            self._worksheet_current = self._worksheet_current and self._fast_edit_pending
+            self._fast_edit_pending = False
+
         self._modified = value
 
     def _sync_active_sheet(self) -> None:
@@ -540,6 +563,69 @@ class Document:
             self._write_column_widths(self.sheet, self.df.columns, active_sheet.column_widths)
             self.sheet.sheet_view.rightToLeft = active_sheet.rtl
             self._write_text_styles(self.sheet, self.df, active_sheet)
+            self._remember_worksheet_state()
+
+    # Whether value-only edits may update just the changed rows of the
+    # worksheet. Switched off only by tests that compare it with a full rewrite.
+    fast_value_sync = True
+
+    # True from a save that wrote the whole worksheet until any change other
+    # than a value-only edit: the worksheet then holds everything, so the next
+    # save need not rewrite it. _fast_edit_pending marks a value-only edit that
+    # has just updated the worksheet in place, for the modified setter.
+    _worksheet_current = False
+    _fast_edit_pending = False
+
+    def _worksheet_signature(self) -> tuple:
+        return (self.sheet, len(self.df), tuple(str(column) for column in self.df.columns))
+
+    def _worksheet_known_current(self) -> bool:
+        """Whether the worksheet is known to hold all of self.df, styles included."""
+        return bool(
+            self.fast_value_sync
+            and self._worksheet_current
+            and self.workbook is not None
+            and self.sheet is not None
+            and self._worksheet_state is not None
+            and self._worksheet_state == self._worksheet_signature()
+        )
+
+    def _remember_worksheet_state(self) -> None:
+        """Note that the worksheet now holds exactly self.df (call right after writing all of it)."""
+        self._worksheet_state = self._worksheet_signature()
+
+    def _sync_changed_rows(self, rows: list[int]) -> bool:
+        """
+        Write just ``rows`` (dataframe positions) of self.df to the worksheet.
+
+        Only for a change that altered VALUES in existing rows and columns, and
+        only while the worksheet is known to hold the rest of self.df already
+        (it was fully written, with the same sheet, row count and columns, and
+        nothing has changed its shape since). Returns False, having written
+        nothing, when that is not certain: the caller then rewrites everything.
+        Styles are not touched: a value edit doesn't change them.
+        """
+        state = self._worksheet_state
+
+        if (
+            not self.fast_value_sync
+            or self.workbook is None
+            or self.sheet is None
+            or state is None
+            or state[0] is not self.sheet
+            or state != self._worksheet_signature()
+            or not rows
+            or any(not isinstance(row, int) or not 0 <= row < len(self.df) for row in rows)
+        ):
+            return False
+
+        # The same conversion a full rewrite applies, done once for all the
+        # changed rows (taking the rows out of the frame keeps every column's type).
+        for position, values in zip(rows, dataframe_to_rows(self.df.iloc[rows], index=False, header=False)):
+            for column, value in enumerate(values, start=1):
+                self.sheet.cell(row=position + 2, column=column).value = value
+
+        return True
 
     def _refresh_view(self) -> None:
         """Reload the active worksheet and reapply the current search/sort state."""
@@ -576,7 +662,11 @@ class Document:
         self._commit_history(history_entry)
 
         self._sync_from_active_sheet()
-        self._sync_active_sheet()
+
+        if self._sync_changed_rows(self._active_sheet_model().last_edited_rows):
+            self._fast_edit_pending = True
+        else:
+            self._sync_active_sheet()
 
         self.modified = True
 
@@ -607,10 +697,16 @@ class Document:
 
         self._commit_history(history_entry)
 
-        # One rebuild of the worksheet for the whole batch - rewriting it
-        # once per cell is what made large pastes slow.
+        # One update of the worksheet for the whole batch - doing it once
+        # per cell is what made large pastes slow. Only the rows that
+        # changed are written when the worksheet is known to hold the rest
+        # (see _sync_changed_rows); otherwise all of it is rewritten.
         self._sync_from_active_sheet()
-        self._sync_active_sheet()
+
+        if self._sync_changed_rows(self._active_sheet_model().last_edited_rows):
+            self._fast_edit_pending = True
+        else:
+            self._sync_active_sheet()
 
         self.modified = True
 

@@ -233,9 +233,12 @@ Each phase is useful on its own and can be checked before the next starts.
 | 5a | **Server: live broadcast and presence** (log subscribers, hub, `/spreadsheet/live`, token on WebSockets) | **done**, once the route tests pass on a real machine |
 | 5b-1 | **Client building blocks:** the server says which revision each grid payload matches; Flutter has the live connection (ping, reconnect), message parsing and the "is my copy out of date?" logic, all tested without a network | **in progress** (code written; Flutter tests to run) |
 | 5b-2 | Wire those into the app: connect when a document is open, **reload mode**, the connection state and "who is here" (this also covers 5c) | **done** (verified with two windows) |
-| 5b-3 | **Cell edits are sent as operations addressed by stable row, column and sheet IDs** (the client now keeps the IDs); receivers still reload | **in progress** |
-| 5b-4 | Apply incoming cell changes one by one instead of reloading (fast, no flicker) | |
+| 5b-3 | **Cell edits are sent as operations addressed by stable row, column and sheet IDs** (the client keeps the IDs) | **done** (verified) |
+| 5b-4 | **Other people's cell changes are applied directly** (no reload, no flicker); anything else still reloads | **in progress** |
+| 4d | **Formatting operations on the server:** `set_cell_style`, `set_text_defaults`, `set_appearance` (by IDs) | **done on the server** (13 new tests); no client uses them yet |
+| 4e | **Fast value edits:** a cell edit updates only the changed worksheet rows instead of rewriting the whole sheet (edit one cell at 10,000 rows: 309 ms to 5 ms); see docs/PERFORMANCE.md | **done on the server** (11 equivalence tests) |
 | 5b-5 | Row, column and sheet changes as operations too, applied incrementally; a sheet per person instead of one shared active sheet | |
+| 5b-6 | Send and apply formatting as operations in the app | |
 | 5c | "Who is here" in the UI | (in 5b-2: a count in the status bar, names in its tooltip) |
 | 6 | **Per-user undo** via inverse operations (replaces snapshot undo) | |
 | 7 | Accounts, permissions, share links, HTTPS hosting (not needed for a small trusted team) | later |
@@ -557,6 +560,52 @@ replace it piece by piece.
 * **Receivers are unchanged:** the batch reaches them as a live `batch` message and they reload (5b-4 makes this
   incremental). What changes is that an edit no longer produces a "reload" entry, and the sender's own response
   carries the revision, so the sender never reloads because of its own edit.
+
+### Phase 5b, step 4: applying other people's cell changes directly
+
+* **`LiveSync` can apply batches** (`applyBatch`). A batch is applied only when it is the very next revision after
+  what the local copy has, in order. Batches that arrive early wait; a missing revision, a revision that is not a
+  batch of operations (an old-route "reload" entry), or a batch the app can't apply means: reload, exactly as
+  before. Batches of a reconnect's catch-up are applied the same way, so a short outage no longer reloads.
+* **What the app can apply** (`SpreadsheetController._applyRemoteBatch`): `set_cells` on the open sheet, when
+  every row and column ID is known. The values go in the way a local edit does (formulas stay formulas, cells that
+  depend on a changed cell are recalculated, your own sort and filter order is kept), nothing is sent back, and
+  your local undo history is dropped (restoring an older snapshot would put back what these changes replaced).
+  Everything else (rows, columns, sheets, formatting) still reloads. Checked completely before anything changes,
+  so a batch is applied whole or not at all.
+* **Your own changes are never applied twice:** a batch with this client's id is stepped over.
+* **A bug fixed on the way (it existed since 5b-3).** The answer to an operation batch says only "revision 6", not
+  what the document looks like. The client used to treat that as "my copy is up to date through revision 6", but
+  if somebody else's change was revision 5 and had not been applied yet, it would be skipped until the next
+  reload. Now an own revision (`LiveSync.ownBatch`) is stepped over only when it directly follows what the copy
+  has; the others are applied first. `dataLoaded` is called only when full data really replaces the grid
+  (`_sheetFromApiData`), not for every response.
+
+### Phase 4d: formatting operations (server side)
+
+Three more operations, so formatting can travel as operations instead of as an old-route "reload" entry:
+
+| Operation | Shape |
+|---|---|
+| `set_cell_style` | `{"ranges": [{"start_row", "end_row", "start_column", "end_column"}, ...], "style": {...}, "reset": [...]}` |
+| `set_text_defaults` | `{"style": {...}, "reset": [...]}` (the sheet's default text style) |
+| `set_appearance` | `{"style": {...}, "reset": [...]}` (grid color, banding) |
+
+* **Ranges are corners given as row and column IDs**, in any order; the rectangle between them *in the sheet's
+  order at the time* is styled. A row or column inserted in between is included, one that was deleted drops
+  that range (`ROW_DELETED` / `COLUMN_DELETED`), and a batch whose ranges are all gone applies nothing and is
+  not an error (like a fully dropped `set_cells`). Each range counts as one change toward the 500 limit.
+* **The style is checked up front with the same rules the style routes use** (`CellStyle.apply_patch`,
+  `SheetAppearance.apply_patch`): bold/italic/underline/strikethrough are booleans, `font_family` text,
+  `font_size` 1-409, `color` / `background` hex (background may be `"NONE"`), appearance has `grid_color`,
+  `banding`, `banding_color`. No nulls (leave the field out), at least one field or one `reset`, and a field
+  can't be both set and reset. A bad style refuses the whole batch with `INVALID_VALUE` before anything changes.
+* **The log holds the stored form** (colors upper-case without `#`, sizes as numbers), so replaying an entry on
+  another copy gives the same result.
+* **Undo:** cell styles and text defaults join the document's undo history like the old routes did; appearance
+  is a setting, not an edit, and is not undoable. Setting what is already set is fine.
+* **Also in this round:** the validation-error handler returns `422` as a plain number, which removes the
+  Starlette deprecation warning (the constant was renamed between versions).
 
 ### Why the order changed
 

@@ -22,6 +22,7 @@ class LiveCoordinator {
     this.onChanged,
     this.onSessionLost,
     void Function(Object error)? onReloadFailed,
+    bool Function(BatchMessage batch)? applyBatch,
     Duration pingInterval = const Duration(seconds: 30),
     Duration debounce = const Duration(milliseconds: 150),
     Future<void> Function(Duration)? delay,
@@ -33,6 +34,7 @@ class LiveCoordinator {
       debounce: debounce,
       delay: wait,
       onReloadFailed: onReloadFailed,
+      applyBatch: applyBatch,
     );
 
     _connection = LiveConnection(
@@ -87,6 +89,9 @@ class LiveCoordinator {
 
   /// A response with grid data arrived; [revision] is the one it carried.
   void dataLoaded(int revision) => _sync.dataLoaded(revision);
+
+  /// The server accepted this client's own change as [revision].
+  void ownBatch(int revision) => _sync.ownBatch(revision);
 
   /// This client is about to change the document on the server.
   void localRequestStarted() => _sync.localRequestStarted();

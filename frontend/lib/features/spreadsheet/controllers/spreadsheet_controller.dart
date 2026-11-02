@@ -28,6 +28,7 @@ typedef LiveCoordinatorFactory = LiveCoordinator Function({
   required Future<void> Function() reload,
   required void Function() onChanged,
   required void Function() onSessionLost,
+  required bool Function(BatchMessage batch) applyBatch,
 });
 
 class SpreadsheetController extends ChangeNotifier {
@@ -40,7 +41,7 @@ class SpreadsheetController extends ChangeNotifier {
     // Live collaboration needs to know the log revision of every response
     // that carries grid data, and when this client has a change on its way.
     _service.trackLive(
-      onRevision: (revision) => _live?.dataLoaded(revision),
+      onOwnRevision: (revision) => _live?.ownBatch(revision),
       onWriteStarted: () => _live?.localRequestStarted(),
       onWriteFinished: () => _live?.localRequestFinished(),
       onSessionLost: _sessionLost,
@@ -311,6 +312,7 @@ class SpreadsheetController extends ChangeNotifier {
         }
       },
       onSessionLost: _sessionLost,
+      applyBatch: _applyRemoteBatch,
     );
 
     _live = live;
@@ -351,6 +353,164 @@ class SpreadsheetController extends ChangeNotifier {
         debugPrint('[SpreadsheetController] Could not reopen it: $error');
       }),
     );
+  }
+
+  /// Applies somebody else's batch of changes straight to the grid, without
+  /// reloading. Returns false when it can't (the batch is about another
+  /// sheet, contains something other than cell changes, or names a row or
+  /// column this sheet doesn't have): the caller then reloads the document.
+  ///
+  /// Only cell changes are applied this way so far; row, column and sheet
+  /// changes still reload.
+  bool _applyRemoteBatch(BatchMessage message) {
+    final current = _spreadsheet;
+
+    if (current == null || _disposed) {
+      return false;
+    }
+
+    // Our own changes are in the grid already (applied when the user made
+    // them); applying them again would only clear the undo history.
+    if (message.clientId == _service.clientId) {
+      return true;
+    }
+
+    final sheet = current.activeSheet;
+    final batch = message.batch;
+    final ops = batch['ops'];
+
+    if (batch['kind'] != 'ops' ||
+        !sheet.hasIds ||
+        batch['sheet_id'] != sheet.sheetId ||
+        ops is! List<dynamic>) {
+      return false;
+    }
+
+    final rowIndex = {
+      for (var i = 0; i < sheet.rowIds.length; i++) sheet.rowIds[i]: i,
+    };
+    final columnIndex = {
+      for (var i = 0; i < sheet.columnIds.length; i++) sheet.columnIds[i]: i,
+    };
+
+    final edits = <({int row, int column, String value})>[];
+
+    for (final op in ops) {
+      if (op is! Map<String, dynamic> || op['op'] != 'set_cells') {
+        return false;
+      }
+
+      final cells = op['cells'];
+
+      if (cells is! List<dynamic>) {
+        return false;
+      }
+
+      for (final cell in cells) {
+        if (cell is! Map<String, dynamic>) {
+          return false;
+        }
+
+        final row = rowIndex[cell['row']?.toString()];
+        final column = columnIndex[cell['column']?.toString()];
+
+        if (row == null || column == null) {
+          return false;
+        }
+
+        edits.add((
+          row: row,
+          column: column,
+          value: cell['value']?.toString() ?? '',
+        ));
+      }
+    }
+
+    _applyRemoteCellEdits(edits);
+    return true;
+  }
+
+  @visibleForTesting
+  bool applyRemoteBatchForTesting(BatchMessage message) =>
+      _applyRemoteBatch(message);
+
+  /// Shows [sheet] as the one open sheet, without a server (tests only).
+  @visibleForTesting
+  void showSheetForTesting(SheetModel sheet) {
+    _spreadsheet = SpreadsheetModel(
+      activeSheetIndex: 0,
+      sheets: [sheet],
+      availableSheetNames: [sheet.name],
+    );
+  }
+
+  /// Puts other people's cell values into the grid the way a local edit
+  /// does (formulas stay formulas, cells that depend on a changed cell are
+  /// recalculated, this client's sort and filter order is kept), but without
+  /// sending anything to the server. Rows are canonical (indices into the
+  /// sheet's allRows).
+  ///
+  /// Local undo history is dropped: restoring an older snapshot would put
+  /// back what these changes replaced (and the server refuses undo after
+  /// somebody else's edit anyway).
+  void _applyRemoteCellEdits(List<({int row, int column, String value})> edits) {
+    final current = _spreadsheet;
+
+    if (current == null || edits.isEmpty) {
+      return;
+    }
+
+    final sheetIndex = current.activeSheetIndex;
+    final sheet = current.sheets[sheetIndex];
+
+    final changedRows = <int, List<CellModel>>{};
+    final changedCells = <String>{};
+
+    for (final edit in edits) {
+      final cells = changedRows.putIfAbsent(
+        edit.row,
+        () => List<CellModel>.from(sheet.allRows[edit.row].cells),
+      );
+      final old = cells[edit.column];
+      final isFormula = _isFormula(edit.value);
+
+      cells[edit.column] = CellModel(
+        row: old.row,
+        column: old.column,
+        // A formula's result is filled in by the recalculation below.
+        value: isFormula ? '' : edit.value,
+        formula: isFormula ? edit.value : null,
+        isSelected: old.isSelected,
+        isEditing: old.isEditing,
+        style: old.style,
+      );
+
+      changedCells.add(
+        FormulaDependencyGraph.addressFor(row: edit.row, column: edit.column),
+      );
+    }
+
+    final sheets = List<SheetModel>.from(current.sheets);
+    sheets[sheetIndex] = sheet.withSourceRows({
+      for (final entry in changedRows.entries)
+        entry.key: RowModel(
+          index: sheet.allRows[entry.key].index,
+          cells: entry.value,
+        ),
+    });
+
+    _spreadsheet = _recalculateDependents(
+      SpreadsheetModel(
+        sheets: sheets,
+        activeSheetIndex: sheetIndex,
+        availableSheetNames: current.availableSheetNames,
+      ),
+      changedCells,
+    );
+
+    _undoStack.clear();
+    _redoStack.clear();
+    notifyListeners();
   }
 
   void _stopLive() {
@@ -630,6 +790,10 @@ class SpreadsheetController extends ChangeNotifier {
         ),
       );
     }
+
+    // This data is about to become what the grid shows, so the local copy
+    // now matches the server as of its revision.
+    _live?.dataLoaded(data.revision);
 
     // The backend returns the CANONICAL data (it no longer sorts or
     // filters for this client), so these rows are the sheet's allRows and

@@ -206,18 +206,23 @@ class SpreadsheetService {
 
   final ApiClient _api;
 
-  void Function(int revision)? _onRevision;
+  void Function(int revision)? _onOwnRevision;
+
+  /// The id this client identifies itself with (`X-Client-Id`); the server
+  /// stamps it on every change it logs.
+  String get clientId => _api.clientId;
 
   /// Lets live collaboration see two things without every call site having
-  /// to cooperate: the log revision of each response that carries grid data,
-  /// and when a request that can change the document starts and finishes.
+  /// to cooperate: the log revision that each of this client's own changes
+  /// got (`onOwnRevision`; reading data does not count), and when a request
+  /// that can change the document starts and finishes.
   void trackLive({
-    void Function(int revision)? onRevision,
+    void Function(int revision)? onOwnRevision,
     void Function()? onWriteStarted,
     void Function()? onWriteFinished,
     void Function()? onSessionLost,
   }) {
-    _onRevision = onRevision;
+    _onOwnRevision = onOwnRevision;
     _api.onSessionLost = onSessionLost;
     _api.onWriteStarted = onWriteStarted;
     _api.onWriteFinished = onWriteFinished;
@@ -366,12 +371,13 @@ class SpreadsheetService {
       );
     }
 
-    return _parsed(json);
+    return SpreadsheetData.fromJson(json);
   }
 
-  SpreadsheetData _parsed(Map<String, dynamic> json) {
+  /// The answer to one of this client's own changes.
+  SpreadsheetData _parsedAfterWrite(Map<String, dynamic> json) {
     final data = SpreadsheetData.fromJson(json);
-    _onRevision?.call(data.revision);
+    _onOwnRevision?.call(data.revision);
     return data;
   }
 
@@ -428,7 +434,7 @@ class SpreadsheetService {
       );
     }
 
-    return _parsed(json);
+    return _parsedAfterWrite(json);
   }
 
   /// Shared POST + response handling for the sheet-management endpoints
@@ -665,7 +671,7 @@ class SpreadsheetService {
     );
 
     if (result.accepted) {
-      _onRevision?.call(result.revision);
+      _onOwnRevision?.call(result.revision);
     }
 
     return result;

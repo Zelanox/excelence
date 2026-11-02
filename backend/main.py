@@ -115,7 +115,9 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     """Return a structured JSON error for invalid requests."""
     logger.warning("Validation error for %s: %s", request.url.path, exc)
     return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        # 422 as a plain number: its name changed between Starlette versions
+        # (UNPROCESSABLE_ENTITY became UNPROCESSABLE_CONTENT).
+        status_code=422,
         content=ErrorResponse(
             success=False,
             message="Invalid request payload.",

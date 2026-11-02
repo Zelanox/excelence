@@ -75,6 +75,10 @@ class Sheet:
     # row-number column side when this is true - see SheetModel.isRtl /
     # SpreadsheetGrid on the frontend.
     rtl: bool = False
+    # The dataframe rows (canonical positions, ascending) that the last
+    # successful edit_cells changed. Lets Document update just those rows of
+    # the worksheet instead of rewriting all of it.
+    last_edited_rows: list[int] = field(default_factory=list)
     # Sheet-wide default text style, and per-cell overrides on top of it.
     # Overrides are keyed [dataframe row position][column NAME] - names
     # rather than indices for the same reason column_widths is, and row
@@ -467,6 +471,7 @@ class Sheet:
         for position, column, value in resolved:
             self._write_cell(position, column, value, prefers_numbers(column))
 
+        self.last_edited_rows = sorted({position for position, _, _ in resolved})
         self.active_view = self.dataframe.copy()
         return True
 

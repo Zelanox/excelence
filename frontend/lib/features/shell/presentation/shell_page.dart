@@ -68,6 +68,7 @@ class _ShellPageState extends State<ShellPage> with WidgetsBindingObserver {
         required reload,
         required onChanged,
         required onSessionLost,
+        required applyBatch,
       }) =>
           LiveCoordinator(
         addressFor: (since) => api.liveUri(since: since),
@@ -75,6 +76,7 @@ class _ShellPageState extends State<ShellPage> with WidgetsBindingObserver {
         reload: reload,
         onChanged: onChanged,
         onSessionLost: onSessionLost,
+        applyBatch: applyBatch,
         onReloadFailed: (error) =>
             debugPrint('[Live] reload failed: $error'),
       ),
