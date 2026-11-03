@@ -230,7 +230,10 @@ class SpreadsheetController extends ChangeNotifier {
         _scheduleAutosave(_autosaveRetryDelay);
       },
       job: () async {
-        await _service.saveDocument();
+        // Autosave only tells the server there is something to save; the
+        // server writes the file when it suits everybody (the Save command
+        // below still writes it at once).
+        await _service.saveDocument(auto: true);
       },
     );
   }

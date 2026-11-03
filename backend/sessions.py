@@ -470,6 +470,11 @@ class SessionRegistry:
                 for session in self._sessions.values()
             ]
 
+    def open_sessions(self) -> list[Session]:
+        """The shared document sessions that are open now (not the default one)."""
+        with self._guard:
+            return list(self._sessions.values())
+
     def save_all(self, lock_timeout: float = 10.0) -> int:
         """Save every session with unsaved changes (used at shutdown).
 

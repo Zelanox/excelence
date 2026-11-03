@@ -23,12 +23,16 @@ from fastapi import Depends, HTTPException, Request
 from backend.collab.hub import Hub
 from backend.collab.service import account_for_untracked_changes
 from backend.controller.controller import Controller
+from backend.save_scheduler import SaveScheduler
 from backend.sessions import Session, SessionNotOpen, SessionRegistry
 
 registry = SessionRegistry()
 
 # The live connections (see backend/collab/hub.py), shared by the whole server.
 hub = Hub()
+
+# Decides when documents are saved to disk (see backend/save_scheduler.py).
+save_scheduler = SaveScheduler(registry)
 
 # The default session's controller, kept under its old name for anything that
 # still imports it.

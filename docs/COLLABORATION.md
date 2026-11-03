@@ -237,6 +237,7 @@ Each phase is useful on its own and can be checked before the next starts.
 | 5b-4 | **Other people's cell changes are applied directly** (no reload, no flicker); anything else still reloads | **in progress** |
 | 4d | **Formatting operations on the server:** `set_cell_style`, `set_text_defaults`, `set_appearance` (by IDs) | **done on the server** (13 new tests); no client uses them yet |
 | 4e | **Fast value edits:** a cell edit updates only the changed worksheet rows instead of rewriting the whole sheet (edit one cell at 10,000 rows: 309 ms to 5 ms); see docs/PERFORMANCE.md | **done on the server** (11 equivalence tests) |
+| 4f | **The server decides when to save** (debounce, ceiling, spacing by how long a save takes); client autosave becomes a hint (`?auto=true`); `lxml` added to the requirements | **written** (19 new tests; the route tests only run on a real machine) |
 | 5b-5 | Row, column and sheet changes as operations too, applied incrementally; a sheet per person instead of one shared active sheet | |
 | 5b-6 | Send and apply formatting as operations in the app | |
 | 5c | "Who is here" in the UI | (in 5b-2: a count in the status bar, names in its tooltip) |

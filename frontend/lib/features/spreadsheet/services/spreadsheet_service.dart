@@ -467,8 +467,14 @@ class SpreadsheetService {
     return SheetsData.fromJson(json);
   }
 
-  Future<void> saveDocument() async {
-    final response = await _api.post('/documents/save');
+  /// Asks the server to save the document. With [auto] (the autosave timer)
+  /// the server only takes note: it saves once for everybody at a sensible
+  /// time (see backend/save_scheduler.py) and answers at once. Without it
+  /// (the Save command) the file is written before this returns.
+  Future<void> saveDocument({bool auto = false}) async {
+    final response = await _api.post(
+      auto ? '/documents/save?auto=true' : '/documents/save',
+    );
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw Exception(

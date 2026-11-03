@@ -3,7 +3,7 @@ import os
 from fastapi import APIRouter, Depends, File, Request, UploadFile
 
 from backend.collab.service import restart_log
-from backend.dependencies import get_controller, get_registry, get_session
+from backend.dependencies import get_controller, get_registry, get_session, save_scheduler
 from backend.controller.controller import Controller
 from backend.sessions import DocumentBusy, Session, SessionRegistry
 
@@ -268,8 +268,28 @@ def rename_document(
     response_model=SaveDocumentResponse
 )
 def save_document(
-    controller: Controller = Depends(get_controller)
+    controller: Controller = Depends(get_controller),
+    auto: bool = False
 ):
+    """Save the document to disk now.
+
+    A client's AUTOSAVE passes ``auto=true``. While the server's save
+    scheduler is running that is only a hint ("there are changes"): the
+    scheduler saves once for everybody at a sensible time, so the request
+    returns at once with ``deferred`` true and nothing is written. An explicit
+    Save (no ``auto``) always saves immediately.
+    """
+    if auto is True and save_scheduler.running:
+        return SaveDocumentResponse(
+
+            success=True,
+
+            filename=controller.filename(),
+
+            modified=controller.modified(),
+
+            deferred=True
+        )
 
     success = controller.save_document()
 

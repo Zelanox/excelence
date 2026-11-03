@@ -59,7 +59,12 @@ class BrowseFolderResponse(ApiResponse):
 
 
 class SaveDocumentResponse(DocumentResponse):
-    pass
+
+    deferred: bool = Field(
+        default=False,
+        description="True when this was an autosave request and the server will save the document itself "
+                    "(see backend/save_scheduler.py); nothing was written yet.",
+    )
 
 
 class CloseDocumentResponse(DocumentResponse):

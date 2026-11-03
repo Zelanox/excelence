@@ -4,6 +4,9 @@ uvicorn
 pandas
 openpyxl
 
+# Makes openpyxl read and write .xlsx files 30-40% faster when present (see docs/PERFORMANCE.md).
+lxml
+
 python-multipart
 
 websockets

@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, Request, WebSocketException, status
@@ -14,7 +15,7 @@ from backend.api.app_state import router as app_state_router
 from backend.api.sessions import router as sessions_router
 from backend.api.collab import router as collab_router
 from backend.api.live import router as live_router
-from backend.dependencies import registry
+from backend.dependencies import registry, save_scheduler
 from backend.api.models.common import ErrorResponse
 from backend.utils.logger import get_logger
 from backend.utils.settings import LOCALHOST_ORIGIN_REGEX, load_settings, token_matches
@@ -68,10 +69,17 @@ async def lifespan(app: FastAPI):
     Replaces app.add_event_handler("shutdown", ...), which newer versions of
     Starlette (the library FastAPI is built on) no longer provide.
     """
-    yield
+    # While this runs, clients' autosave requests are left to it.
+    scheduler_task = asyncio.create_task(save_scheduler.run())
+
+    try:
+        yield
+    finally:
+        scheduler_task.cancel()
+        await asyncio.gather(scheduler_task, return_exceptions=True)
 
     # Save any unsaved work when the server stops, so a shutdown can't lose
-    # what autosave hadn't written yet.
+    # what the scheduler hadn't written yet.
     await run_in_threadpool(registry.save_all)
 
 

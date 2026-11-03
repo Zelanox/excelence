@@ -71,6 +71,39 @@ now survives value edits instead of being wiped by the next full rewrite.
 development PC is roughly 2.5 times slower than the sandbox on this Python-bound work, so scale the sandbox
 table above accordingly.
 
+## lxml: measured on the development PC (10,000 rows, terminal)
+
+`pip install lxml` makes openpyxl parse and write faster, with no code change. Same machine, same run, before and after:
+
+| | before | with lxml |
+|---|---|---|
+| open document | 4,649 | 3,422 (-26%) |
+| insert a row | 1,196 | 785 (-34%) |
+| style 1,000 x 3 cells | 1,289 | 860 (-33%) |
+| edit a cell, then save | 3,535 | 2,072 (-41%) |
+| insert a row, then save | 5,680 | 3,626 (-36%) |
+
+It is now in `backend/requirements.txt`. (If it is missing openpyxl simply falls back to its slower parser.)
+Not yet checked: the PyInstaller build with it (PyInstaller follows openpyxl's optional import, so it should be
+bundled).
+
+## The server decides when to save (backend/save_scheduler.py)
+
+Even at about 2 s per save, a save that every client triggers after every pause in its typing would freeze a busy
+document. Now the server decides, once for everybody:
+
+* saved after **2 s of quiet** (the usual case);
+* saved anyway once the oldest unsaved change is **30 s old** (so a crash loses at most about that much);
+* never closer together than **4 times as long as the last save took** (and 2 s): a 2 s save happens at most every
+  8 s, so saving can use at most about a fifth of the time;
+* a document someone is working in (lock busy) is skipped and tried again a second later.
+
+A client's autosave now sends `POST /documents/save?auto=true`. While the scheduler is running the server answers
+at once (`deferred: true`, nothing written) and the scheduler saves when it is due. The Save command (no `auto`),
+closing a document, the last person leaving and server shutdown still write immediately. Without a running
+scheduler an `auto` request saves immediately, as before. The numbers are constants in `SaveScheduler`
+(`debounce`, `max_wait`, `factor`, `min_interval`); say if they should be settings.
+
 ## Saving no longer rewrites the worksheet when it already holds everything
 
 `Document.save_local` used to rewrite the whole worksheet (about 40% of a save) before writing the file. It now
@@ -90,11 +123,9 @@ openpyxl writing the file.
 
 ## What is still slow, in order of how much it matters
 
-1. **Writing the file during a save holds the session lock** (about 0.6 s per 10,000 rows in the sandbox, about
-   1.8 s on the development PC): every other client's change waits behind it, and autosave runs after every
-   burst of typing. Options: **`pip install lxml`** first (no code change, may speed the writing a lot), then
-   save less often when a document is large (idle-based with a ceiling, one save for all clients instead of one
-   per client), then writing the file from a copy outside the lock (a copy is itself costly).
+1. **Writing the file during a save holds the session lock** (about 1.2 s per 10,000 rows on the development PC with
+   lxml). Saves are now rare and spaced out (see above), so this is felt once per pause in typing, not once per
+   client per pause. If it still matters: write the file from a copy outside the lock (a copy is itself costly).
 2. **Insert/delete a row or column, styling a block:** still a full rewrite (about 340 ms at 10,000 rows, 2.1 s at
    50,000). Fine for small sheets; the next candidate if big sheets matter.
 3. **Opening:** about 85% is openpyxl parsing the file (not our code). 100,000 rows will take roughly 19 s by
