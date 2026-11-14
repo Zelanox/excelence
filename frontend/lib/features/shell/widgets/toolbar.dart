@@ -9,9 +9,17 @@ import 'color_picker_dialog.dart';
 import 'font_options_dialog.dart';
 import 'settings_dialog.dart';
 
+/// Below this width the Font button shows only its icon (the tooltip keeps
+/// the full description).
+const double compactToolbarWidth = 600;
+
+// Horizontal padding on each side of the toolbar.
+const double _toolbarPadding = 10;
+
 /// The top toolbar: text formatting for the selected cells (bold, italic,
 /// underline, strikethrough, and a Font... dialog with preview) plus
-/// Settings.
+/// Settings. The formatting buttons scroll sideways when the window is
+/// too narrow to show them all; Settings stays pinned at the right.
 ///
 /// File open/save/undo/redo icons used to sit here but were removed -
 /// they were bare Icon widgets with no onTap/IconButton wrapping them at
@@ -39,9 +47,11 @@ class Toolbar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 48,
+      // At least 48 high, but free to grow so a large text size can't
+      // clip the buttons.
+      constraints: const BoxConstraints(minHeight: 48),
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
+      padding: const EdgeInsets.symmetric(horizontal: _toolbarPadding),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
         border: Border(
@@ -164,94 +174,133 @@ class Toolbar extends StatelessWidget {
             );
           }
 
-          return Row(
-            children: [
-              flagButton(
-                icon: Icons.format_bold,
-                tooltip: 'Bold (Ctrl+B)',
-                field: TextStyleSpec.fieldBold,
-              ),
-              flagButton(
-                icon: Icons.format_italic,
-                tooltip: 'Italic (Ctrl+I)',
-                field: TextStyleSpec.fieldItalic,
-              ),
-              flagButton(
-                icon: Icons.format_underlined,
-                tooltip: 'Underline (Ctrl+U)',
-                field: TextStyleSpec.fieldUnderline,
-              ),
-              flagButton(
-                icon: Icons.format_strikethrough,
-                tooltip: 'Strikethrough',
-                field: TextStyleSpec.fieldStrikethrough,
-              ),
-              colorButton(
-                icon: Icons.format_color_text,
-                tooltip: 'Text color',
-                current: active.color,
-                title: 'Text color',
-                defaultLabel: 'Automatic',
-                allowNoFill: false,
-                onPicked: (value) =>
-                    applyColor(TextStyleSpec.fieldColor, value),
-              ),
-              colorButton(
-                icon: Icons.format_color_fill,
-                tooltip: 'Fill color',
-                current: active.background,
-                title: 'Fill color',
-                defaultLabel: 'Sheet default',
-                allowNoFill: true,
-                onPicked: (value) =>
-                    applyColor(TextStyleSpec.fieldBackground, value),
-              ),
-              const SizedBox(width: 4),
-              TextButton.icon(
-                icon: const Icon(Icons.text_fields),
-                label: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 240),
-                  child: Text(
-                    describeTextStyle(active, emptyLabel: 'Font...'),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                onPressed: hasCells
-                    ? () async {
-                        final result = await FontOptionsDialog.show(
-                          context,
-                          title: 'Font for selected cells',
-                          initial: active,
-                          resetLabel: 'Reset to sheet default',
-                          allowNoFill: true,
-                        );
+          final fontLabel = describeTextStyle(active, emptyLabel: 'Font...');
 
-                        if (result == null || result.isEmpty) {
-                          return;
-                        }
+          Future<void> openFontDialog() async {
+            final result = await FontOptionsDialog.show(
+              context,
+              title: 'Font for selected cells',
+              initial: active,
+              resetLabel: 'Reset to sheet default',
+              allowNoFill: true,
+            );
 
-                        spreadsheetController.applyTextStyle(
-                          startRow: selection.startRow,
-                          startColumn: selection.startColumn,
-                          endRow: selection.endRow,
-                          endColumn: selection.endColumn,
-                          set: result.set,
-                          reset: result.reset,
-                        );
-                      }
-                    : null,
-              ),
-              const Spacer(),
-              IconButton(
-                icon: const Icon(Icons.settings),
-                tooltip: 'Settings',
-                onPressed: () => SettingsDialog.show(
-                  context,
-                  spreadsheetController: spreadsheetController,
-                ),
-              ),
-            ],
+            if (result == null || result.isEmpty) {
+              return;
+            }
+
+            spreadsheetController.applyTextStyle(
+              startRow: selection.startRow,
+              startColumn: selection.startColumn,
+              endRow: selection.endRow,
+              endColumn: selection.endColumn,
+              set: result.set,
+              reset: result.reset,
+            );
+          }
+
+          // The formatting buttons. They scroll sideways when they do not
+          // fit; Settings stays pinned at the end so it is always reachable.
+          final actions = <Widget>[
+            flagButton(
+              icon: Icons.format_bold,
+              tooltip: 'Bold (Ctrl+B)',
+              field: TextStyleSpec.fieldBold,
+            ),
+            flagButton(
+              icon: Icons.format_italic,
+              tooltip: 'Italic (Ctrl+I)',
+              field: TextStyleSpec.fieldItalic,
+            ),
+            flagButton(
+              icon: Icons.format_underlined,
+              tooltip: 'Underline (Ctrl+U)',
+              field: TextStyleSpec.fieldUnderline,
+            ),
+            flagButton(
+              icon: Icons.format_strikethrough,
+              tooltip: 'Strikethrough',
+              field: TextStyleSpec.fieldStrikethrough,
+            ),
+            colorButton(
+              icon: Icons.format_color_text,
+              tooltip: 'Text color',
+              current: active.color,
+              title: 'Text color',
+              defaultLabel: 'Automatic',
+              allowNoFill: false,
+              onPicked: (value) => applyColor(TextStyleSpec.fieldColor, value),
+            ),
+            colorButton(
+              icon: Icons.format_color_fill,
+              tooltip: 'Fill color',
+              current: active.background,
+              title: 'Fill color',
+              defaultLabel: 'Sheet default',
+              allowNoFill: true,
+              onPicked: (value) =>
+                  applyColor(TextStyleSpec.fieldBackground, value),
+            ),
+            const SizedBox(width: 4),
+          ];
+
+          // The toolbar keeps its left-to-right order even in a right-to-left
+          // sheet or locale (only the grid flips), and decides between the
+          // full and the icon-only Font button from the width it is given.
+          return Directionality(
+            textDirection: TextDirection.ltr,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                // Compared on the full toolbar width, padding included.
+                final compact =
+                    constraints.maxWidth + 2 * _toolbarPadding <
+                        compactToolbarWidth;
+
+                return Row(
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ...actions,
+                            if (compact)
+                              IconButton(
+                                icon: const Icon(Icons.text_fields),
+                                tooltip: fontLabel,
+                                onPressed: hasCells ? openFontDialog : null,
+                              )
+                            else
+                              TextButton.icon(
+                                icon: const Icon(Icons.text_fields),
+                                label: ConstrainedBox(
+                                  constraints:
+                                      const BoxConstraints(maxWidth: 240),
+                                  child: Text(
+                                    fontLabel,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                onPressed: hasCells ? openFontDialog : null,
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.settings),
+                      tooltip: 'Settings',
+                      onPressed: () => SettingsDialog.show(
+                        context,
+                        spreadsheetController: spreadsheetController,
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
           );
         },
       ),

@@ -303,6 +303,91 @@ def save_document(
     )
 
 
+_LEGACY_MESSAGE = "This action needs a shared session; open the document again."
+
+
+@router.post(
+    "/save-as",
+    response_model=SaveAsDocumentResponse
+)
+def save_as_document(
+    request: NewNameRequest,
+    session: Session = Depends(get_session),
+    registry: SessionRegistry = Depends(get_registry)
+):
+    """Save the open document, then copy it under a new name.
+
+    Never overwrites: an existing or open name is refused with a message that
+    can be shown to the user. The caller opens the copy afterwards.
+    """
+    filename = session.controller.filename()
+
+    if session.is_default:
+        return SaveAsDocumentResponse(success=False, message=_LEGACY_MESSAGE, filename=filename, new_name=request.new_name)
+
+    try:
+        new_name = registry.save_as(session, request.new_name)
+    except DocumentBusy as error:
+        return SaveAsDocumentResponse(success=False, message=str(error), filename=filename, new_name=request.new_name)
+
+    return SaveAsDocumentResponse(success=True, filename=filename, new_name=new_name)
+
+
+@router.post(
+    "/rename-open",
+    response_model=RenameDocumentResponse
+)
+def rename_open_document(
+    request: NewNameRequest,
+    http_request: Request,
+    session: Session = Depends(get_session),
+    registry: SessionRegistry = Depends(get_registry)
+):
+    """Rename the open document (refused while other people are in it).
+
+    On success the document is closed on the server; open the new name next.
+    On failure after the session was closed, open the old name again.
+    """
+    old_name = session.controller.filename()
+
+    if session.is_default:
+        return RenameDocumentResponse(success=False, message=_LEGACY_MESSAGE, old_name=old_name, new_name=request.new_name)
+
+    client_id, _ = _client(http_request)
+
+    try:
+        new_name = registry.rename_open(session, client_id, request.new_name)
+    except DocumentBusy as error:
+        return RenameDocumentResponse(success=False, message=str(error), old_name=old_name, new_name=request.new_name)
+
+    return RenameDocumentResponse(success=True, old_name=old_name, new_name=new_name)
+
+
+@router.post(
+    "/delete-open",
+    response_model=DeleteDocumentResponse
+)
+def delete_open_document(
+    http_request: Request,
+    session: Session = Depends(get_session),
+    registry: SessionRegistry = Depends(get_registry)
+):
+    """Delete the open document's file (refused while other people are in it)."""
+    filename = session.controller.filename()
+
+    if session.is_default:
+        return DeleteDocumentResponse(success=False, message=_LEGACY_MESSAGE, filename=filename)
+
+    client_id, _ = _client(http_request)
+
+    try:
+        registry.delete_open(session, client_id)
+    except DocumentBusy as error:
+        return DeleteDocumentResponse(success=False, message=str(error), filename=filename)
+
+    return DeleteDocumentResponse(success=True, filename=filename)
+
+
 @router.post(
     "/reload",
     response_model=ReloadDocumentResponse

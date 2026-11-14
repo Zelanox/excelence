@@ -376,15 +376,17 @@ class SessionRegistry:
 
             return self._release(session)
 
-    def _release(self, session: Session) -> bool:
+    def _release(self, session: Session, save: bool = True) -> bool:
         """Save and drop a session that has no clients. Caller holds its lock.
 
         If the save fails the session is KEPT, so unsaved work is never
         thrown away - it will be retried on the next expiry or shutdown.
+        ``save=False`` drops it without saving (only for a document whose
+        file has just been deleted).
         """
         controller = session.controller
 
-        if controller.modified() and not controller.save_document():
+        if save and controller.modified() and not controller.save_document():
             logger.error("Could not save %s; keeping its session open", session.filename)
             return False
 
@@ -422,6 +424,109 @@ class SessionRegistry:
                     self._release(session)
                 finally:
                     session.lock.release()
+
+    # ------------------------------------------------------------------
+    # File menu: Save as, Rename and Delete of the OPEN document
+    # ------------------------------------------------------------------
+    #
+    # All three are called with the session's lock held (a request handler
+    # does, via its dependency) and raise DocumentBusy with a message that is
+    # safe to show to the user. They check everything BEFORE changing
+    # anything, and never overwrite a file.
+
+    def _checked_new_name(self, session: Session, new_name: str) -> tuple[str, str]:
+        """The key and disk path for ``new_name``, or DocumentBusy saying why not."""
+        key = document_key(new_name)
+        resolved = session.controller.document._resolve_path(new_name) if key else None
+
+        if key is None or resolved is None or not new_name.lower().endswith(".xlsx"):
+            raise DocumentBusy("That name is not valid. Use a file name that ends in .xlsx.")
+
+        if key == session.key:
+            raise DocumentBusy("That is already the name of this document.")
+
+        self._refuse_if_default_has(key)
+
+        if key in self._by_key:
+            raise DocumentBusy("A document with that name is already open.")
+
+        if os.path.exists(resolved):
+            raise DocumentBusy(f"A document named {new_name} already exists. Choose another name.")
+
+        return key, resolved
+
+    def _refuse_if_others(self, session: Session, client_id: str | None) -> None:
+        if any(other != client_id for other in session.clients):
+            raise DocumentBusy("Other people are working in this document. Ask them to leave first.")
+
+    def save_as(self, session: Session, new_name: str) -> str:
+        """Save the document, then copy it to ``new_name``. Returns the new name.
+
+        The original keeps everything up to this moment. Nobody is moved: the
+        caller opens the copy like any other document.
+        """
+        new_name = new_name.strip() if isinstance(new_name, str) else ""
+
+        with self._guard:
+            self._checked_new_name(session, new_name)
+            controller = session.controller
+
+            if controller.modified() and not controller.save_document():
+                raise DocumentBusy("Could not save the document, so no copy was made. Try again.")
+
+            if not controller.copy_document(session.filename, new_name):
+                raise DocumentBusy("Could not create the copy. Check that the server has free disk space and try again.")
+
+            logger.info("Saved %s as %s", session.filename, new_name)
+            return new_name
+
+    def rename_open(self, session: Session, client_id: str | None, new_name: str) -> str:
+        """Rename the open document (only while the caller is alone in it).
+
+        The session is saved and closed, then the file renamed; the caller
+        opens the new name afterwards. If the rename fails the document is
+        still saved under its old name and the caller should open that again.
+        """
+        new_name = new_name.strip() if isinstance(new_name, str) else ""
+
+        with self._guard:
+            self._checked_new_name(session, new_name)
+            self._refuse_if_others(session, client_id)
+
+            info = session.clients.pop(client_id, None) if client_id is not None else None
+
+            if not self._release(session):
+                if info is not None:
+                    session.clients[client_id] = info
+
+                raise DocumentBusy("Could not save the document, so it was not renamed. Try again.")
+
+            if not session.controller.rename_document(session.filename, new_name):
+                raise DocumentBusy(
+                    "Could not rename the document. It was saved under its old name; open it again."
+                )
+
+            logger.info("Renamed %s to %s", session.filename, new_name)
+            return new_name
+
+    def delete_open(self, session: Session, client_id: str | None) -> str:
+        """Delete the open document's file (only while the caller is alone in it).
+
+        The file goes first: if that fails nothing has changed and the session
+        (with any unsaved work) stays open.
+        """
+        with self._guard:
+            self._refuse_if_others(session, client_id)
+
+            if not session.controller.delete_document(session.filename):
+                raise DocumentBusy("Could not delete the document. It may be in use by another program.")
+
+            if client_id is not None:
+                session.clients.pop(client_id, None)
+
+            self._release(session, save=False)
+            logger.info("Deleted %s", session.filename)
+            return session.filename
 
     # ------------------------------------------------------------------
     # Questions about the state of things

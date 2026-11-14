@@ -95,3 +95,19 @@ class RenameDocumentResponse(ApiResponse):
     old_name: str = Field(default="", description="Original workbook filename.")
 
     new_name: str = Field(default="", description="Updated workbook filename.")
+
+
+class NewNameRequest(BaseModel):
+
+    new_name: str = Field(
+        ...,
+        description="New workbook filename, ending in .xlsx.",
+        json_schema_extra={"example": "copy.xlsx"}
+    )
+
+
+class SaveAsDocumentResponse(ApiResponse):
+
+    filename: str = Field(default="", description="The document that was copied.")
+
+    new_name: str = Field(default="", description="Filename of the copy.")
