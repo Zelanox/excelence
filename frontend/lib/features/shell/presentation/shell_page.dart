@@ -10,6 +10,7 @@ import '../../../core/preferences/app_preferences.dart';
 import '../../spreadsheet/controllers/spreadsheet_controller.dart';
 import '../../spreadsheet/controllers/viewport_controller.dart';
 import '../../spreadsheet/services/spreadsheet_service.dart';
+import '../startup_status.dart';
 import '../widgets/app_menu_bar.dart';
 import '../widgets/workspace.dart';
 import '../widgets/status_bar.dart';
@@ -39,6 +40,9 @@ class ShellPage extends StatefulWidget {
 class _ShellPageState extends State<ShellPage> with WidgetsBindingObserver {
   late final SpreadsheetController spreadsheetController;
   late final ViewportController viewportController;
+
+  /// Whether the first document has been tried, and why there is none.
+  final StartupStatus startup = StartupStatus();
 
   @override
   void initState() {
@@ -115,6 +119,8 @@ class _ShellPageState extends State<ShellPage> with WidgetsBindingObserver {
   /// still surfaced to the user via loadDocument's normal error path if
   /// IT also fails - this only guards the one retry, not indefinitely.
   Future<void> _loadInitialDocument() async {
+    startup.begin();
+
     final lastOpened = await const AppPreferences().getLastOpenedDocument();
 
     if (!mounted) return;
@@ -141,10 +147,21 @@ class _ShellPageState extends State<ShellPage> with WidgetsBindingObserver {
 
     if (mounted) {
       _syncViewportBounds();
+
+      startup.finish(
+        problem: spreadsheetController.hasDocument
+            ? null
+            : 'Could not open a document. Check that the server is running '
+                'and that this device can reach it.',
+      );
     }
   }
 
   void _syncViewportBounds() {
+    if (spreadsheetController.hasDocument) {
+      startup.clearProblem();
+    }
+
     final spreadsheet = spreadsheetController.spreadsheet;
     if (spreadsheet == null) {
       return;
@@ -161,6 +178,7 @@ class _ShellPageState extends State<ShellPage> with WidgetsBindingObserver {
     spreadsheetController.removeListener(_syncViewportBounds);
     spreadsheetController.dispose();
     viewportController.dispose();
+    startup.dispose();
     super.dispose();
   }
 
@@ -182,6 +200,8 @@ class _ShellPageState extends State<ShellPage> with WidgetsBindingObserver {
             Workspace(
               spreadsheetController: spreadsheetController,
               viewportController: viewportController,
+              startup: startup,
+              onRetry: _loadInitialDocument,
             ),
             SheetTabs(spreadsheetController: spreadsheetController),
             StatusBar(

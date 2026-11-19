@@ -1,6 +1,9 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
+
 import '../../../core/api/api_client.dart';
+import '../models/file_action_result.dart';
 import '../models/sheet_appearance.dart';
 import '../models/text_style_spec.dart';
 
@@ -509,6 +512,116 @@ class SpreadsheetService {
       // Ignored on purpose; see above.
     } finally {
       _api.documentSession = null;
+    }
+  }
+
+  // ------------------------------------------------------------
+  // File menu actions on the open document
+  // ------------------------------------------------------------
+
+  /// Saves the open document, then copies it to [newName]. The copy is not
+  /// opened; the caller does that.
+  Future<FileActionResult> saveAs(String newName) {
+    return _fileAction(
+      '/documents/save-as',
+      body: {'new_name': newName},
+      nameKey: 'new_name',
+    );
+  }
+
+  /// Renames the open document (only possible while this client is alone in
+  /// it). On success the server has closed the document: open the new name
+  /// next.
+  Future<FileActionResult> renameOpen(String newName) async {
+    final result = await _fileAction(
+      '/documents/rename-open',
+      body: {'new_name': newName},
+      nameKey: 'new_name',
+    );
+
+    if (result.ok) {
+      _api.documentSession = null;
+    }
+
+    return result;
+  }
+
+  /// Deletes the open document (only possible while this client is alone in
+  /// it). On success the server has closed it.
+  Future<FileActionResult> deleteOpen() async {
+    final result = await _fileAction(
+      '/documents/delete-open',
+      nameKey: 'filename',
+    );
+
+    if (result.ok) {
+      _api.documentSession = null;
+    }
+
+    return result;
+  }
+
+  /// Posts a File menu action and turns every outcome into a result with a
+  /// message the user can read; the technical detail goes to the log.
+  Future<FileActionResult> _fileAction(
+    String path, {
+    Map<String, dynamic>? body,
+    required String nameKey,
+  }) async {
+    try {
+      final response = await _api.post(path, body: body);
+
+      if (response.statusCode == 409) {
+        return const FileActionResult.failure(
+          'This document is no longer open on the server. Open it again.',
+        );
+      }
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        debugPrint(
+          '[SpreadsheetService] $path failed: '
+          '${response.statusCode} ${response.body}',
+        );
+
+        return FileActionResult.failure(
+          'The server could not complete that '
+          '(error ${response.statusCode}). Try again.',
+        );
+      }
+
+      final decoded = jsonDecode(response.body);
+
+      if (decoded is! Map<String, dynamic>) {
+        throw const FormatException('expected a JSON object');
+      }
+
+      final json = decoded;
+
+      if (json['success'] != true) {
+        final message = json['message']?.toString() ?? '';
+
+        return FileActionResult.failure(
+          message.isNotEmpty
+              ? message
+              : 'The server did not accept that. Try again.',
+        );
+      }
+
+      return FileActionResult.success(
+        name: json[nameKey]?.toString() ?? '',
+      );
+    } on FormatException catch (error) {
+      debugPrint('[SpreadsheetService] $path: unreadable answer: $error');
+
+      return const FileActionResult.failure(
+        'The server sent an answer that could not be read. Try again.',
+      );
+    } catch (error) {
+      debugPrint('[SpreadsheetService] $path: $error');
+
+      return const FileActionResult.failure(
+        "Can't reach the server. Check the connection and try again.",
+      );
     }
   }
 

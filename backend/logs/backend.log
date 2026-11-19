@@ -12330,3 +12330,24 @@ RuntimeError: boom
 2026-11-14 19:37:26,606 - INFO - document - Saved document #U0646#U0633#U062e #U0627#U062d#U062a#U064a#U0627#U0637#U064a #U0644#U0644#U0641#U0647#U0631#U0633 - Copy.xlsx
 2026-11-14 19:37:40,779 - INFO - document - Saved document #U0646#U0633#U062e #U0627#U062d#U062a#U064a#U0627#U0637#U064a #U0644#U0644#U0641#U0647#U0631#U0633 - Copy.xlsx
 2026-11-14 19:37:45,838 - INFO - document - Saved document #U0646#U0633#U062e #U0627#U062d#U062a#U064a#U0627#U0637#U064a #U0644#U0644#U0641#U0647#U0631#U0633 - Copy.xlsx
+2026-11-15 20:14:44,594 - WARNING - run_server - Listening on 0.0.0.0 with NO access token: anyone who can reach this address can read, change and delete every document. Set EXCELENCE_ACCESS_TOKEN (and see docs/COLLABORATION.md).
+2026-11-15 20:14:44,962 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-11-16 09:47:20,211 - WARNING - run_server - Listening on 0.0.0.0 with NO access token: anyone who can reach this address can read, change and delete every document. Set EXCELENCE_ACCESS_TOKEN (and see docs/COLLABORATION.md).
+2026-11-16 09:47:21,042 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json
+2026-11-16 12:56:31,893 - INFO - document - Opened document #U0646#U0633#U062e #U0627#U062d#U062a#U064a#U0627#U0637#U064a #U0644#U0644#U0641#U0647#U0631#U0633 - Copy.xlsx
+2026-11-16 12:56:31,907 - INFO - sessions - Opened session c88fbfbdba76d3a5 for #U0646#U0633#U062e #U0627#U062d#U062a#U064a#U0627#U0637#U064a #U0644#U0644#U0641#U0647#U0631#U0633 - Copy.xlsx
+2026-11-16 12:56:44,024 - INFO - sessions - Released session c88fbfbdba76d3a5 (#U0646#U0633#U062e #U0627#U062d#U062a#U064a#U0627#U0637#U064a #U0644#U0644#U0641#U0647#U0631#U0633 - Copy.xlsx)
+2026-11-16 12:56:45,250 - INFO - document - Opened document نسخ احتياطي للفهرس - Copy.xlsx
+2026-11-16 12:56:45,251 - INFO - sessions - Opened session 936a70a2efd3440f for نسخ احتياطي للفهرس - Copy.xlsx
+2026-11-16 13:01:40,700 - INFO - sessions - Released session 936a70a2efd3440f (نسخ احتياطي للفهرس - Copy.xlsx)
+2026-11-16 13:01:40,877 - INFO - document - Opened document نسخ احتياطي للفهرس - Copy.xlsx
+2026-11-16 13:01:40,877 - INFO - sessions - Opened session 936a70a2efd3440f for نسخ احتياطي للفهرس - Copy.xlsx
+2026-11-16 13:01:40,878 - INFO - sessions - Re-opened released session 936a70a2efd3440f
+2026-11-16 13:35:51,100 - INFO - sessions - Released session 936a70a2efd3440f (نسخ احتياطي للفهرس - Copy.xlsx)
+2026-11-16 13:35:51,674 - INFO - document - Opened document نسخ احتياطي للفهرس - Copy.xlsx
+2026-11-16 13:35:51,674 - INFO - sessions - Opened session 936a70a2efd3440f for نسخ احتياطي للفهرس - Copy.xlsx
+2026-11-16 13:35:51,675 - INFO - sessions - Re-opened released session 936a70a2efd3440f
+2026-11-16 18:53:42,469 - INFO - sessions - Released session 936a70a2efd3440f (نسخ احتياطي للفهرس - Copy.xlsx)
+2026-11-16 18:53:42,863 - INFO - document - Opened document نسخ احتياطي للفهرس - Copy.xlsx
+2026-11-16 18:53:42,873 - INFO - sessions - Opened session 936a70a2efd3440f for نسخ احتياطي للفهرس - Copy.xlsx
+2026-11-19 17:08:14,772 - INFO - config - Using config file E:\Projects\excelence\backend\utils\config.json

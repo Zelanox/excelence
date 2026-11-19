@@ -1,14 +1,75 @@
 import 'package:flutter/material.dart';
 
 import '../../spreadsheet/controllers/spreadsheet_controller.dart';
-import 'file_explorer_dialog.dart';
+import '../file_actions.dart';
 
-enum _FileMenuAction { newDocument, openDocument, saveDocument }
+/// Menu items that are planned but not built yet. They are shown greyed out
+/// so the menus already have their final shape; an item moves out of this
+/// list (and becomes a working one) when its feature is implemented.
+/// "-" is a divider.
+const Map<String, List<String>> plannedMenuItems = {
+  'File': ['Import...', 'Download as...', 'Print...'],
+  'Edit': ['Find and replace...', 'Select all', 'Clear formatting'],
+  'View': [
+    'Freeze rows and columns',
+    'Show gridlines',
+    'Zoom...',
+    'Full screen',
+  ],
+  'Insert': ['Chart', 'Image', 'Link', 'Comment'],
+  'Data': [
+    'Sort range...',
+    'Create a filter',
+    'Data validation...',
+    'Remove duplicates',
+  ],
+  'Tools': ['Speech to text', 'Spell check'],
+  'Help': ['Keyboard shortcuts', 'About Excelence'],
+};
 
-/// The app's top menu bar. Only "File" is wired up for now (New/Open/
-/// Save via FileExplorerDialog and SpreadsheetController) - Edit/View/
-/// Insert/Data/Tools/Help stay as plain labels until they get the same
-/// treatment.
+List<PopupMenuEntry<T>> _plannedEntries<T>(String menu) {
+  return <PopupMenuEntry<T>>[
+    for (final item in plannedMenuItems[menu] ?? const <String>[])
+      if (item == '-')
+        const PopupMenuDivider()
+      else
+        PopupMenuItem<T>(enabled: false, child: Text(item)),
+  ];
+}
+
+/// A top-level menu whose items are all planned (greyed out).
+class _PlannedMenu extends StatelessWidget {
+  const _PlannedMenu(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<Object>(
+      tooltip: '',
+      offset: const Offset(0, 24),
+      itemBuilder: (context) => _plannedEntries<Object>(label),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Text(label),
+      ),
+    );
+  }
+}
+
+enum _FileMenuAction {
+  newDocument,
+  openDocument,
+  saveDocument,
+  saveAs,
+  rename,
+  close,
+  delete,
+}
+
+/// The app's top menu bar. The File menu's document actions work (what each
+/// one does lives in [FileActions]); every other item is a greyed-out
+/// placeholder listed in [plannedMenuItems] until its feature is built.
 class AppMenuBar extends StatelessWidget {
   const AppMenuBar({
     super.key,
@@ -20,50 +81,22 @@ class AppMenuBar extends StatelessWidget {
   Future<void> _handleFileAction(
     BuildContext context,
     _FileMenuAction action,
-  ) async {
+  ) {
     switch (action) {
       case _FileMenuAction.newDocument:
-        final path = await FileExplorerDialog.show(
-          context,
-          spreadsheetController: spreadsheetController,
-          mode: FileExplorerMode.create,
-        );
-        if (path == null || !context.mounted) return;
-        await _run(context, () => spreadsheetController.newDocument(path));
-        break;
-
+        return FileActions.newDocument(context, spreadsheetController);
       case _FileMenuAction.openDocument:
-        final path = await FileExplorerDialog.show(
-          context,
-          spreadsheetController: spreadsheetController,
-          mode: FileExplorerMode.open,
-        );
-        if (path == null || !context.mounted) return;
-        await _run(context, () => spreadsheetController.loadDocument(path));
-        break;
-
+        return FileActions.openDocument(context, spreadsheetController);
       case _FileMenuAction.saveDocument:
-        await _run(context, spreadsheetController.saveDocument);
-        break;
-    }
-  }
-
-  /// Runs a controller action, showing a snackbar on failure. Success is
-  /// silent - the grid updating (for New/Open) or simply not erroring
-  /// (for Save) is feedback enough, matching how the rest of the app
-  /// (e.g. GridColumnHeader's rename/delete) only surfaces failures.
-  Future<void> _run(
-    BuildContext context,
-    Future<void> Function() action,
-  ) async {
-    try {
-      await action();
-    } catch (error) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$error')),
-        );
-      }
+        return FileActions.save(context, spreadsheetController);
+      case _FileMenuAction.saveAs:
+        return FileActions.saveAs(context, spreadsheetController);
+      case _FileMenuAction.rename:
+        return FileActions.rename(context, spreadsheetController);
+      case _FileMenuAction.close:
+        return FileActions.close(context, spreadsheetController);
+      case _FileMenuAction.delete:
+        return FileActions.delete(context, spreadsheetController);
     }
   }
 
@@ -82,44 +115,84 @@ class AppMenuBar extends StatelessWidget {
           ),
         ),
       ),
-      child: Row(
-        children: [
+      // Scrolls sideways instead of overflowing on a very narrow screen.
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
           PopupMenuButton<_FileMenuAction>(
             tooltip: '',
             offset: const Offset(0, 24),
             onSelected: (action) => _handleFileAction(context, action),
-            itemBuilder: (context) => const [
-              PopupMenuItem(
-                value: _FileMenuAction.newDocument,
-                child: Text('New'),
-              ),
-              PopupMenuItem(
-                value: _FileMenuAction.openDocument,
-                child: Text('Open...'),
-              ),
-              PopupMenuItem(
-                value: _FileMenuAction.saveDocument,
-                child: Text('Save'),
-              ),
-            ],
+            itemBuilder: (context) {
+              // Read when the menu opens: document items need an open
+              // document, and nothing is offered while another file action
+              // is still running.
+              final idle = !spreadsheetController.isFileActionBusy;
+              final onDocument = idle && spreadsheetController.hasDocument;
+
+              return [
+                PopupMenuItem(
+                  value: _FileMenuAction.newDocument,
+                  enabled: idle,
+                  child: const Text('New'),
+                ),
+                PopupMenuItem(
+                  value: _FileMenuAction.openDocument,
+                  enabled: idle,
+                  child: const Text('Open...'),
+                ),
+                const PopupMenuDivider(),
+                PopupMenuItem(
+                  value: _FileMenuAction.saveDocument,
+                  enabled: onDocument,
+                  child: const Text('Save'),
+                ),
+                PopupMenuItem(
+                  value: _FileMenuAction.saveAs,
+                  enabled: onDocument,
+                  child: const Text('Save as...'),
+                ),
+                PopupMenuItem(
+                  value: _FileMenuAction.rename,
+                  enabled: onDocument,
+                  child: const Text('Rename...'),
+                ),
+                const PopupMenuDivider(),
+                PopupMenuItem(
+                  value: _FileMenuAction.close,
+                  enabled: onDocument,
+                  child: const Text('Close'),
+                ),
+                PopupMenuItem(
+                  value: _FileMenuAction.delete,
+                  enabled: onDocument,
+                  child: const Text('Delete...'),
+                ),
+                const PopupMenuDivider(),
+                ..._plannedEntries<_FileMenuAction>('File'),
+              ];
+            },
             child: const Padding(
               padding: EdgeInsets.symmetric(vertical: 6),
               child: Text('File'),
             ),
           ),
           const SizedBox(width: 20),
-          const Text('Edit'),
+          const _PlannedMenu('Edit'),
           const SizedBox(width: 20),
-          const Text('View'),
+          const _PlannedMenu('View'),
           const SizedBox(width: 20),
-          const Text('Insert'),
+          const _PlannedMenu('Insert'),
           const SizedBox(width: 20),
-          const Text('Data'),
+          const _PlannedMenu('Data'),
           const SizedBox(width: 20),
-          const Text('Tools'),
+          const _PlannedMenu('Tools'),
           const SizedBox(width: 20),
-          const Text('Help'),
+          const _PlannedMenu('Help'),
         ],
+        ),
       ),
     );
   }

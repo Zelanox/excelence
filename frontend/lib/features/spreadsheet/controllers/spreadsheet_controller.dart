@@ -8,6 +8,8 @@ import '../../../core/live/live_coordinator.dart';
 import '../../../core/live/live_messages.dart';
 import '../../../core/preferences/app_preferences.dart';
 import '../models/cell_model.dart';
+import '../models/document_name.dart';
+import '../models/file_action_result.dart';
 import '../models/row_model.dart';
 import '../models/sheet_model.dart';
 import '../models/spreadsheet_model.dart';
@@ -333,7 +335,7 @@ class SpreadsheetController extends ChangeNotifier {
   void _sessionLost() {
     final filename = _openFilename;
 
-    if (_disposed || _loadingDocument || filename == null) {
+    if (_disposed || _loadingDocument || _fileActionBusy || filename == null) {
       return;
     }
 
@@ -439,12 +441,16 @@ class SpreadsheetController extends ChangeNotifier {
 
   /// Shows [sheet] as the one open sheet, without a server (tests only).
   @visibleForTesting
-  void showSheetForTesting(SheetModel sheet) {
+  void showSheetForTesting(SheetModel sheet, {String? filename}) {
     _spreadsheet = SpreadsheetModel(
       activeSheetIndex: 0,
       sheets: [sheet],
       availableSheetNames: [sheet.name],
     );
+
+    if (filename != null) {
+      _openFilename = filename;
+    }
   }
 
   /// Puts other people's cell values into the grid the way a local edit
@@ -676,6 +682,273 @@ class SpreadsheetController extends ChangeNotifier {
       debugPrintStack(stackTrace: stackTrace);
 
       rethrow;
+    }
+  }
+
+  // ============================================================
+  // File menu actions (Save as, Rename, Close, Delete)
+  // ============================================================
+
+  /// The document that is open, as the server knows it; null when none.
+  String? get openFilename => _openFilename;
+
+  bool get hasDocument => _spreadsheet != null;
+
+  /// True while a document is being opened (so "no document" is not final).
+  bool get isLoadingDocument => _loadingDocument;
+
+  /// True while a File menu action is running. The menu should not offer a
+  /// second one, and the "server forgot our document" recovery waits.
+  bool get isFileActionBusy => _fileActionBusy;
+
+  bool _fileActionBusy = false;
+
+  /// Why a File menu action cannot start now, or null if it can.
+  FileActionResult? _cannotStartFileAction() {
+    if (_openFilename == null || _spreadsheet == null) {
+      return const FileActionResult.failure('Open a document first.');
+    }
+
+    if (_fileActionBusy || _loadingDocument) {
+      return const FileActionResult.failure(
+        'Another file action is still running. Wait a moment and try again.',
+      );
+    }
+
+    return null;
+  }
+
+  void _beginFileAction() {
+    _fileActionBusy = true;
+    notifyListeners();
+  }
+
+  void _endFileAction() {
+    _fileActionBusy = false;
+
+    if (!_disposed) {
+      notifyListeners();
+    }
+  }
+
+  /// After a refused action: asks the server something harmless. If it
+  /// closed our document on the way, the answer is "not open" and the normal
+  /// recovery reopens it; if not, nothing happens.
+  Future<void> _checkSessionStillOpen() async {
+    _endFileAction();
+
+    try {
+      await _service.sheets();
+    } catch (_) {
+      // Nothing to do: the recovery above reacts to a "not open" answer, and
+      // any other failure shows up in whatever the user does next.
+    }
+  }
+
+  /// Goes back to "no document open" (after Close or Delete).
+  void _resetToNoDocument() {
+    _stopLive();
+    _spreadsheet = null;
+    _openFilename = null;
+    _undoStack.clear();
+    _redoStack.clear();
+    _autosaveTimer?.cancel();
+    _hasUnsavedChanges = false;
+    notifyListeners();
+  }
+
+  /// Saves the open document, copies it to [input] (`.xlsx` is added) and
+  /// switches to the copy. Nothing changes if anything goes wrong.
+  Future<FileActionResult> saveDocumentAs(String input) async {
+    final blocked = _cannotStartFileAction();
+
+    if (blocked != null) {
+      return blocked;
+    }
+
+    final original = _openFilename!;
+    final check = checkDocumentName(input, current: original);
+
+    if (!check.ok) {
+      return FileActionResult.failure(check.error!);
+    }
+
+    _beginFileAction();
+
+    try {
+      try {
+        await flushPendingChanges();
+      } catch (error) {
+        debugPrint('[SpreadsheetController.saveDocumentAs] flush: $error');
+
+        return const FileActionResult.failure(
+          'Could not save your latest changes, so no copy was made. '
+          'Try again.',
+        );
+      }
+
+      final result = await _service.saveAs(check.name!);
+
+      if (!result.ok) {
+        return result;
+      }
+
+      final copy = result.name.isEmpty ? check.name! : result.name;
+
+      try {
+        await loadDocument(copy);
+      } catch (error) {
+        debugPrint('[SpreadsheetController.saveDocumentAs] open copy: $error');
+
+        // loadDocument left the original; go back to it.
+        try {
+          await loadDocument(original);
+        } catch (_) {
+          // The original could not be reopened either; the next action
+          // or the recovery will show the real state.
+        }
+
+        return FileActionResult.failure(
+          'The copy $copy was saved, but it could not be opened. '
+          'Open it from File > Open.',
+        );
+      }
+
+      return FileActionResult.success(name: copy);
+    } finally {
+      _endFileAction();
+    }
+  }
+
+  /// Renames the open document to [input] (`.xlsx` is added) and keeps it
+  /// open under the new name. Refused while other people are in it.
+  Future<FileActionResult> renameDocument(String input) async {
+    final blocked = _cannotStartFileAction();
+
+    if (blocked != null) {
+      return blocked;
+    }
+
+    final original = _openFilename!;
+    final check = checkDocumentName(input, current: original);
+
+    if (!check.ok) {
+      return FileActionResult.failure(check.error!);
+    }
+
+    _beginFileAction();
+
+    try {
+      try {
+        await flushPendingChanges();
+      } catch (error) {
+        debugPrint('[SpreadsheetController.renameDocument] flush: $error');
+
+        return const FileActionResult.failure(
+          'Could not save your latest changes, so the document was not '
+          'renamed. Try again.',
+        );
+      }
+
+      final result = await _service.renameOpen(check.name!);
+
+      if (!result.ok) {
+        await _checkSessionStillOpen();
+        return result;
+      }
+
+      // The server closed the document; stop listening to its old room and
+      // open it again under the new name.
+      _stopLive();
+      final renamed = result.name.isEmpty ? check.name! : result.name;
+
+      try {
+        await loadDocument(renamed);
+      } catch (error) {
+        debugPrint('[SpreadsheetController.renameDocument] reopen: $error');
+        _resetToNoDocument();
+
+        return FileActionResult.failure(
+          'The document was renamed to $renamed, but it could not be '
+          'opened. Open it from File > Open.',
+        );
+      }
+
+      return FileActionResult.success(name: renamed);
+    } finally {
+      _endFileAction();
+    }
+  }
+
+  /// Deletes the open document's file and returns to "no document". Refused
+  /// while other people are in it; nothing is lost if it fails.
+  Future<FileActionResult> deleteDocument() async {
+    final blocked = _cannotStartFileAction();
+
+    if (blocked != null) {
+      return blocked;
+    }
+
+    final filename = _openFilename!;
+    _beginFileAction();
+
+    try {
+      // Let writes already on their way land first, or they would reach a
+      // document that is no longer there. Their outcome no longer matters.
+      try {
+        await _flushPendingSaves();
+      } catch (_) {}
+
+      _autosaveTimer?.cancel();
+
+      final result = await _service.deleteOpen();
+
+      if (!result.ok) {
+        await _checkSessionStillOpen();
+        return result;
+      }
+
+      _resetToNoDocument();
+
+      return FileActionResult.success(name: filename);
+    } finally {
+      _endFileAction();
+    }
+  }
+
+  /// Saves, leaves the document and returns to "no document". If the save
+  /// fails the document stays open and the result says [FileActionResult.saveFailed],
+  /// so the caller can offer Retry / Close anyway (`force: true`) / Cancel.
+  Future<FileActionResult> closeCurrentDocument({bool force = false}) async {
+    final blocked = _cannotStartFileAction();
+
+    if (blocked != null) {
+      return blocked;
+    }
+
+    _beginFileAction();
+
+    try {
+      if (!force) {
+        try {
+          await saveDocument();
+        } catch (error) {
+          debugPrint('[SpreadsheetController.closeCurrentDocument] $error');
+
+          return const FileActionResult.failure(
+            'Could not save your changes, so the document was not closed.',
+            saveFailed: true,
+          );
+        }
+      }
+
+      _stopLive();
+      await _service.closeDocument();
+      _resetToNoDocument();
+
+      return const FileActionResult.success();
+    } finally {
+      _endFileAction();
     }
   }
 

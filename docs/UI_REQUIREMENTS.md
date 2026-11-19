@@ -1,4 +1,6 @@
-# Toolbar and UI requirements (draft 1, nothing built yet)
+# Toolbar and UI requirements
+
+The overall plan and what is delivered or waiting is in `docs/ROADMAP.md`.
 
 Three work items, in this order: **A** toolbar fits any width, **B** File menu, **C** formatting buttons (C1 alignment, C2 number format, C3 borders). Each ships as its own round with tests.
 
@@ -101,3 +103,7 @@ Order: C1 alignment, C2 number format, C3 borders. Each needs the same chain: ba
 
 ## Definition of Done per round
 Requirements met, tests written with the code, backend and Flutter suites green on your machine, regression list checked, no silent failures, this file and `docs/` updated, you accept it.
+
+## D. Top menus (placeholders)
+
+Every top menu (File, Edit, View, Insert, Data, Tools, Help) opens. Items whose features are not built yet are greyed out and do nothing; the list is `plannedMenuItems` in `app_menu_bar.dart`. When a feature is built its item is removed from that list and becomes a working item. The menu bar scrolls sideways instead of overflowing on a narrow screen.
