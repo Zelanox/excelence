@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/app_text.dart';
 import '../../../core/live/live_connection.dart';
 import '../../../core/preferences/app_preferences.dart';
 import '../../spreadsheet/controllers/spreadsheet_controller.dart';
@@ -54,11 +55,14 @@ class StatusBar extends StatelessWidget {
                 // Autosave runs a moment after the last change, so there's
                 // a short "Unsaved changes" window between editing and
                 // "Saving...".
-                spreadsheetController.isSaving
-                    ? 'Saving...'
-                    : spreadsheetController.hasUnsavedChanges
-                        ? 'Unsaved changes'
-                        : 'All changes saved',
+                appText(
+                  context,
+                  spreadsheetController.isSaving
+                      ? 'Saving...'
+                      : spreadsheetController.hasUnsavedChanges
+                          ? 'Unsaved changes'
+                          : 'All changes saved',
+                ),
                 style: TextStyle(color: Colors.grey.shade600),
               ),
               const SizedBox(width: 16),
@@ -105,7 +109,9 @@ class _LiveIndicator extends StatelessWidget {
           .join(', ');
 
       return Tooltip(
-        message: names.isEmpty ? 'Live updates on' : 'Here now: $names',
+        message: names.isEmpty
+            ? appText(context, 'Live updates on')
+            : '${appText(context, 'Here now: ')}$names',
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -125,10 +131,12 @@ class _LiveIndicator extends StatelessWidget {
 
     return Tooltip(
       message: stopped
-          ? (controller.liveError ??
-              'The server stopped live updates for this window. '
-                  'Open the document again to resume.')
-          : 'Not connected to the server. Trying again...',
+          ?           (controller.liveError ??
+              appText(
+                context,
+                'The server stopped live updates for this window. Open the document again to resume.',
+              ))
+          : appText(context, 'Not connected to the server. Trying again...'),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -140,10 +148,10 @@ class _LiveIndicator extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             stopped
-                ? 'Live updates off'
+                ? appText(context, 'Live updates off')
                 : state == LiveState.connecting
-                    ? 'Connecting...'
-                    : 'Reconnecting...',
+                    ? appText(context, 'Connecting...')
+                    : appText(context, 'Reconnecting...'),
             style: TextStyle(color: color),
           ),
         ],
@@ -205,7 +213,11 @@ class _QuickAddRowFieldState extends State<_QuickAddRowField> {
         } catch (error) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Row added, but searching failed: $error')),
+              SnackBar(
+                content: Text(
+                  '${appText(context, 'Row added, but searching failed: ')}$error',
+                ),
+              ),
             );
           }
         }
@@ -220,7 +232,9 @@ class _QuickAddRowFieldState extends State<_QuickAddRowField> {
       // feedback at all).
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to add row: $error')),
+          SnackBar(
+            content: Text('${appText(context, 'Failed to add row: ')}$error'),
+          ),
         );
       }
     } finally {
@@ -242,7 +256,7 @@ class _QuickAddRowFieldState extends State<_QuickAddRowField> {
         decoration: InputDecoration(
           isDense: true,
           contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-          hintText: 'Add row with value...',
+          hintText: appText(context, 'Add row with value...'),
           hintStyle: TextStyle(
             fontSize: 12,
             color: Colors.grey.shade400,

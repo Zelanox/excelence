@@ -26,20 +26,21 @@ import '../services/formula_dependency_graph.dart';
 /// Creates the live-collaboration coordinator for a document that has just
 /// been opened. [reload] reloads the document from the server; [onChanged]
 /// asks the UI to redraw (people or connection state changed).
-typedef LiveCoordinatorFactory = LiveCoordinator Function({
-  required Future<void> Function() reload,
-  required void Function() onChanged,
-  required void Function() onSessionLost,
-  required bool Function(BatchMessage batch) applyBatch,
-});
+typedef LiveCoordinatorFactory =
+    LiveCoordinator Function({
+      required Future<void> Function() reload,
+      required void Function() onChanged,
+      required void Function() onSessionLost,
+      required bool Function(BatchMessage batch) applyBatch,
+    });
 
 class SpreadsheetController extends ChangeNotifier {
   SpreadsheetController(
     this._service, {
     AppPreferences preferences = const AppPreferences(),
     LiveCoordinatorFactory? liveFactory,
-  })  : _preferences = preferences,
-        _liveFactory = liveFactory {
+  }) : _preferences = preferences,
+       _liveFactory = liveFactory {
     // Live collaboration needs to know the log revision of every response
     // that carries grid data, and when this client has a change on its way.
     _service.trackLive(
@@ -115,7 +116,8 @@ class SpreadsheetController extends ChangeNotifier {
     return column != null && sheet!.headers.contains(column) ? column : null;
   }
 
-  bool get sortAscending => _spreadsheet?.activeSheet.view.sortAscending ?? true;
+  bool get sortAscending =>
+      _spreadsheet?.activeSheet.view.sortAscending ?? true;
 
   bool get canUndo => _undoStack.isNotEmpty;
   bool get canRedo => _redoStack.isNotEmpty;
@@ -177,18 +179,24 @@ class SpreadsheetController extends ChangeNotifier {
     VoidCallback? onFailure,
   }) {
     late final Future<void> save;
-    save = _writeQueueTail.then((_) => job()).then((_) {}, onError: (Object error) {
-      debugPrint('[SpreadsheetController] $errorPrefix: $error');
-      _lastSaveError = '$errorPrefix: $error';
-      notifyListeners();
-      onFailure?.call();
+    save = _writeQueueTail
+        .then((_) => job())
+        .then(
+          (_) {},
+          onError: (Object error) {
+            debugPrint('[SpreadsheetController] $errorPrefix: $error');
+            _lastSaveError = '$errorPrefix: $error';
+            notifyListeners();
+            onFailure?.call();
 
-      if (resyncOnFailure) {
-        unawaited(_resyncFromBackend());
-      }
-    }).whenComplete(() {
-      _pendingSaves.remove(save);
-    });
+            if (resyncOnFailure) {
+              unawaited(_resyncFromBackend());
+            }
+          },
+        )
+        .whenComplete(() {
+          _pendingSaves.remove(save);
+        });
 
     _writeQueueTail = save;
     _pendingSaves.add(save);
@@ -462,7 +470,9 @@ class SpreadsheetController extends ChangeNotifier {
   /// Local undo history is dropped: restoring an older snapshot would put
   /// back what these changes replaced (and the server refuses undo after
   /// somebody else's edit anyway).
-  void _applyRemoteCellEdits(List<({int row, int column, String value})> edits) {
+  void _applyRemoteCellEdits(
+    List<({int row, int column, String value})> edits,
+  ) {
     final current = _spreadsheet;
 
     if (current == null || edits.isEmpty) {
@@ -579,9 +589,7 @@ class SpreadsheetController extends ChangeNotifier {
     } else {
       _spreadsheet = SpreadsheetModel(
         activeSheetIndex: 0,
-        sheets: [
-          _sheetFromApiData(name: sheetsData.currentSheet, data: data),
-        ],
+        sheets: [_sheetFromApiData(name: sheetsData.currentSheet, data: data)],
         availableSheetNames: sheetsData.sheetNames,
       );
     }
@@ -597,6 +605,10 @@ class SpreadsheetController extends ChangeNotifier {
 
   Future<void> loadDocument(String filename) async {
     _loadingDocument = true;
+
+    // Tell the screen right away, so it can show "loading" instead of the
+    // "No document open" screen while the document is being fetched.
+    notifyListeners();
 
     try {
       // Opening replaces the backend's current document, so anything not
@@ -626,9 +638,7 @@ class SpreadsheetController extends ChangeNotifier {
       // 4. Convert API data into our Flutter spreadsheet model.
       _spreadsheet = SpreadsheetModel(
         activeSheetIndex: 0,
-        sheets: [
-          _sheetFromApiData(name: sheetsData.currentSheet, data: data),
-        ],
+        sheets: [_sheetFromApiData(name: sheetsData.currentSheet, data: data)],
         availableSheetNames: sheetsData.sheetNames,
       );
 
@@ -651,14 +661,17 @@ class SpreadsheetController extends ChangeNotifier {
 
       notifyListeners();
     } catch (error, stackTrace) {
-      debugPrint(
-        '[SpreadsheetController.loadDocument] Error: $error',
-      );
+      debugPrint('[SpreadsheetController.loadDocument] Error: $error');
       debugPrintStack(stackTrace: stackTrace);
 
       rethrow;
     } finally {
       _loadingDocument = false;
+
+      // After a failure nothing else announces that loading has ended.
+      if (!_disposed) {
+        notifyListeners();
+      }
     }
   }
 
@@ -676,9 +689,7 @@ class SpreadsheetController extends ChangeNotifier {
       await _service.createDocument(filename);
       await loadDocument(filename);
     } catch (error, stackTrace) {
-      debugPrint(
-        '[SpreadsheetController.newDocument] Error: $error',
-      );
+      debugPrint('[SpreadsheetController.newDocument] Error: $error');
       debugPrintStack(stackTrace: stackTrace);
 
       rethrow;
@@ -970,9 +981,7 @@ class SpreadsheetController extends ChangeNotifier {
       await _service.saveDocument();
       notifyListeners();
     } catch (error, stackTrace) {
-      debugPrint(
-        '[SpreadsheetController.saveDocument] Error: $error',
-      );
+      debugPrint('[SpreadsheetController.saveDocument] Error: $error');
       debugPrintStack(stackTrace: stackTrace);
 
       rethrow;
@@ -991,9 +1000,7 @@ class SpreadsheetController extends ChangeNotifier {
     try {
       await _service.uploadDocument(filename, bytes);
     } catch (error, stackTrace) {
-      debugPrint(
-        '[SpreadsheetController.uploadDocument] Error: $error',
-      );
+      debugPrint('[SpreadsheetController.uploadDocument] Error: $error');
       debugPrintStack(stackTrace: stackTrace);
 
       rethrow;
@@ -1033,9 +1040,11 @@ class SpreadsheetController extends ChangeNotifier {
 
       final cells = <CellModel>[];
 
-      for (int columnIndex = 0;
-          columnIndex < data.headers.length;
-          columnIndex++) {
+      for (
+        int columnIndex = 0;
+        columnIndex < data.headers.length;
+        columnIndex++
+      ) {
         final header = data.headers[columnIndex];
 
         final rawValue = apiRow[header];
@@ -1053,18 +1062,12 @@ class SpreadsheetController extends ChangeNotifier {
             column: columnIndex,
             value: isFormula ? '' : text,
             formula: isFormula ? text : null,
-            style: stylesByCell[(rowIndex, columnIndex)] ??
-                TextStyleSpec.empty,
+            style: stylesByCell[(rowIndex, columnIndex)] ?? TextStyleSpec.empty,
           ),
         );
       }
 
-      rows.add(
-        RowModel(
-          index: rowIndex,
-          cells: cells,
-        ),
-      );
+      rows.add(RowModel(index: rowIndex, cells: cells));
     }
 
     // This data is about to become what the grid shows, so the local copy
@@ -1081,6 +1084,7 @@ class SpreadsheetController extends ChangeNotifier {
         allRows: rows,
         headers: data.headers,
         columnWidths: data.columnWidths,
+        rowHeights: data.rowHeights,
         isRtl: data.isRtl,
         textDefaults: data.textDefaults,
         appearance: data.appearance,
@@ -1125,7 +1129,10 @@ class SpreadsheetController extends ChangeNotifier {
       }
 
       if (updatedCells != null) {
-        replacements[row.index] = RowModel(index: row.index, cells: updatedCells);
+        replacements[row.index] = RowModel(
+          index: row.index,
+          cells: updatedCells,
+        );
       }
     }
 
@@ -1153,9 +1160,7 @@ class SpreadsheetController extends ChangeNotifier {
 
       _spreadsheet = SpreadsheetModel(
         activeSheetIndex: 0,
-        sheets: [
-          _sheetFromApiData(name: sheetsData.currentSheet, data: data),
-        ],
+        sheets: [_sheetFromApiData(name: sheetsData.currentSheet, data: data)],
         availableSheetNames: sheetsData.sheetNames,
       );
 
@@ -1182,9 +1187,7 @@ class SpreadsheetController extends ChangeNotifier {
 
       _spreadsheet = SpreadsheetModel(
         activeSheetIndex: 0,
-        sheets: [
-          _sheetFromApiData(name: sheetsData.currentSheet, data: data),
-        ],
+        sheets: [_sheetFromApiData(name: sheetsData.currentSheet, data: data)],
         availableSheetNames: sheetsData.sheetNames,
       );
 
@@ -1217,9 +1220,7 @@ class SpreadsheetController extends ChangeNotifier {
 
       _spreadsheet = SpreadsheetModel(
         activeSheetIndex: 0,
-        sheets: [
-          _sheetFromApiData(name: sheetsData.currentSheet, data: data),
-        ],
+        sheets: [_sheetFromApiData(name: sheetsData.currentSheet, data: data)],
         availableSheetNames: sheetsData.sheetNames,
       );
 
@@ -1543,13 +1544,77 @@ class SpreadsheetController extends ChangeNotifier {
     late final Future<void> save;
     save = _service
         .setColumnWidth(name: name, width: width)
-        .then((_) {}, onError: (Object error) {
-      debugPrint('[SpreadsheetController.setColumnWidth] Save failed: $error');
-      _lastSaveError = 'Failed to save column width: $error';
-      notifyListeners();
-    }).whenComplete(() {
-      _pendingSaves.remove(save);
-    });
+        .then(
+          (_) {},
+          onError: (Object error) {
+            debugPrint(
+              '[SpreadsheetController.setColumnWidth] Save failed: $error',
+            );
+            _lastSaveError = 'Failed to save column width: $error';
+            notifyListeners();
+          },
+        )
+        .whenComplete(() {
+          _pendingSaves.remove(save);
+        });
+
+    _pendingSaves.add(save);
+    _markDirty();
+  }
+
+  /// Applies a row height locally while a resize gesture is in progress.
+  void setRowHeightLocal({required String rowId, required double height}) {
+    final currentSpreadsheet = _spreadsheet;
+    if (currentSpreadsheet == null) {
+      return;
+    }
+
+    final activeSheetIndex = currentSpreadsheet.activeSheetIndex;
+    final activeSheet = currentSpreadsheet.sheets[activeSheetIndex];
+    if (!activeSheet.rowIds.contains(rowId)) {
+      return;
+    }
+
+    final updatedHeights = Map<String, double>.from(activeSheet.rowHeights)
+      ..[rowId] = height;
+    final updatedSheet = activeSheet.copyWith(rowHeights: updatedHeights);
+    final updatedSheets = List<SheetModel>.from(currentSpreadsheet.sheets)
+      ..[activeSheetIndex] = updatedSheet;
+
+    _spreadsheet = SpreadsheetModel(
+      activeSheetIndex: activeSheetIndex,
+      sheets: updatedSheets,
+      availableSheetNames: currentSpreadsheet.availableSheetNames,
+    );
+    notifyListeners();
+  }
+
+  /// Applies and persists a row height after a resize gesture or numeric edit.
+  void setRowHeight({required String rowId, required double height}) {
+    final sheet = _spreadsheet?.activeSheet;
+    if (sheet == null || !sheet.rowIds.contains(rowId)) {
+      return;
+    }
+
+    final boundedHeight = height.clamp(16.0, 500.0).toDouble();
+    setRowHeightLocal(rowId: rowId, height: boundedHeight);
+
+    late final Future<void> save;
+    save = _service
+        .setRowHeight(rowId: rowId, height: boundedHeight)
+        .then(
+          (_) {},
+          onError: (Object error) {
+            debugPrint(
+              '[SpreadsheetController.setRowHeight] Save failed: $error',
+            );
+            _lastSaveError = 'Failed to save row height: $error';
+            notifyListeners();
+          },
+        )
+        .whenComplete(() {
+          _pendingSaves.remove(save);
+        });
 
     _pendingSaves.add(save);
     _markDirty();
@@ -1586,13 +1651,19 @@ class SpreadsheetController extends ChangeNotifier {
     notifyListeners();
 
     late final Future<void> save;
-    save = _service.setRtl(rtl: rtl).then((_) {}, onError: (Object error) {
-      debugPrint('[SpreadsheetController.setRtl] Save failed: $error');
-      _lastSaveError = 'Failed to save sheet direction: $error';
-      notifyListeners();
-    }).whenComplete(() {
-      _pendingSaves.remove(save);
-    });
+    save = _service
+        .setRtl(rtl: rtl)
+        .then(
+          (_) {},
+          onError: (Object error) {
+            debugPrint('[SpreadsheetController.setRtl] Save failed: $error');
+            _lastSaveError = 'Failed to save sheet direction: $error';
+            notifyListeners();
+          },
+        )
+        .whenComplete(() {
+          _pendingSaves.remove(save);
+        });
 
     _pendingSaves.add(save);
     _markDirty();
@@ -1651,10 +1722,14 @@ class SpreadsheetController extends ChangeNotifier {
       return;
     }
 
-    final firstRow = (startRow < endRow ? startRow : endRow)
-        .clamp(0, sheet.rows.length - 1);
-    final lastRow = (startRow > endRow ? startRow : endRow)
-        .clamp(0, sheet.rows.length - 1);
+    final firstRow = (startRow < endRow ? startRow : endRow).clamp(
+      0,
+      sheet.rows.length - 1,
+    );
+    final lastRow = (startRow > endRow ? startRow : endRow).clamp(
+      0,
+      sheet.rows.length - 1,
+    );
     final firstColumn = (startColumn < endColumn ? startColumn : endColumn)
         .clamp(0, sheet.headers.length - 1);
     final lastColumn = (startColumn > endColumn ? startColumn : endColumn)
@@ -1675,9 +1750,11 @@ class SpreadsheetController extends ChangeNotifier {
       final current = sheet.allRows[sourceRow];
       final cells = List<CellModel>.from(current.cells);
 
-      for (int column = firstColumn;
-          column <= lastColumn && column < cells.length;
-          column++) {
+      for (
+        int column = firstColumn;
+        column <= lastColumn && column < cells.length;
+        column++
+      ) {
         final cell = cells[column];
         cells[column] = cell.copyWith(
           style: cell.style.applied(set, reset: reset),
@@ -1688,8 +1765,9 @@ class SpreadsheetController extends ChangeNotifier {
     }
 
     final updatedSheets = List<SheetModel>.from(currentSpreadsheet.sheets);
-    updatedSheets[currentSpreadsheet.activeSheetIndex] =
-        sheet.withSourceRows(replacements);
+    updatedSheets[currentSpreadsheet.activeSheetIndex] = sheet.withSourceRows(
+      replacements,
+    );
 
     _spreadsheet = SpreadsheetModel(
       activeSheetIndex: currentSpreadsheet.activeSheetIndex,
@@ -1756,10 +1834,7 @@ class SpreadsheetController extends ChangeNotifier {
   /// line color and alternating row colors. Like [setRtl] these are
   /// sheet-level settings set from the Settings dialog - persisted, but
   /// not recorded in the undo history.
-  void setAppearance(
-    SheetAppearance set, {
-    Set<String> reset = const {},
-  }) {
+  void setAppearance(SheetAppearance set, {Set<String> reset = const {}}) {
     final currentSpreadsheet = _spreadsheet;
 
     if (currentSpreadsheet == null || (set.isEmpty && reset.isEmpty)) {
@@ -1797,10 +1872,7 @@ class SpreadsheetController extends ChangeNotifier {
   /// what every cell inherits unless it has its own override. Like
   /// [setRtl] this is sheet-level state set from the Settings dialog, so
   /// it is persisted but not recorded in the undo history.
-  void setTextDefaults(
-    TextStyleSpec set, {
-    Set<String> reset = const {},
-  }) {
+  void setTextDefaults(TextStyleSpec set, {Set<String> reset = const {}}) {
     final currentSpreadsheet = _spreadsheet;
 
     if (currentSpreadsheet == null || (set.isEmpty && reset.isEmpty)) {
@@ -1925,8 +1997,7 @@ class SpreadsheetController extends ChangeNotifier {
     }
 
     final activeSheetIndex = currentSpreadsheet.activeSheetIndex;
-    final activeSheetName =
-        currentSpreadsheet.sheets[activeSheetIndex].name;
+    final activeSheetName = currentSpreadsheet.sheets[activeSheetIndex].name;
 
     final updatedSheets = List<SheetModel>.from(currentSpreadsheet.sheets);
     updatedSheets[activeSheetIndex] = _sheetFromApiData(
@@ -1957,11 +2028,7 @@ class SpreadsheetController extends ChangeNotifier {
               index: r,
               cells: List.generate(
                 26,
-                (c) => CellModel(
-                  row: r,
-                  column: c,
-                  value: "",
-                ),
+                (c) => CellModel(row: r, column: c, value: ""),
               ),
             ),
           ),
@@ -2080,16 +2147,13 @@ class SpreadsheetController extends ChangeNotifier {
     SpreadsheetModel spreadsheet,
     Set<String> changedCells,
   ) {
-    final graph = FormulaDependencyGraph(
-      spreadsheet,
-      _formulaEngine,
-    );
+    final graph = FormulaDependencyGraph(spreadsheet, _formulaEngine);
     final cellsToRecalculate = graph.dependentsOf(changedCells);
 
     for (final changedCell in changedCells) {
       final position = FormulaDependencyGraph.positionFor(changedCell);
-      final cell = spreadsheet.activeSheet.allRows[position.row]
-          .cells[position.column];
+      final cell =
+          spreadsheet.activeSheet.allRows[position.row].cells[position.column];
       if (cell.formula != null) {
         cellsToRecalculate.add(changedCell);
       }
@@ -2098,7 +2162,9 @@ class SpreadsheetController extends ChangeNotifier {
     var recalculatedSpreadsheet = spreadsheet;
     for (final address in cellsToRecalculate) {
       final position = FormulaDependencyGraph.positionFor(address);
-      final cell = recalculatedSpreadsheet.activeSheet.allRows[position.row]
+      final cell = recalculatedSpreadsheet
+          .activeSheet
+          .allRows[position.row]
           .cells[position.column];
       final formula = cell.formula;
       if (formula == null) {
@@ -2197,8 +2263,9 @@ class SpreadsheetController extends ChangeNotifier {
     _recordHistoryPoint();
 
     final isFormula = _isFormula(value);
-    final newValue =
-        isFormula ? _formulaEngine.evaluate(value, currentSpreadsheet) : value;
+    final newValue = isFormula
+        ? _formulaEngine.evaluate(value, currentSpreadsheet)
+        : value;
     final newFormula = isFormula ? value : null;
 
     final oldCell = currentRow.cells[column];
@@ -2227,15 +2294,9 @@ class SpreadsheetController extends ChangeNotifier {
       availableSheetNames: currentSpreadsheet.availableSheetNames,
     );
 
-    _spreadsheet = _recalculateDependents(
-      updatedSpreadsheet,
-      {
-        FormulaDependencyGraph.addressFor(
-          row: sourceRow,
-          column: column,
-        ),
-      },
-    );
+    _spreadsheet = _recalculateDependents(updatedSpreadsheet, {
+      FormulaDependencyGraph.addressFor(row: sourceRow, column: column),
+    });
 
     notifyListeners();
 
@@ -2273,9 +2334,7 @@ class SpreadsheetController extends ChangeNotifier {
   /// the sheet's allRows), not positions in whatever the user is currently
   /// sorting or filtering.
   ///
-  void _persistCellEdits(
-    List<({int row, int column, String value})> edits,
-  ) {
+  void _persistCellEdits(List<({int row, int column, String value})> edits) {
     if (edits.isEmpty) {
       return;
     }
@@ -2327,42 +2386,32 @@ class SpreadsheetController extends ChangeNotifier {
       return;
     }
 
-    final activeSheetIndex =
-        currentSpreadsheet.activeSheetIndex;
+    final activeSheetIndex = currentSpreadsheet.activeSheetIndex;
 
-    final currentSheet =
-        currentSpreadsheet.sheets[activeSheetIndex];
+    final currentSheet = currentSpreadsheet.sheets[activeSheetIndex];
 
-    final startRow =
-        selection.startRow <= selection.endRow
-            ? selection.startRow
-            : selection.endRow;
+    final startRow = selection.startRow <= selection.endRow
+        ? selection.startRow
+        : selection.endRow;
 
-    final endRow =
-        selection.startRow <= selection.endRow
-            ? selection.endRow
-            : selection.startRow;
+    final endRow = selection.startRow <= selection.endRow
+        ? selection.endRow
+        : selection.startRow;
 
-    final startColumn =
-        selection.startColumn <= selection.endColumn
-            ? selection.startColumn
-            : selection.endColumn;
+    final startColumn = selection.startColumn <= selection.endColumn
+        ? selection.startColumn
+        : selection.endColumn;
 
-    final endColumn =
-        selection.startColumn <= selection.endColumn
-            ? selection.endColumn
-            : selection.startColumn;
+    final endColumn = selection.startColumn <= selection.endColumn
+        ? selection.endColumn
+        : selection.startColumn;
 
     final rows = <String>[];
 
     for (int row = startRow; row <= endRow; row++) {
       final cells = <String>[];
 
-      for (
-        int column = startColumn;
-        column <= endColumn;
-        column++
-      ) {
+      for (int column = startColumn; column <= endColumn; column++) {
         final cell = currentSheet.rows[row].cells[column];
         cells.add(cell.formula ?? cell.value);
       }
@@ -2370,11 +2419,7 @@ class SpreadsheetController extends ChangeNotifier {
       rows.add(cells.join('\t'));
     }
 
-    await Clipboard.setData(
-      ClipboardData(
-        text: rows.join('\n'),
-      ),
-    );
+    await Clipboard.setData(ClipboardData(text: rows.join('\n')));
   }
 
   Future<void> pasteClipboard({
@@ -2388,11 +2433,9 @@ class SpreadsheetController extends ChangeNotifier {
       return;
     }
 
-    final activeSheetIndex =
-        currentSpreadsheet.activeSheetIndex;
+    final activeSheetIndex = currentSpreadsheet.activeSheetIndex;
 
-    final currentSheet =
-        currentSpreadsheet.sheets[activeSheetIndex];
+    final currentSheet = currentSpreadsheet.sheets[activeSheetIndex];
 
     // ----------------------------------------------------------
     // Parse clipboard text as TSV
@@ -2412,9 +2455,7 @@ class SpreadsheetController extends ChangeNotifier {
       return;
     }
 
-    final pastedRows = lines.map(
-      (line) => line.split('\t'),
-    ).toList();
+    final pastedRows = lines.map((line) => line.split('\t')).toList();
 
     // ----------------------------------------------------------
     // Validate paste origin
@@ -2424,8 +2465,7 @@ class SpreadsheetController extends ChangeNotifier {
       return;
     }
 
-    if (column < 0 ||
-        column >= currentSheet.rows[row].cells.length) {
+    if (column < 0 || column >= currentSheet.rows[row].cells.length) {
       return;
     }
 
@@ -2445,9 +2485,7 @@ class SpreadsheetController extends ChangeNotifier {
     final changedCells = <String>{};
     final pastedEdits = <({int row, int column, String value})>[];
 
-    for (int pastedRow = 0;
-        pastedRow < pastedRows.length;
-        pastedRow++) {
+    for (int pastedRow = 0; pastedRow < pastedRows.length; pastedRow++) {
       final targetRow = row + pastedRow;
 
       if (targetRow >= currentSheet.rows.length) {
@@ -2457,14 +2495,11 @@ class SpreadsheetController extends ChangeNotifier {
       final sourceRow = currentSheet.sourceRowOf(targetRow);
       final currentRow = currentSheet.allRows[sourceRow];
 
-      final newCells =
-          List<CellModel>.from(currentRow.cells);
+      final newCells = List<CellModel>.from(currentRow.cells);
 
       final values = pastedRows[pastedRow];
 
-      for (int pastedColumn = 0;
-          pastedColumn < values.length;
-          pastedColumn++) {
+      for (int pastedColumn = 0; pastedColumn < values.length; pastedColumn++) {
         final targetColumn = column + pastedColumn;
 
         if (targetColumn >= currentRow.cells.length) {
@@ -2492,7 +2527,11 @@ class SpreadsheetController extends ChangeNotifier {
             column: targetColumn,
           ),
         );
-        pastedEdits.add((row: sourceRow, column: targetColumn, value: pastedValue));
+        pastedEdits.add((
+          row: sourceRow,
+          column: targetColumn,
+          value: pastedValue,
+        ));
       }
 
       replacements[sourceRow] = RowModel(
@@ -2511,10 +2550,7 @@ class SpreadsheetController extends ChangeNotifier {
     // Create new sheet list
     // ----------------------------------------------------------
 
-    final newSheets =
-        List<SheetModel>.from(
-      currentSpreadsheet.sheets,
-    );
+    final newSheets = List<SheetModel>.from(currentSpreadsheet.sheets);
 
     newSheets[activeSheetIndex] = newSheet;
 
@@ -2528,10 +2564,7 @@ class SpreadsheetController extends ChangeNotifier {
       availableSheetNames: currentSpreadsheet.availableSheetNames,
     );
 
-    _spreadsheet = _recalculateDependents(
-      updatedSpreadsheet,
-      changedCells,
-    );
+    _spreadsheet = _recalculateDependents(updatedSpreadsheet, changedCells);
 
     notifyListeners();
 
@@ -2545,42 +2578,35 @@ class SpreadsheetController extends ChangeNotifier {
       return;
     }
 
-    final activeSheetIndex =
-        currentSpreadsheet.activeSheetIndex;
+    final activeSheetIndex = currentSpreadsheet.activeSheetIndex;
 
-    final currentSheet =
-        currentSpreadsheet.sheets[activeSheetIndex];
+    final currentSheet = currentSpreadsheet.sheets[activeSheetIndex];
 
     // ----------------------------------------------------------
     // Normalize selection bounds
     // ----------------------------------------------------------
 
-    final startRow =
-        selection.startRow <= selection.endRow
-            ? selection.startRow
-            : selection.endRow;
+    final startRow = selection.startRow <= selection.endRow
+        ? selection.startRow
+        : selection.endRow;
 
-    final endRow =
-        selection.startRow <= selection.endRow
-            ? selection.endRow
-            : selection.startRow;
+    final endRow = selection.startRow <= selection.endRow
+        ? selection.endRow
+        : selection.startRow;
 
-    final startColumn =
-        selection.startColumn <= selection.endColumn
-            ? selection.startColumn
-            : selection.endColumn;
+    final startColumn = selection.startColumn <= selection.endColumn
+        ? selection.startColumn
+        : selection.endColumn;
 
-    final endColumn =
-        selection.startColumn <= selection.endColumn
-            ? selection.endColumn
-            : selection.startColumn;
+    final endColumn = selection.startColumn <= selection.endColumn
+        ? selection.endColumn
+        : selection.startColumn;
 
     // ----------------------------------------------------------
     // Validate selection
     // ----------------------------------------------------------
 
-    if (startRow < 0 ||
-        startRow >= currentSheet.rows.length) {
+    if (startRow < 0 || startRow >= currentSheet.rows.length) {
       return;
     }
 
@@ -2608,16 +2634,10 @@ class SpreadsheetController extends ChangeNotifier {
       final sourceRow = currentSheet.sourceRowOf(row);
       final currentRow = currentSheet.allRows[sourceRow];
 
-      final newCells =
-          List<CellModel>.from(currentRow.cells);
+      final newCells = List<CellModel>.from(currentRow.cells);
 
-      for (
-        int column = startColumn;
-        column <= endColumn;
-        column++
-      ) {
-        if (column < 0 ||
-            column >= currentRow.cells.length) {
+      for (int column = startColumn; column <= endColumn; column++) {
+        if (column < 0 || column >= currentRow.cells.length) {
           continue;
         }
 
@@ -2633,10 +2653,7 @@ class SpreadsheetController extends ChangeNotifier {
           style: oldCell.style,
         );
         changedCells.add(
-          FormulaDependencyGraph.addressFor(
-            row: sourceRow,
-            column: column,
-          ),
+          FormulaDependencyGraph.addressFor(row: sourceRow, column: column),
         );
         clearedEdits.add((row: sourceRow, column: column, value: ""));
       }
@@ -2657,10 +2674,7 @@ class SpreadsheetController extends ChangeNotifier {
     // Create new sheet list
     // ----------------------------------------------------------
 
-    final newSheets =
-        List<SheetModel>.from(
-      currentSpreadsheet.sheets,
-    );
+    final newSheets = List<SheetModel>.from(currentSpreadsheet.sheets);
 
     newSheets[activeSheetIndex] = newSheet;
 
@@ -2674,14 +2688,10 @@ class SpreadsheetController extends ChangeNotifier {
       availableSheetNames: currentSpreadsheet.availableSheetNames,
     );
 
-    _spreadsheet = _recalculateDependents(
-      updatedSpreadsheet,
-      changedCells,
-    );
+    _spreadsheet = _recalculateDependents(updatedSpreadsheet, changedCells);
 
     notifyListeners();
 
     _persistCellEdits(clearedEdits);
   }
-
 }

@@ -52,6 +52,13 @@ def ensure_starter_document(folder: str) -> bool:
 def main(argv: list[str] | None = None) -> int:
     arguments = sys.argv[1:] if argv is None else argv
 
+    # Settings kept in excelence.env (next to the program) apply even when
+    # the server is started without a terminal, e.g. at Windows log-on.
+    from backend import service_control
+
+    paths = service_control.default_paths()
+    service_control.load_env_file(paths.env_file)
+
     try:
         settings = load_settings()
     except ValueError as error:
@@ -88,7 +95,35 @@ def main(argv: list[str] | None = None) -> int:
     # "backend.main". Importing it here makes it an ordinary, visible import.
     from backend.main import app
 
-    uvicorn.run(app, host=settings.host, port=settings.port)
+    # Only one server per folder: a second one would fight for the port and
+    # overwrite the first one's PID file.
+    problem = service_control.claim_pid_file(paths, settings.host, settings.port)
+
+    if problem is not None:
+        print(problem, file=sys.stderr)
+        return 3
+
+    server = uvicorn.Server(uvicorn.Config(app, host=settings.host, port=settings.port))
+
+    # "excelence-server stop" asks for a proper shutdown (which saves every
+    # open document) by creating a file; this thread notices it.
+    try:
+        paths.stop_file.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+    watcher = service_control.StopWatcher(
+        paths.stop_file,
+        lambda: setattr(server, "should_exit", True),
+    )
+    watcher.start()
+
+    try:
+        server.run()
+    finally:
+        watcher.close()
+        service_control.remove_pid_file(paths, only_pid=os.getpid())
+
     return 0
 
 

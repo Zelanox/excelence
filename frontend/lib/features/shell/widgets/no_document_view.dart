@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/app_text.dart';
 import '../../spreadsheet/controllers/spreadsheet_controller.dart';
 import '../file_actions.dart';
 
@@ -37,13 +38,16 @@ class NoDocumentView extends StatelessWidget {
               color: theme.colorScheme.outline,
             ),
             const SizedBox(height: 12),
-            Text('No document open', style: theme.textTheme.titleMedium),
+            Text(
+              appText(context, 'No document open'),
+              style: theme.textTheme.titleMedium,
+            ),
             if (problem != null) ...[
               const SizedBox(height: 8),
               ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 360),
                 child: Text(
-                  problem!,
+                  appText(context, problem!),
                   textAlign: TextAlign.center,
                   style: TextStyle(color: theme.colorScheme.error),
                 ),
@@ -57,13 +61,13 @@ class NoDocumentView extends StatelessWidget {
               children: [
                 FilledButton.icon(
                   icon: const Icon(Icons.add),
-                  label: const Text('New...'),
+                  label: Text(appText(context, 'New...')),
                   onPressed: () =>
                       FileActions.newDocument(context, spreadsheetController),
                 ),
                 OutlinedButton.icon(
                   icon: const Icon(Icons.folder_open),
-                  label: const Text('Open...'),
+                  label: Text(appText(context, 'Open...')),
                   onPressed: () => FileActions.openDocument(
                     context,
                     spreadsheetController,
@@ -72,7 +76,7 @@ class NoDocumentView extends StatelessWidget {
                 if (onRetry != null)
                   TextButton(
                     onPressed: onRetry,
-                    child: const Text('Try again'),
+                    child: Text(appText(context, 'Try again')),
                   ),
               ],
             ),

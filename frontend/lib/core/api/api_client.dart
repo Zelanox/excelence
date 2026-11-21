@@ -197,6 +197,7 @@ class ApiClient {
       return http.Response.fromStream(streamedResponse);
     });
   }
+
 }
 
 /// Whether an answer from the server means "I no longer have your document

@@ -18,7 +18,14 @@ from dataclasses import dataclass
 from typing import Any
 
 BOOL_FIELDS = ("bold", "italic", "underline", "strikethrough")
-FIELDS = BOOL_FIELDS + ("font_family", "font_size", "color", "background")
+FIELDS = BOOL_FIELDS + (
+    "font_family",
+    "font_size",
+    "color",
+    "background",
+    "horizontal_alignment",
+    "vertical_alignment",
+)
 
 # A cell fill of "NONE" means "explicitly no fill" - distinct from unset
 # (None, inherit). It lets one cell stay clear on a sheet whose default
@@ -96,6 +103,16 @@ def _normalize_field(name: str, value: Any) -> tuple[bool, Any]:
 
         return True, match.group(1).upper()
 
+    if name == "horizontal_alignment":
+        if value in ("general", "left", "center", "right"):
+            return True, value
+        return False, None
+
+    if name == "vertical_alignment":
+        if value in ("top", "center", "bottom"):
+            return True, value
+        return False, None
+
     return False, None
 
 
@@ -112,6 +129,8 @@ class CellStyle:
 
     # Cell fill: "RRGGBB", or NO_FILL ("NONE") for explicitly none.
     background: str | None = None
+    horizontal_alignment: str | None = None
+    vertical_alignment: str | None = None
 
     def is_empty(self) -> bool:
         return all(getattr(self, name) is None for name in FIELDS)

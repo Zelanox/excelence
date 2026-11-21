@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/app_text.dart';
 import '../../spreadsheet/models/document_name.dart';
 import '../../spreadsheet/models/file_action_result.dart';
 
@@ -113,7 +114,7 @@ class _DocumentNameDialogState extends State<DocumentNameDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(widget.title),
+      title: Text(appText(context, widget.title)),
       content: SizedBox(
         width: 400,
         child: Column(
@@ -126,8 +127,8 @@ class _DocumentNameDialogState extends State<DocumentNameDialog> {
               enabled: !_busy,
               onSubmitted: (_) => _submit(),
               decoration: InputDecoration(
-                labelText: 'Name',
-                helperText: '.xlsx is added automatically',
+                labelText: appText(context, 'Name'),
+                helperText: appText(context, '.xlsx is added automatically'),
                 errorText: _error,
                 errorMaxLines: 4,
               ),
@@ -136,7 +137,7 @@ class _DocumentNameDialogState extends State<DocumentNameDialog> {
               const SizedBox(height: 12),
               const LinearProgressIndicator(),
               const SizedBox(height: 4),
-              const Text('Working...'),
+              Text(appText(context, 'Working...')),
             ],
           ],
         ),
@@ -144,11 +145,11 @@ class _DocumentNameDialogState extends State<DocumentNameDialog> {
       actions: [
         TextButton(
           onPressed: _busy ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(appText(context, 'Cancel')),
         ),
         FilledButton(
           onPressed: _busy ? null : _submit,
-          child: Text(widget.confirmLabel),
+          child: Text(appText(context, widget.confirmLabel)),
         ),
       ],
     );

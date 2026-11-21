@@ -2,8 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../app/app_text.dart';
 import '../../spreadsheet/controllers/spreadsheet_controller.dart';
 import '../../spreadsheet/controllers/viewport_controller.dart';
+import '../dictation_controller.dart';
 
 /// A search bar shown directly above the spreadsheet grid, filtering the
 /// active sheet's visible rows to those matching the typed text.
@@ -18,10 +20,12 @@ class SpreadsheetSearchBar extends StatefulWidget {
     super.key,
     required this.spreadsheetController,
     required this.viewportController,
+    required this.dictation,
   });
 
   final SpreadsheetController spreadsheetController;
   final ViewportController viewportController;
+  final DictationController dictation;
 
   @override
   State<SpreadsheetSearchBar> createState() => _SpreadsheetSearchBarState();
@@ -42,6 +46,7 @@ class _SpreadsheetSearchBarState extends State<SpreadsheetSearchBar> {
     _textController.addListener(_handleTextChanged);
     _lastSeenQuery = widget.spreadsheetController.searchQuery;
     widget.spreadsheetController.addListener(_syncFromController);
+    widget.dictation.addListener(_syncSpeechState);
   }
 
   /// Shows a search started from somewhere else (e.g. the status bar's
@@ -75,10 +80,17 @@ class _SpreadsheetSearchBarState extends State<SpreadsheetSearchBar> {
     setState(() {});
   }
 
+  void _syncSpeechState() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
   @override
   void dispose() {
     _debounce?.cancel();
     widget.spreadsheetController.removeListener(_syncFromController);
+    widget.dictation.removeListener(_syncSpeechState);
     _textController.removeListener(_handleTextChanged);
     _textController.dispose();
     super.dispose();
@@ -107,7 +119,9 @@ class _SpreadsheetSearchBarState extends State<SpreadsheetSearchBar> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Search failed: $error')),
+          SnackBar(
+            content: Text('${appText(context, 'Search failed: ')}$error'),
+          ),
         );
       }
     } finally {
@@ -136,51 +150,112 @@ class _SpreadsheetSearchBarState extends State<SpreadsheetSearchBar> {
     _runSearch('');
   }
 
+  Future<void> _toggleSpeech() async {
+    if (widget.dictation.isSearchCapture) {
+      await widget.dictation.stop();
+      return;
+    }
+
+    if (!widget.dictation.canStart) {
+      return;
+    }
+
+    await widget.dictation.startForSearch(_onSpeechResult);
+  }
+
+  void _onSpeechResult(String text, bool isFinal) {
+    if (!mounted) {
+      return;
+    }
+
+    _textController.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+
+    if (isFinal) {
+      _debounce?.cancel();
+      _runSearch(text);
+    } else {
+      _onChanged(text);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 44,
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        border: Border(
-          bottom: BorderSide(color: Colors.grey.shade300),
-        ),
-      ),
-      child: TextField(
-        controller: _textController,
-        onChanged: _onChanged,
-        decoration: InputDecoration(
-          isDense: true,
-          hintText: 'Search this sheet…',
-          prefixIcon: _isSearching
-              ? const Padding(
-                  padding: EdgeInsets.all(10),
-                  child: SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                )
-              : const Icon(Icons.search, size: 20),
-          suffixIcon: _textController.text.isEmpty
-              ? null
-              : IconButton(
-                  icon: const Icon(Icons.close, size: 18),
-                  tooltip: 'Clear search',
-                  onPressed: _clear,
-                ),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(6),
-            borderSide: BorderSide(color: Colors.grey.shade400),
+    return AnimatedBuilder(
+      animation: widget.dictation,
+      builder: (context, _) {
+        final isSearchCapture = widget.dictation.isSearchCapture;
+        final canToggleSpeech = isSearchCapture
+            ? widget.dictation.isListening
+            : widget.dictation.canStart;
+
+        return Container(
+          height: 44,
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            border: Border(
+              bottom: BorderSide(color: Colors.grey.shade300),
+            ),
           ),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 8,
+          child: TextField(
+            controller: _textController,
+            onChanged: _onChanged,
+            decoration: InputDecoration(
+              isDense: true,
+              hintText: appText(context, 'Search this sheet…'),
+              prefixIcon: _isSearching
+                  ? const Padding(
+                      padding: EdgeInsets.all(10),
+                      child: SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    )
+                  : const Icon(Icons.search, size: 20),
+              suffixIcon: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (widget.dictation.isSupported)
+                    IconButton(
+                      icon: Icon(
+                        isSearchCapture ? Icons.stop : Icons.mic,
+                        size: 18,
+                      ),
+                      tooltip: appText(
+                        context,
+                        isSearchCapture
+                            ? 'Stop voice search'
+                            : 'Search by voice',
+                      ),
+                      onPressed: canToggleSpeech
+                          ? () => unawaited(_toggleSpeech())
+                          : null,
+                    ),
+                  if (_textController.text.isNotEmpty)
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 18),
+                      tooltip: appText(context, 'Clear search'),
+                      onPressed: _clear,
+                    ),
+                ],
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(6),
+                borderSide: BorderSide(color: Colors.grey.shade400),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 8,
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

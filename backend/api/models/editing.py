@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -50,6 +50,13 @@ class ColumnWidthRequest(BaseModel):
     width: float = Field(..., gt=0, description="New column width, in Excel character-width units.", json_schema_extra={"example": 18.5})
 
 
+class RowHeightRequest(BaseModel):
+
+    row_id: str = Field(..., min_length=1, description="Stable ID of the row to resize.")
+
+    height: float = Field(..., ge=16, le=500, description="New row height in display pixels (16-500).")
+
+
 class CellEditItem(BaseModel):
 
     row: int = Field(..., ge=0, description="Row of the grid as currently shown.", json_schema_extra={"example": 0})
@@ -87,6 +94,10 @@ class TextStyleFields(BaseModel):
     color: str | None = Field(default=None, description="Text color as RRGGBB hex (a leading # is accepted).", json_schema_extra={"example": "FF0000"})
 
     background: str | None = Field(default=None, description="Cell fill as RRGGBB hex, or NONE for explicitly no fill.", json_schema_extra={"example": "FFF2CC"})
+
+    horizontal_alignment: Literal["general", "left", "center", "right"] | None = Field(default=None, description="Horizontal text alignment.")
+
+    vertical_alignment: Literal["top", "center", "bottom"] | None = Field(default=None, description="Vertical text alignment.")
 
 
 class CellStyleRequest(BaseModel):

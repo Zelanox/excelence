@@ -2,6 +2,7 @@ from typing import Any
 
 import json
 import os
+from copy import copy
 import pandas as pd
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
@@ -326,6 +327,11 @@ class Document:
 
             sheet_model.bind(worksheet, dataframe.copy())
             sheet_model.column_widths = self._read_column_widths(worksheet, dataframe.columns)
+            sheet_model.ensure_ids()
+            sheet_model.row_heights = self._read_row_heights(
+                worksheet,
+                sheet_model.row_ids,
+            )
             sheet_model.rtl = bool(worksheet.sheet_view.rightToLeft)
 
             if worksheet_name == current_sheet_name:
@@ -410,6 +416,7 @@ class Document:
 
             if active_sheet is not None:
                 self._write_column_widths(self.sheet, self.df.columns, active_sheet.column_widths)
+                self._write_row_heights(self.sheet, active_sheet)
                 self.sheet.sheet_view.rightToLeft = active_sheet.rtl
                 self._write_text_styles(self.sheet, self.df, active_sheet)
                 self._remember_worksheet_state()
@@ -561,6 +568,7 @@ class Document:
         # was actually leaking across sheets before this check existed.
         if active_sheet is not None and active_sheet.worksheet is self.sheet:
             self._write_column_widths(self.sheet, self.df.columns, active_sheet.column_widths)
+            self._write_row_heights(self.sheet, active_sheet)
             self.sheet.sheet_view.rightToLeft = active_sheet.rtl
             self._write_text_styles(self.sheet, self.df, active_sheet)
             self._remember_worksheet_state()
@@ -987,6 +995,24 @@ class Document:
             if active_sheet is not None:
                 self._write_column_widths(self.sheet, self.df.columns, active_sheet.column_widths)
 
+        self.modified = True
+        return True
+
+    def set_row_height(self, row_id: str, height: float) -> bool:
+        if self.workbook is None or self.sheet is None:
+            return False
+
+        active_sheet = self._active_sheet_model()
+
+        if active_sheet is None or not active_sheet.set_row_height(row_id, height):
+            return False
+
+        position = active_sheet.row_position(row_id)
+
+        if position is None:
+            return False
+
+        self.sheet.row_dimensions[position + 2].height = float(height) * 0.75
         self.modified = True
         return True
 
@@ -1828,6 +1854,20 @@ class Document:
             if fill is not None:
                 cell.fill = fill
 
+            if (
+                style.horizontal_alignment is not None
+                or style.vertical_alignment is not None
+            ):
+                alignment = copy(cell.alignment)
+
+                if style.horizontal_alignment is not None:
+                    alignment.horizontal = style.horizontal_alignment
+
+                if style.vertical_alignment is not None:
+                    alignment.vertical = style.vertical_alignment
+
+                cell.alignment = alignment
+
         if not defaults.is_empty():
             # Every data cell carries the default (plus its override, if any).
             for position in range(row_count):
@@ -1963,6 +2003,21 @@ class Document:
             # explicitly cleared.
             found["background"] = NO_FILL
 
+        horizontal_alignment = cell.alignment.horizontal
+        if (
+            horizontal_alignment in ("general", "left", "center", "right")
+            and horizontal_alignment
+            != (effective.horizontal_alignment or "general")
+        ):
+            found["horizontal_alignment"] = horizontal_alignment
+
+        vertical_alignment = cell.alignment.vertical
+        if (
+            vertical_alignment in ("top", "center", "bottom")
+            and vertical_alignment != (effective.vertical_alignment or "bottom")
+        ):
+            found["vertical_alignment"] = vertical_alignment
+
         # from_dict drops anything invalid (e.g. an out-of-range size)
         # instead of raising.
         return CellStyle.from_dict(found)
@@ -1995,6 +2050,23 @@ class Document:
 
         return widths
 
+    def _read_row_heights(self, worksheet: Any, row_ids: list[str]) -> dict[str, float]:
+        """Read Excel row heights as display pixels, keyed by stable row ID."""
+        heights: dict[str, float] = {}
+
+        for position, row_id in enumerate(row_ids):
+            dimension = worksheet.row_dimensions.get(position + 2)
+
+            if dimension is None or dimension.height is None:
+                continue
+
+            height = float(dimension.height) / 0.75
+
+            if height > 0:
+                heights[row_id] = min(500.0, max(16.0, height))
+
+        return heights
+
     def _write_column_widths(self, worksheet: Any, headers: Any, widths: dict[str, float]) -> None:
         """
         Write a Sheet's name-keyed column_widths back onto the worksheet
@@ -2026,6 +2098,20 @@ class Document:
                 worksheet.column_dimensions[letter].width = width
             elif letter in worksheet.column_dimensions:
                 del worksheet.column_dimensions[letter]
+
+    def _write_row_heights(self, worksheet: Any, sheet_model: Sheet) -> None:
+        """Write row heights in Excel points, clearing stale data-row heights."""
+        for row_number, dimension in list(worksheet.row_dimensions.items()):
+            if row_number >= 2:
+                dimension.height = None
+
+        positions = sheet_model.row_positions()
+
+        for row_id, height in sheet_model.row_heights.items():
+            position = positions.get(row_id)
+
+            if position is not None and position < len(sheet_model.dataframe):
+                worksheet.row_dimensions[position + 2].height = height * 0.75
 
     def _clear_view_data(self) -> None:
         """Reset the in-memory DataFrame view state."""

@@ -27,6 +27,8 @@ class TextStyleSpec {
     this.fontSize,
     this.color,
     this.background,
+    this.horizontalAlignment,
+    this.verticalAlignment,
   });
 
   static const TextStyleSpec empty = TextStyleSpec();
@@ -43,8 +45,23 @@ class TextStyleSpec {
   static const String fieldFontSize = 'font_size';
   static const String fieldColor = 'color';
   static const String fieldBackground = 'background';
+  static const String fieldHorizontalAlignment = 'horizontal_alignment';
+  static const String fieldVerticalAlignment = 'vertical_alignment';
 
   static const Set<String> allFields = {
+    fieldBold,
+    fieldItalic,
+    fieldUnderline,
+    fieldStrikethrough,
+    fieldFontFamily,
+    fieldFontSize,
+    fieldColor,
+    fieldBackground,
+    fieldHorizontalAlignment,
+    fieldVerticalAlignment,
+  };
+
+  static const Set<String> fontFields = {
     fieldBold,
     fieldItalic,
     fieldUnderline,
@@ -68,6 +85,12 @@ class TextStyleSpec {
   /// Cell fill: "RRGGBB", or [noFill].
   final String? background;
 
+  /// One of general, left, center, or right.
+  final String? horizontalAlignment;
+
+  /// One of top, center, or bottom.
+  final String? verticalAlignment;
+
   bool get isEmpty =>
       bold == null &&
       italic == null &&
@@ -76,7 +99,9 @@ class TextStyleSpec {
       fontFamily == null &&
       fontSize == null &&
       color == null &&
-      background == null;
+      background == null &&
+      horizontalAlignment == null &&
+      verticalAlignment == null;
 
   /// Tolerant of missing/odd values - never throws on server data.
   factory TextStyleSpec.fromJson(Map<String, dynamic> json) {
@@ -97,7 +122,24 @@ class TextStyleSpec {
       background: json[fieldBackground] is String
           ? json[fieldBackground] as String
           : null,
+      horizontalAlignment: _validHorizontalAlignment(
+        json[fieldHorizontalAlignment],
+      ),
+      verticalAlignment: _validVerticalAlignment(json[fieldVerticalAlignment]),
     );
+  }
+
+  static String? _validHorizontalAlignment(Object? value) {
+    return value is String &&
+            const {'general', 'left', 'center', 'right'}.contains(value)
+        ? value
+        : null;
+  }
+
+  static String? _validVerticalAlignment(Object? value) {
+    return value is String && const {'top', 'center', 'bottom'}.contains(value)
+        ? value
+        : null;
   }
 
   /// Only the fields that are set - an empty style is `{}`.
@@ -111,6 +153,9 @@ class TextStyleSpec {
       if (fontSize != null) fieldFontSize: fontSize,
       if (color != null) fieldColor: color,
       if (background != null) fieldBackground: background,
+      if (horizontalAlignment != null)
+        fieldHorizontalAlignment: horizontalAlignment,
+      if (verticalAlignment != null) fieldVerticalAlignment: verticalAlignment,
     };
   }
 
@@ -125,6 +170,8 @@ class TextStyleSpec {
       fontSize: fontSize ?? base.fontSize,
       color: color ?? base.color,
       background: background ?? base.background,
+      horizontalAlignment: horizontalAlignment ?? base.horizontalAlignment,
+      verticalAlignment: verticalAlignment ?? base.verticalAlignment,
     );
   }
 
@@ -138,13 +185,19 @@ class TextStyleSpec {
       bold: reset.contains(fieldBold) ? null : merged.bold,
       italic: reset.contains(fieldItalic) ? null : merged.italic,
       underline: reset.contains(fieldUnderline) ? null : merged.underline,
-      strikethrough:
-          reset.contains(fieldStrikethrough) ? null : merged.strikethrough,
+      strikethrough: reset.contains(fieldStrikethrough)
+          ? null
+          : merged.strikethrough,
       fontFamily: reset.contains(fieldFontFamily) ? null : merged.fontFamily,
       fontSize: reset.contains(fieldFontSize) ? null : merged.fontSize,
       color: reset.contains(fieldColor) ? null : merged.color,
-      background:
-          reset.contains(fieldBackground) ? null : merged.background,
+      background: reset.contains(fieldBackground) ? null : merged.background,
+      horizontalAlignment: reset.contains(fieldHorizontalAlignment)
+          ? null
+          : merged.horizontalAlignment,
+      verticalAlignment: reset.contains(fieldVerticalAlignment)
+          ? null
+          : merged.verticalAlignment,
     );
   }
 
@@ -158,20 +211,24 @@ class TextStyleSpec {
         other.fontFamily == fontFamily &&
         other.fontSize == fontSize &&
         other.color == color &&
-        other.background == background;
+        other.background == background &&
+        other.horizontalAlignment == horizontalAlignment &&
+        other.verticalAlignment == verticalAlignment;
   }
 
   @override
   int get hashCode => Object.hash(
-        bold,
-        italic,
-        underline,
-        strikethrough,
-        fontFamily,
-        fontSize,
-        color,
-        background,
-      );
+    bold,
+    italic,
+    underline,
+    strikethrough,
+    fontFamily,
+    fontSize,
+    color,
+    background,
+    horizontalAlignment,
+    verticalAlignment,
+  );
 
   @override
   String toString() => 'TextStyleSpec(${toJson()})';

@@ -27,6 +27,8 @@ class AppPreferences {
 
   static const _lastOpenedDocumentKey = 'last_opened_document';
   static const _autoSearchAfterAddRowKey = 'auto_search_after_add_row';
+  static const _interfaceLanguageKey = 'interface_language';
+  static const _speechLanguageKey = 'speech_language';
 
   static final SharedPreferencesAsync _prefs = SharedPreferencesAsync();
 
@@ -134,6 +136,63 @@ class AppPreferences {
   Future<void> setAutoSearchAfterAddRow(bool enabled) async {
     await _write((prefs) => prefs.setBool(_autoSearchAfterAddRowKey, enabled));
     await _writeBackendPreference(_autoSearchAfterAddRowKey, enabled);
+  }
+
+  Future<String> getInterfaceLanguage() async {
+    final state = await _readBackendState();
+    final preferences = state?['preferences'];
+    final backendValue =
+        preferences is Map ? preferences[_interfaceLanguageKey] : null;
+
+    if (backendValue == 'ar' || backendValue == 'en') {
+      return backendValue as String;
+    }
+
+    final localValue = await _read<String>(
+      (prefs) => prefs.getString(_interfaceLanguageKey),
+    );
+    return localValue == 'ar' ? 'ar' : 'en';
+  }
+
+  Future<void> setInterfaceLanguage(String languageCode) async {
+    if (languageCode != 'ar' && languageCode != 'en') {
+      throw ArgumentError.value(languageCode, 'languageCode');
+    }
+
+    await _write(
+      (prefs) => prefs.setString(_interfaceLanguageKey, languageCode),
+    );
+    await _writeBackendPreference(_interfaceLanguageKey, languageCode);
+  }
+
+  /// The speech locale. An explicit choice wins; otherwise Arabic is used.
+  Future<String> getSpeechLanguage() async {
+    final state = await _readBackendState();
+    final preferences = state?['preferences'];
+    final backendValue =
+        preferences is Map ? preferences[_speechLanguageKey] : null;
+
+    if (backendValue == 'ar_SA' || backendValue == 'system') {
+      return backendValue as String;
+    }
+
+    final localValue = await _read<String>(
+      (prefs) => prefs.getString(_speechLanguageKey),
+    );
+    if (localValue == 'ar_SA' || localValue == 'system') {
+      return localValue!;
+    }
+
+    return 'ar_SA';
+  }
+
+  Future<void> setSpeechLanguage(String localeId) async {
+    if (localeId != 'ar_SA' && localeId != 'system') {
+      throw ArgumentError.value(localeId, 'localeId');
+    }
+
+    await _write((prefs) => prefs.setString(_speechLanguageKey, localeId));
+    await _writeBackendPreference(_speechLanguageKey, localeId);
   }
 
   /// Records [filename] as the most recently opened document, in LOCAL

@@ -20,11 +20,14 @@ import 'text_style_spec.dart';
 /// Sorting and filtering are client-local (see [SheetView]): they change
 /// which rows [rows] contains, never [allRows].
 class SheetModel {
+  static const double defaultRowHeight = 28;
+
   SheetModel({
     required this.name,
     required this.allRows,
     this.headers = const [],
     this.columnWidths = const {},
+    this.rowHeights = const {},
     this.isRtl = false,
     this.textDefaults = TextStyleSpec.empty,
     this.appearance = SheetAppearance.empty,
@@ -34,10 +37,12 @@ class SheetModel {
     this.rowIds = const [],
     this.columnIds = const [],
   }) : assert(
-          viewToSource == null ||
-              viewToSource.every((index) => index >= 0 && index < allRows.length),
-          'viewToSource points outside allRows',
-        );
+         viewToSource == null ||
+             viewToSource.every(
+               (index) => index >= 0 && index < allRows.length,
+             ),
+         'viewToSource points outside allRows',
+       );
 
   final String name;
 
@@ -69,6 +74,26 @@ class SheetModel {
   /// Per-column pixel widths, keyed by column NAME (survives inserts and
   /// deletes elsewhere in the sheet). Absent = default width.
   final Map<String, double> columnWidths;
+
+  /// Per-row pixel heights, keyed by stable row ID.
+  final Map<String, double> rowHeights;
+
+  double rowHeightForViewRow(
+    int viewRow, {
+    double defaultHeight = defaultRowHeight,
+  }) {
+    if (viewRow < 0 || viewRow >= rows.length) {
+      return defaultHeight;
+    }
+
+    final sourceRow = sourceRowOf(viewRow);
+
+    if (sourceRow < 0 || sourceRow >= rowIds.length) {
+      return defaultHeight;
+    }
+
+    return rowHeights[rowIds[sourceRow]] ?? defaultHeight;
+  }
 
   final bool isRtl;
 
@@ -137,6 +162,7 @@ class SheetModel {
       allRows: allRows,
       headers: headers,
       columnWidths: columnWidths,
+      rowHeights: rowHeights,
       isRtl: isRtl,
       textDefaults: textDefaults,
       appearance: appearance,
@@ -168,6 +194,7 @@ class SheetModel {
       allRows: updated,
       headers: headers,
       columnWidths: columnWidths,
+      rowHeights: rowHeights,
       isRtl: isRtl,
       textDefaults: textDefaults,
       appearance: appearance,
@@ -186,6 +213,7 @@ class SheetModel {
     String? name,
     List<String>? headers,
     Map<String, double>? columnWidths,
+    Map<String, double>? rowHeights,
     bool? isRtl,
     TextStyleSpec? textDefaults,
     SheetAppearance? appearance,
@@ -195,6 +223,7 @@ class SheetModel {
       allRows: allRows,
       headers: headers ?? this.headers,
       columnWidths: columnWidths ?? this.columnWidths,
+      rowHeights: rowHeights ?? this.rowHeights,
       isRtl: isRtl ?? this.isRtl,
       textDefaults: textDefaults ?? this.textDefaults,
       appearance: appearance ?? this.appearance,

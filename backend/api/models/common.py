@@ -55,6 +55,8 @@ class SpreadsheetResponse(ApiResponse):
 
     column_widths: dict[str, float] = Field(default_factory=dict, description="Column name to display width, for columns with an explicitly set width.")
 
+    row_heights: dict[str, float] = Field(default_factory=dict, description="Row ID to display height in pixels for rows with an explicitly set height.")
+
     rtl: bool = Field(default=False, description="Whether the active worksheet is right-to-left.")
 
     row_ids: list[str] = Field(default_factory=list, description="Stable ID of each visible row, in the same order as `rows`. Does not change when other rows are inserted or deleted; reassigned when the document is loaded.")

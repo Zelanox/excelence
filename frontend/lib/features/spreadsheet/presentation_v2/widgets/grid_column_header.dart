@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../app/app_text.dart';
 import '../../controllers/spreadsheet_controller.dart';
 import '../column_naming.dart';
 
@@ -172,7 +173,11 @@ class _GridColumnHeaderState extends State<GridColumnHeader> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to rename column: $error')),
+          SnackBar(
+            content: Text(
+              '${appText(context, 'Failed to rename column: ')}$error',
+            ),
+          ),
         );
       }
     }
@@ -205,7 +210,11 @@ class _GridColumnHeaderState extends State<GridColumnHeader> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to delete column: $error')),
+          SnackBar(
+            content: Text(
+              '${appText(context, 'Failed to delete column: ')}$error',
+            ),
+          ),
         );
       }
     }
@@ -224,7 +233,9 @@ class _GridColumnHeaderState extends State<GridColumnHeader> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to sort: $error')),
+          SnackBar(
+            content: Text('${appText(context, 'Failed to sort: ')}$error'),
+          ),
         );
       }
     }
@@ -238,7 +249,9 @@ class _GridColumnHeaderState extends State<GridColumnHeader> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to sort: $error')),
+          SnackBar(
+            content: Text('${appText(context, 'Failed to sort: ')}$error'),
+          ),
         );
       }
     }
@@ -252,7 +265,9 @@ class _GridColumnHeaderState extends State<GridColumnHeader> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to sort: $error')),
+          SnackBar(
+            content: Text('${appText(context, 'Failed to sort: ')}$error'),
+          ),
         );
       }
     }
@@ -271,11 +286,23 @@ class _GridColumnHeaderState extends State<GridColumnHeader> {
         position & const Size(1, 1),
         Offset.zero & overlay.size,
       ),
-      items: const [
-        PopupMenuItem(value: 'sort_asc', child: Text('Sort ascending')),
-        PopupMenuItem(value: 'sort_desc', child: Text('Sort descending')),
-        PopupMenuItem(value: 'rename', child: Text('Rename column')),
-        PopupMenuItem(value: 'delete', child: Text('Delete column')),
+      items: [
+        PopupMenuItem(
+          value: 'sort_asc',
+          child: Text(appText(context, 'Sort ascending')),
+        ),
+        PopupMenuItem(
+          value: 'sort_desc',
+          child: Text(appText(context, 'Sort descending')),
+        ),
+        PopupMenuItem(
+          value: 'rename',
+          child: Text(appText(context, 'Rename column')),
+        ),
+        PopupMenuItem(
+          value: 'delete',
+          child: Text(appText(context, 'Delete column')),
+        ),
       ],
     );
 

@@ -28,6 +28,7 @@ class SpreadsheetData {
     required this.rowCount,
     required this.columnCount,
     this.columnWidths = const {},
+    this.rowHeights = const {},
     this.isRtl = false,
     this.cellStyles = const [],
     this.textDefaults = TextStyleSpec.empty,
@@ -43,6 +44,7 @@ class SpreadsheetData {
   final int rowCount;
   final int columnCount;
   final Map<String, double> columnWidths;
+  final Map<String, double> rowHeights;
   final bool isRtl;
   final List<CellStyleEntry> cellStyles;
   final TextStyleSpec textDefaults;
@@ -63,18 +65,20 @@ class SpreadsheetData {
     final rawHeaders = json['headers'] as List<dynamic>? ?? [];
     final rawRows = json['rows'] as List<dynamic>? ?? [];
     final rawWidths = json['column_widths'] as Map<String, dynamic>? ?? {};
+    final rawHeights = json['row_heights'] as Map<String, dynamic>? ?? {};
     final rawStyles = json['cell_styles'] as List<dynamic>? ?? [];
     final rawDefaults = json['text_defaults'] as Map<String, dynamic>? ?? {};
     final rawAppearance = json['appearance'] as Map<String, dynamic>? ?? {};
 
     return SpreadsheetData(
       headers: rawHeaders.map((header) => header.toString()).toList(),
-      rows: rawRows
-          .whereType<Map<String, dynamic>>()
-          .toList(),
+      rows: rawRows.whereType<Map<String, dynamic>>().toList(),
       rowCount: json['row_count'] as int? ?? 0,
       columnCount: json['column_count'] as int? ?? 0,
       columnWidths: rawWidths.map(
+        (key, value) => MapEntry(key, (value as num).toDouble()),
+      ),
+      rowHeights: rawHeights.map(
         (key, value) => MapEntry(key, (value as num).toDouble()),
       ),
       isRtl: json['rtl'] as bool? ?? false,
@@ -158,10 +162,7 @@ class OpsResult {
 /// always needs a separate loadData() call to fetch the newly-active
 /// sheet's actual content.
 class SheetsData {
-  SheetsData({
-    required this.sheetNames,
-    required this.currentSheet,
-  });
+  SheetsData({required this.sheetNames, required this.currentSheet});
 
   final List<String> sheetNames;
   final String currentSheet;
@@ -240,9 +241,7 @@ class SpreadsheetService {
 
     final response = await _api.post(
       '/documents/open',
-      body: {
-        'filename': filename,
-      },
+      body: {'filename': filename},
     );
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -270,9 +269,7 @@ class SpreadsheetService {
 
     final response = await _api.post(
       '/documents/create',
-      body: {
-        'filename': filename,
-      },
+      body: {'filename': filename},
     );
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -607,9 +604,7 @@ class SpreadsheetService {
         );
       }
 
-      return FileActionResult.success(
-        name: json[nameKey]?.toString() ?? '',
-      );
+      return FileActionResult.success(name: json[nameKey]?.toString() ?? '');
     } on FormatException catch (error) {
       debugPrint('[SpreadsheetService] $path: unreadable answer: $error');
 
@@ -687,11 +682,7 @@ class SpreadsheetService {
   }) {
     return _postEdit(
       '/spreadsheet/edit-cell',
-      body: {
-        'row': row,
-        'column': column,
-        'value': value,
-      },
+      body: {'row': row, 'column': column, 'value': value},
       failureMessage: 'Failed to save cell edit',
     );
   }
@@ -701,9 +692,7 @@ class SpreadsheetService {
   Future<SpreadsheetData> insertRow({int? index}) {
     return _postEdit(
       '/spreadsheet/rows/insert',
-      body: {
-        'index': ?index,
-      },
+      body: {'index': ?index},
       failureMessage: 'Failed to insert row',
     );
   }
@@ -719,16 +708,10 @@ class SpreadsheetService {
 
   /// Inserts a new column named [name] at [index] (zero-based). If
   /// [index] is omitted, the backend appends the column at the end.
-  Future<SpreadsheetData> insertColumn({
-    required String name,
-    int? index,
-  }) {
+  Future<SpreadsheetData> insertColumn({required String name, int? index}) {
     return _postEdit(
       '/spreadsheet/columns/insert',
-      body: {
-        'name': name,
-        'index': ?index,
-      },
+      body: {'name': name, 'index': ?index},
       failureMessage: 'Failed to insert column',
     );
   }
@@ -769,6 +752,18 @@ class SpreadsheetService {
       '/spreadsheet/columns/width',
       body: {'name': name, 'width': width},
       failureMessage: 'Failed to update column width',
+    );
+  }
+
+  /// Sets the display height of the row named by [rowId].
+  Future<SpreadsheetData> setRowHeight({
+    required String rowId,
+    required double height,
+  }) {
+    return _postEdit(
+      '/spreadsheet/rows/height',
+      body: {'row_id': rowId, 'height': height},
+      failureMessage: 'Failed to update row height',
     );
   }
 
@@ -876,7 +871,7 @@ class SpreadsheetService {
   /// client has a sort or filter in place.
   Future<SpreadsheetData> setCellStyles({
     required List<({int startRow, int startColumn, int endRow, int endColumn})>
-        ranges,
+    ranges,
     required Map<String, dynamic> style,
     required List<String> reset,
   }) {

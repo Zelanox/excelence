@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../../app/app_text.dart';
 import 'package:flutter/services.dart';
 import 'package:two_dimensional_scrollables/two_dimensional_scrollables.dart';
 
@@ -53,7 +55,7 @@ class SpreadsheetGrid extends StatefulWidget {
   final ViewportController viewportController;
 
   static const double columnWidth = 100;
-  static const double rowHeight = 28;
+  static const double rowHeight = SheetModel.defaultRowHeight;
   static const double headerSize = 40;
   static const double addHandleSize = 20.0;
 
@@ -117,8 +119,7 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
   // TextField at the current cursor position. Owned by the grid (the only
   // widget that knows about every cell), listened to by the editing cell
   // only. Set back to null immediately after being read/consumed.
-  final ValueNotifier<String?> _formulaReferenceToInsert =
-      ValueNotifier(null);
+  final ValueNotifier<String?> _formulaReferenceToInsert = ValueNotifier(null);
 
   // True while a REFERENCE-RANGE drag is in progress (dragging across
   // cells during formula editing to build e.g. "B1:B3", as opposed to
@@ -135,7 +136,7 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
   // the spanned cells without the grid needing setState() on every
   // pointer-move (which would rebuild the whole Table unnecessarily).
   final ValueNotifier<({CellPosition? start, CellPosition? end})>
-      _referenceRangeDrag = ValueNotifier((start: null, end: null));
+  _referenceRangeDrag = ValueNotifier((start: null, end: null));
 
   // The active sheet's RTL flag as of the last build, or null before the
   // first build has happened at all. Compared against the CURRENT sheet's
@@ -169,8 +170,9 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
         if (!mounted || !_horizontalController.hasClients) {
           return;
         }
-        final target =
-            isRtl ? _horizontalController.position.maxScrollExtent : 0.0;
+        final target = isRtl
+            ? _horizontalController.position.maxScrollExtent
+            : 0.0;
         _horizontalController.jumpTo(target);
         widget.viewportController.setScroll(
           x: target,
@@ -289,7 +291,7 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
   String _nextColumnName() {
     final headers =
         widget.spreadsheetController.spreadsheet?.activeSheet.headers ??
-            const <String>[];
+        const <String>[];
     final existing = headers.toSet();
 
     var index = headers.length;
@@ -317,9 +319,7 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
 
   Future<void> _appendRow() async {
     try {
-      await widget.spreadsheetController.insertRow(
-        index: _currentRowCount(),
-      );
+      await widget.spreadsheetController.insertRow(index: _currentRowCount());
       _refreshSheetBounds();
     } catch (error) {
       _showError('Failed to insert row: $error');
@@ -465,7 +465,10 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
       return;
     }
     final name = sheet.headers[column];
-    widget.spreadsheetController.setColumnWidthLocal(name: name, width: newWidth);
+    widget.spreadsheetController.setColumnWidthLocal(
+      name: name,
+      width: newWidth,
+    );
   }
 
   /// Persists [column]'s final width once its resize drag ends -
@@ -528,7 +531,8 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
 
     // The header: its text (same style the header draws with) plus room
     // for the sort arrow.
-    var widest = measure(
+    var widest =
+        measure(
           sheet.headers[column],
           const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
         ) +
@@ -541,7 +545,7 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
     int byLength((String, TextStyleSpec) a, (String, TextStyleSpec) b) =>
         a.$1.length.compareTo(b.$1.length);
 
-    for (final row in sheet.rows) {
+    for (final row in sheet.allRows) {
       if (column >= row.cells.length) {
         continue;
       }
@@ -563,8 +567,9 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
     }
 
     for (final (text, style) in longest) {
-      final textStyle =
-          resolveCellTextStyle(style.mergedOver(sheet.textDefaults));
+      final textStyle = resolveCellTextStyle(
+        style.mergedOver(sheet.textDefaults),
+      );
       final width = measure(text, textStyle);
 
       if (width > widest) {
@@ -572,9 +577,7 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
       }
     }
 
-    return (widest + _fitPadding)
-        .clamp(_fitMinWidth, _fitMaxWidth)
-        .toDouble();
+    return (widest + _fitPadding).clamp(_fitMinWidth, _fitMaxWidth).toDouble();
   }
 
   void _refreshSheetBounds() {
@@ -584,43 +587,41 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
     }
     widget.viewportController.setSheetBounds(
       rowCount: sheet.rows.length,
-      columnCount:
-          sheet.rows.isEmpty ? 0 : sheet.rows.first.cells.length,
+      columnCount: sheet.rows.isEmpty ? 0 : sheet.rows.first.cells.length,
     );
   }
 
   void _showError(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _handleCopy({required bool andClear}) async {
-    await widget.spreadsheetController
-        .copySelection(widget.viewportController.selection);
+    await widget.spreadsheetController.copySelection(
+      widget.viewportController.selection,
+    );
     if (andClear) {
-      widget.spreadsheetController
-          .clearSelection(widget.viewportController.selection);
+      widget.spreadsheetController.clearSelection(
+        widget.viewportController.selection,
+      );
     }
   }
 
   Future<void> _handlePaste() async {
-    final clipboardData =
-        await Clipboard.getData(Clipboard.kTextPlain);
+    final clipboardData = await Clipboard.getData(Clipboard.kTextPlain);
     final text = clipboardData?.text;
     if (text == null) {
       return;
     }
     final selection = widget.viewportController.selection;
-    final targetRow =
-        selection.startRow <= selection.endRow
-            ? selection.startRow
-            : selection.endRow;
-    final targetColumn =
-        selection.startColumn <= selection.endColumn
-            ? selection.startColumn
-            : selection.endColumn;
+    final targetRow = selection.startRow <= selection.endRow
+        ? selection.startRow
+        : selection.endRow;
+    final targetColumn = selection.startColumn <= selection.endColumn
+        ? selection.startColumn
+        : selection.endColumn;
 
     await widget.spreadsheetController.pasteClipboard(
       row: targetRow,
@@ -643,8 +644,7 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
   /// the current viewport isn't built at all, so navigating to it
   /// without this would move the selection "off-screen" invisibly.
   void _ensureSelectionVisible() {
-    if (!_verticalController.hasClients ||
-        !_horizontalController.hasClients) {
+    if (!_verticalController.hasClients || !_horizontalController.hasClients) {
       return;
     }
 
@@ -685,15 +685,17 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
     // is min(window, total table width).
     final availableWidth = isRtlForBody
         ? (viewportSize.width < _totalTableWidth()
-            ? viewportSize.width
-            : _totalTableWidth())
+              ? viewportSize.width
+              : _totalTableWidth())
         : (viewportSize.width - SpreadsheetGrid.headerSize)
-            .clamp(0, viewportSize.width)
-            .toDouble();
+              .clamp(0, viewportSize.width)
+              .toDouble();
     final bodySize = Size(
       availableWidth,
-      (viewportSize.height - SpreadsheetGrid.headerSize)
-          .clamp(0, viewportSize.height),
+      (viewportSize.height - SpreadsheetGrid.headerSize).clamp(
+        0,
+        viewportSize.height,
+      ),
     );
 
     final isRtl =
@@ -712,19 +714,13 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
 
     if (target.scrollX != _horizontalController.offset) {
       _horizontalController.jumpTo(
-        target.scrollX.clamp(
-          0,
-          _horizontalController.position.maxScrollExtent,
-        ),
+        target.scrollX.clamp(0, _horizontalController.position.maxScrollExtent),
       );
     }
 
     if (target.scrollY != _verticalController.offset) {
       _verticalController.jumpTo(
-        target.scrollY.clamp(
-          0,
-          _verticalController.position.maxScrollExtent,
-        ),
+        target.scrollY.clamp(0, _verticalController.position.maxScrollExtent),
       );
     }
   }
@@ -742,7 +738,8 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
       return KeyEventResult.ignored;
     }
 
-    final isCtrlOrCmd = HardwareKeyboard.instance.isControlPressed ||
+    final isCtrlOrCmd =
+        HardwareKeyboard.instance.isControlPressed ||
         HardwareKeyboard.instance.isMetaPressed;
     final isShift = HardwareKeyboard.instance.isShiftPressed;
     final isRtl =
@@ -846,8 +843,9 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
         return KeyEventResult.handled;
       case LogicalKeyboardKey.delete:
       case LogicalKeyboardKey.backspace:
-        widget.spreadsheetController
-            .clearSelection(widget.viewportController.selection);
+        widget.spreadsheetController.clearSelection(
+          widget.viewportController.selection,
+        );
         return KeyEventResult.handled;
       default:
         // Typing a plain printable character while a cell is selected
@@ -890,8 +888,7 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
         child: AnimatedBuilder(
           animation: widget.spreadsheetController,
           builder: (context, _) {
-            final sheet =
-                widget.spreadsheetController.spreadsheet?.activeSheet;
+            final sheet = widget.spreadsheetController.spreadsheet?.activeSheet;
 
             if (sheet == null || sheet.rows.isEmpty) {
               return const Center(child: CircularProgressIndicator());
@@ -942,8 +939,7 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
             // matters for text alignment in cells/headers and the resize
             // handle's edge.
 
-            final rowNumberColumn =
-                _rowNumberTableColumn(isRtl: sheet.isRtl);
+            final rowNumberColumn = _rowNumberTableColumn(isRtl: sheet.isRtl);
             final appendColumn = _appendTableColumn(isRtl: sheet.isRtl);
 
             // RTL: real Excel-style right-anchoring. The row-number
@@ -956,8 +952,9 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
             // _snapScrollToDirectionStart). LTR: full width, pinned
             // row-number column, aligned left - same as before.
             return Directionality(
-              textDirection:
-                  sheet.isRtl ? TextDirection.rtl : TextDirection.ltr,
+              textDirection: sheet.isRtl
+                  ? TextDirection.rtl
+                  : TextDirection.ltr,
               // A Row of [grid | scroll strip]. Under the RTL Directionality
               // a Row lays its FIRST child out on the right, so the strip -
               // the last child - lands on the LEFT in RTL and the RIGHT in
@@ -968,180 +965,216 @@ class _SpreadsheetGridState extends State<SpreadsheetGrid> {
                 children: [
                   Expanded(
                     child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final maxWidth = constraints.maxWidth;
-                  final totalWidth = _totalTableWidth();
-                  final tableWidth = sheet.isRtl && totalWidth < maxWidth
-                      ? totalWidth
-                      : maxWidth;
-                  return Align(
-                    alignment: sheet.isRtl
-                        ? Alignment.topRight
-                        : Alignment.topLeft,
-                    child: SizedBox(
-                      width: tableWidth,
-                      height: constraints.hasBoundedHeight
-                          ? constraints.maxHeight
-                          : null,
-                      child: TableView.builder(
-                pinnedRowCount: 1,
-                pinnedColumnCount: sheet.isRtl ? 0 : 1,
-                verticalDetails: ScrollableDetails.vertical(
-                  controller: _verticalController,
-                ),
-                horizontalDetails: ScrollableDetails.horizontal(
-                  controller: _horizontalController,
-                ),
-                rowCount: rowCount + 2,
-                columnCount: columnCount + 2,
-                rowBuilder: (int index) {
-                  final extent = index == 0
-                      ? SpreadsheetGrid.headerSize
-                      : index == rowCount + 1
-                          ? SpreadsheetGrid.addHandleSize
-                          : SpreadsheetGrid.rowHeight;
-                  return TableSpan(extent: FixedTableSpanExtent(extent));
-                },
-                columnBuilder: (int index) {
-                  final extent = index == rowNumberColumn
-                      ? SpreadsheetGrid.headerSize
-                      : index == appendColumn
-                          ? SpreadsheetGrid.addHandleSize
-                          : _columnWidth(
-                              _dataColumnForTableColumn(
-                                index,
-                                isRtl: sheet.isRtl,
-                              )!,
-                            );
-                  return TableSpan(extent: FixedTableSpanExtent(extent));
-                },
-                cellBuilder: (context, vicinity) {
-                  final isHeaderRow = vicinity.row == 0;
-                  final isHeaderColumn = vicinity.column == rowNumberColumn;
-                  final isAppendRow = vicinity.row == rowCount + 1;
-                  final isAppendColumn = vicinity.column == appendColumn;
+                      builder: (context, constraints) {
+                        final maxWidth = constraints.maxWidth;
+                        final totalWidth = _totalTableWidth();
+                        final tableWidth = sheet.isRtl && totalWidth < maxWidth
+                            ? totalWidth
+                            : maxWidth;
+                        return Align(
+                          alignment: sheet.isRtl
+                              ? Alignment.topRight
+                              : Alignment.topLeft,
+                          child: SizedBox(
+                            width: tableWidth,
+                            height: constraints.hasBoundedHeight
+                                ? constraints.maxHeight
+                                : null,
+                            child: TableView.builder(
+                              pinnedRowCount: 1,
+                              pinnedColumnCount: sheet.isRtl ? 0 : 1,
+                              verticalDetails: ScrollableDetails.vertical(
+                                controller: _verticalController,
+                              ),
+                              horizontalDetails: ScrollableDetails.horizontal(
+                                controller: _horizontalController,
+                              ),
+                              rowCount: rowCount + 2,
+                              columnCount: columnCount + 2,
+                              rowBuilder: (int index) {
+                                final extent = index == 0
+                                    ? SpreadsheetGrid.headerSize
+                                    : index == rowCount + 1
+                                    ? SpreadsheetGrid.addHandleSize
+                                    : sheet.rowHeightForViewRow(
+                                        index - 1,
+                                        defaultHeight:
+                                            SpreadsheetGrid.rowHeight,
+                                      );
+                                return TableSpan(
+                                  extent: FixedTableSpanExtent(extent),
+                                );
+                              },
+                              columnBuilder: (int index) {
+                                final extent = index == rowNumberColumn
+                                    ? SpreadsheetGrid.headerSize
+                                    : index == appendColumn
+                                    ? SpreadsheetGrid.addHandleSize
+                                    : _columnWidth(
+                                        _dataColumnForTableColumn(
+                                          index,
+                                          isRtl: sheet.isRtl,
+                                        )!,
+                                      );
+                                return TableSpan(
+                                  extent: FixedTableSpanExtent(extent),
+                                );
+                              },
+                              cellBuilder: (context, vicinity) {
+                                final isHeaderRow = vicinity.row == 0;
+                                final isHeaderColumn =
+                                    vicinity.column == rowNumberColumn;
+                                final isAppendRow =
+                                    vicinity.row == rowCount + 1;
+                                final isAppendColumn =
+                                    vicinity.column == appendColumn;
 
-                  // Corner cell: blank above the row-number column.
-                  if (isHeaderRow && isHeaderColumn) {
-                    return const TableViewCell(child: SizedBox.shrink());
-                  }
+                                // Corner cell: blank above the row-number column.
+                                if (isHeaderRow && isHeaderColumn) {
+                                  return const TableViewCell(
+                                    child: SizedBox.shrink(),
+                                  );
+                                }
 
-                  // Top-right corner: "+" to append a column.
-                  if (isHeaderRow && isAppendColumn) {
-                    return TableViewCell(
-                      child: _HoverAddHandle(
-                        axis: Axis.horizontal,
-                        tooltip: sheet.isRtl
-                            ? 'Add column to the left'
-                            : 'Add column to the right',
-                        onTap: _appendColumn,
-                      ),
-                    );
-                  }
+                                // Top-right corner: "+" to append a column.
+                                if (isHeaderRow && isAppendColumn) {
+                                  return TableViewCell(
+                                    child: _HoverAddHandle(
+                                      axis: Axis.horizontal,
+                                      tooltip: sheet.isRtl
+                                          ? 'Add column to the left'
+                                          : 'Add column to the right',
+                                      onTap: _appendColumn,
+                                    ),
+                                  );
+                                }
 
-                  // Column header row.
-                  if (isHeaderRow) {
-                    final column =
-                        _dataColumnForTableColumn(
-                          vicinity.column,
-                          isRtl: sheet.isRtl,
-                        )!;
-                    return TableViewCell(
-                      child: GridColumnHeader(
-                        columnIndex: column,
-                        width: _columnWidth(column),
-                        spreadsheetController: widget.spreadsheetController,
-                        onRenamingChanged: _setRenamingHeader,
-                        onResize: (newWidth) => _handleColumnResize(column, newWidth),
-                        onResizeEnd: (finalWidth) => _handleColumnResizeEnd(column, finalWidth),
-                        onAutoFit: () => _handleColumnAutoFit(column),
-                      ),
-                    );
-                  }
+                                // Column header row.
+                                if (isHeaderRow) {
+                                  final column = _dataColumnForTableColumn(
+                                    vicinity.column,
+                                    isRtl: sheet.isRtl,
+                                  )!;
+                                  return TableViewCell(
+                                    child: GridColumnHeader(
+                                      columnIndex: column,
+                                      width: _columnWidth(column),
+                                      spreadsheetController:
+                                          widget.spreadsheetController,
+                                      onRenamingChanged: _setRenamingHeader,
+                                      onResize: (newWidth) =>
+                                          _handleColumnResize(column, newWidth),
+                                      onResizeEnd: (finalWidth) =>
+                                          _handleColumnResizeEnd(
+                                            column,
+                                            finalWidth,
+                                          ),
+                                      onAutoFit: () =>
+                                          _handleColumnAutoFit(column),
+                                    ),
+                                  );
+                                }
 
-                  // Bottom-left corner (below row numbers): blank filler.
-                  if (isAppendRow && isHeaderColumn) {
-                    return const TableViewCell(child: SizedBox.shrink());
-                  }
+                                // Bottom-left corner (below row numbers): blank filler.
+                                if (isAppendRow && isHeaderColumn) {
+                                  return const TableViewCell(
+                                    child: SizedBox.shrink(),
+                                  );
+                                }
 
-                  // Bottom-right corner: blank filler.
-                  if (isAppendRow && isAppendColumn) {
-                    return const TableViewCell(child: SizedBox.shrink());
-                  }
+                                // Bottom-right corner: blank filler.
+                                if (isAppendRow && isAppendColumn) {
+                                  return const TableViewCell(
+                                    child: SizedBox.shrink(),
+                                  );
+                                }
 
-                  // Append-row bar: only the leftmost data-column slot
-                  // actually renders the (visually full-width, via
-                  // OverflowBox) handle - a TABLE-index check (always the
-                  // physically leftmost slot), not a data-column check,
-                  // since which rendered cell draws the bar is about
-                  // screen position, not which sheet column that slot
-                  // happens to show in the current direction.
-                  if (isAppendRow) {
-                    final isLeftmostDataSlot = vicinity.column == 1;
-                    return TableViewCell(
-                      child: isLeftmostDataSlot
-                          ? _HoverAddHandle(
-                              axis: Axis.vertical,
-                              tooltip: 'Add row below',
-                              onTap: _appendRow,
-                              spanWidth: _totalDataColumnsWidth(),
-                            )
-                          : const SizedBox.shrink(),
-                    );
-                  }
+                                // Append-row bar: only the leftmost data-column slot
+                                // actually renders the (visually full-width, via
+                                // OverflowBox) handle - a TABLE-index check (always the
+                                // physically leftmost slot), not a data-column check,
+                                // since which rendered cell draws the bar is about
+                                // screen position, not which sheet column that slot
+                                // happens to show in the current direction.
+                                if (isAppendRow) {
+                                  final isLeftmostDataSlot =
+                                      vicinity.column == 1;
+                                  return TableViewCell(
+                                    child: isLeftmostDataSlot
+                                        ? _HoverAddHandle(
+                                            axis: Axis.vertical,
+                                            tooltip: appText(
+                                              context,
+                                              'Add row below',
+                                            ),
+                                            onTap: _appendRow,
+                                            spanWidth: _totalDataColumnsWidth(),
+                                          )
+                                        : const SizedBox.shrink(),
+                                  );
+                                }
 
-                  // Row-number header column.
-                  if (isHeaderColumn) {
-                    final row = vicinity.row - 1;
-                    return TableViewCell(
-                      child: GridRowHeader(
-                        rowIndex: row,
-                        spreadsheetController: widget.spreadsheetController,
-                      ),
-                    );
-                  }
+                                // Row-number header column.
+                                if (isHeaderColumn) {
+                                  final row = vicinity.row - 1;
+                                  return TableViewCell(
+                                    child: GridRowHeader(
+                                      rowIndex: row,
+                                      spreadsheetController:
+                                          widget.spreadsheetController,
+                                    ),
+                                  );
+                                }
 
-                  // Append-column bar (to the right of real data, any
-                  // row): blank filler, matching the old trailing column.
-                  if (isAppendColumn) {
-                    return const TableViewCell(child: SizedBox.shrink());
-                  }
+                                // Append-column bar (to the right of real data, any
+                                // row): blank filler, matching the old trailing column.
+                                if (isAppendColumn) {
+                                  return const TableViewCell(
+                                    child: SizedBox.shrink(),
+                                  );
+                                }
 
-                  // A real data cell.
-                  final row = vicinity.row - 1;
-                  final column = _dataColumnForTableColumn(
-                    vicinity.column,
-                    isRtl: sheet.isRtl,
-                  )!;
-                  return TableViewCell(
-                    child: GridCell(
-                      row: row,
-                      column: column,
-                      spreadsheetController: widget.spreadsheetController,
-                      viewportController: widget.viewportController,
-                      gridFocusNode: _gridFocusNode,
-                      onDragStart: _handleDragStart,
-                      onDragEnter: _handleDragEnter,
-                      onDragEnd: _handleDragEnd,
-                      isFormulaReferencePickingActive: _isEditingFormula,
-                      onCellTapDuringFormulaEdit:
-                          _handleCellTapDuringFormulaEdit,
-                      onFormulaEditingChanged: _handleFormulaEditingChanged,
-                      formulaReferenceToInsert: _formulaReferenceToInsert,
-                      onReferenceRangeDragStart:
-                          _handleReferenceRangeDragStart,
-                      onReferenceRangeDragEnter:
-                          _handleReferenceRangeDragEnter,
-                      onReferenceRangeDragEnd: _handleReferenceRangeDragEnd,
-                      referenceRangeDrag: _referenceRangeDrag,
+                                // A real data cell.
+                                final row = vicinity.row - 1;
+                                final column = _dataColumnForTableColumn(
+                                  vicinity.column,
+                                  isRtl: sheet.isRtl,
+                                )!;
+                                return TableViewCell(
+                                  child: GridCell(
+                                    row: row,
+                                    column: column,
+                                    spreadsheetController:
+                                        widget.spreadsheetController,
+                                    viewportController:
+                                        widget.viewportController,
+                                    gridFocusNode: _gridFocusNode,
+                                    onDragStart: _handleDragStart,
+                                    onDragEnter: _handleDragEnter,
+                                    onDragEnd: _handleDragEnd,
+                                    isFormulaReferencePickingActive:
+                                        _isEditingFormula,
+                                    onCellTapDuringFormulaEdit:
+                                        _handleCellTapDuringFormulaEdit,
+                                    onFormulaEditingChanged:
+                                        _handleFormulaEditingChanged,
+                                    formulaReferenceToInsert:
+                                        _formulaReferenceToInsert,
+                                    onReferenceRangeDragStart:
+                                        _handleReferenceRangeDragStart,
+                                    onReferenceRangeDragEnter:
+                                        _handleReferenceRangeDragEnter,
+                                    onReferenceRangeDragEnd:
+                                        _handleReferenceRangeDragEnd,
+                                    referenceRangeDrag: _referenceRangeDrag,
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        );
+                      },
                     ),
-                  );
-                },
-                      ),
-                    ),
-                  );
-                },
-              ),
                   ),
                   // Its own strip of the layout (not drawn over the
                   // cells), always visible. Redraws when rows are added or

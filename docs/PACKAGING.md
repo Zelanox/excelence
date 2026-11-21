@@ -61,6 +61,15 @@ excelence-server.exe
 The first time, Windows Firewall asks whether to allow it: allow **Private networks**. The
 server prints a warning if it is reachable from the network without a token.
 
+To keep it running after the window is closed, use the commands in
+[BACKGROUND_SERVER.md](BACKGROUND_SERVER.md): `excelence-server.exe start`, `stop`, `status`, and
+`autostart on` to start it when you log in. Put the settings above in `excelence.env` (create it
+with `excelence-server.exe config`) instead of `set` lines, so they survive.
+
+> `run_server.spec` and `dist\run_server.exe` in the project are an older one-file build. Build
+> with the `pyinstaller` command above (it uses `server_entry.py`, which now also understands
+> these commands).
+
 ## 2. The client (Windows desktop app)
 
 On the build machine (needs Flutter and Visual Studio with the "Desktop development with

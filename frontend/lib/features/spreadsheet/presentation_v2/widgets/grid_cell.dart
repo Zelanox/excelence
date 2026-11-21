@@ -118,7 +118,7 @@ class GridCell extends StatefulWidget {
   /// cell can show a live highlight if it falls within the spanned range.
   /// Null start/end means no reference-range drag is in progress.
   final ValueNotifier<({CellPosition? start, CellPosition? end})>
-      referenceRangeDrag;
+  referenceRangeDrag;
 
   @override
   State<GridCell> createState() => _GridCellState();
@@ -208,8 +208,11 @@ class _GridCellState extends State<GridCell> {
     final selection = _textController.selection;
     final text = _textController.text;
     final insertAt = selection.isValid ? selection.start : text.length;
-    final newText =
-        text.replaceRange(insertAt, selection.isValid ? selection.end : insertAt, reference);
+    final newText = text.replaceRange(
+      insertAt,
+      selection.isValid ? selection.end : insertAt,
+      reference,
+    );
     _textController.value = TextEditingValue(
       text: newText,
       selection: TextSelection.collapsed(offset: insertAt + reference.length),
@@ -227,7 +230,8 @@ class _GridCellState extends State<GridCell> {
   }
 
   void _syncReferenceListener() {
-    final shouldListen = _isThisCellActive &&
+    final shouldListen =
+        _isThisCellActive &&
         widget.viewportController.isEditing &&
         widget.formulaReferenceToInsert != null;
 
@@ -235,8 +239,7 @@ class _GridCellState extends State<GridCell> {
       widget.formulaReferenceToInsert!.addListener(_handleReferenceToInsert);
       _isListeningForReferences = true;
     } else if (!shouldListen && _isListeningForReferences) {
-      widget.formulaReferenceToInsert!
-          .removeListener(_handleReferenceToInsert);
+      widget.formulaReferenceToInsert!.removeListener(_handleReferenceToInsert);
       _isListeningForReferences = false;
     }
   }
@@ -246,9 +249,7 @@ class _GridCellState extends State<GridCell> {
     _focusNode.removeListener(_handleFocusChange);
     _textController.removeListener(_handleTextChanged);
     if (_isListeningForReferences) {
-      widget.formulaReferenceToInsert?.removeListener(
-        _handleReferenceToInsert,
-      );
+      widget.formulaReferenceToInsert?.removeListener(_handleReferenceToInsert);
     }
     _textController.dispose();
     _focusNode.dispose();
@@ -366,8 +367,7 @@ class _GridCellState extends State<GridCell> {
         widget.viewportController,
       ]),
       builder: (context, _) {
-        final sheet =
-            widget.spreadsheetController.spreadsheet?.activeSheet;
+        final sheet = widget.spreadsheetController.spreadsheet?.activeSheet;
         if (sheet == null ||
             widget.row < 0 ||
             widget.row >= sheet.rows.length) {
@@ -391,9 +391,20 @@ class _GridCellState extends State<GridCell> {
           appearance: sheet.appearance,
           row: widget.row,
         );
+        final effectiveTextStyle = cell.style.mergedOver(sheet.textDefaults);
         final cellTextStyle = readableOnFill(
-          resolveCellTextStyle(cell.style.mergedOver(sheet.textDefaults)),
+          resolveCellTextStyle(effectiveTextStyle),
           fill,
+        );
+        final textAlignment = _textAlignment(
+          effectiveTextStyle.horizontalAlignment,
+        );
+        final verticalAlignment = _verticalTextAlignment(
+          effectiveTextStyle.verticalAlignment,
+        );
+        final cellAlignment = _cellAlignment(
+          effectiveTextStyle.horizontalAlignment,
+          effectiveTextStyle.verticalAlignment,
         );
 
         // What the cell looks like with no selection on it. The selection
@@ -404,8 +415,11 @@ class _GridCellState extends State<GridCell> {
             parseHexColor(sheet.appearance.gridColor) ?? Colors.grey.shade300;
 
         final selection = widget.viewportController.selection;
-        final isSelected =
-            _isWithinSelection(selection, widget.row, widget.column);
+        final isSelected = _isWithinSelection(
+          selection,
+          widget.row,
+          widget.column,
+        );
         final isActiveCell = _isThisCellActive;
         final isEditingThisCell =
             isActiveCell && widget.viewportController.isEditing;
@@ -479,6 +493,8 @@ class _GridCellState extends State<GridCell> {
               // position we've explicitly set.
               selectAllOnFocus: false,
               style: cellTextStyle,
+              textAlign: textAlignment,
+              textAlignVertical: verticalAlignment,
               decoration: const InputDecoration(
                 border: InputBorder.none,
                 isDense: true,
@@ -492,8 +508,7 @@ class _GridCellState extends State<GridCell> {
         return MouseRegion(
           onEnter: (_) {
             if (widget.isFormulaReferencePickingActive) {
-              widget.onReferenceRangeDragEnter
-                  ?.call(widget.row, widget.column);
+              widget.onReferenceRangeDragEnter?.call(widget.row, widget.column);
             } else {
               widget.onDragEnter?.call(widget.row, widget.column);
             }
@@ -502,8 +517,10 @@ class _GridCellState extends State<GridCell> {
             behavior: HitTestBehavior.opaque,
             onTap: () {
               if (widget.isFormulaReferencePickingActive) {
-                widget.onCellTapDuringFormulaEdit
-                    ?.call(widget.row, widget.column);
+                widget.onCellTapDuringFormulaEdit?.call(
+                  widget.row,
+                  widget.column,
+                );
                 return;
               }
 
@@ -519,8 +536,7 @@ class _GridCellState extends State<GridCell> {
               if (isActiveCell) {
                 widget.viewportController.startEditing();
               } else {
-                widget.viewportController
-                    .selectCell(widget.row, widget.column);
+                widget.viewportController.selectCell(widget.row, widget.column);
                 // Explicitly reclaim grid focus here rather than relying
                 // on this tap bubbling up to SpreadsheetGrid's outer
                 // GestureDetector - a GestureDetector wrapping a
@@ -534,8 +550,10 @@ class _GridCellState extends State<GridCell> {
             },
             onPanStart: widget.isFormulaReferencePickingActive
                 ? (_) {
-                    widget.onReferenceRangeDragStart
-                        ?.call(widget.row, widget.column);
+                    widget.onReferenceRangeDragStart?.call(
+                      widget.row,
+                      widget.column,
+                    );
                   }
                 : (_) {
                     widget.onDragStart?.call(widget.row, widget.column);
@@ -547,68 +565,114 @@ class _GridCellState extends State<GridCell> {
                 : (_) {
                     widget.onDragEnd?.call();
                   },
-            child: ValueListenableBuilder<
-                ({CellPosition? start, CellPosition? end})>(
-              valueListenable: widget.referenceRangeDrag,
-              builder: (context, dragRange, _) {
-                final isInReferenceRangeDrag = _isWithinCellRange(
-                  dragRange.start,
-                  dragRange.end,
-                  widget.row,
-                  widget.column,
-                );
+            child:
+                ValueListenableBuilder<
+                  ({CellPosition? start, CellPosition? end})
+                >(
+                  valueListenable: widget.referenceRangeDrag,
+                  builder: (context, dragRange, _) {
+                    final isInReferenceRangeDrag = _isWithinCellRange(
+                      dragRange.start,
+                      dragRange.end,
+                      widget.row,
+                      widget.column,
+                    );
 
-                final referenceRangeEdges = isInReferenceRangeDrag
-                    ? _rangeEdges(
-                        startRow: dragRange.start!.row,
-                        endRow: dragRange.end!.row,
-                        startColumn: dragRange.start!.column,
-                        endColumn: dragRange.end!.column,
-                        row: widget.row,
-                        column: widget.column,
-                      )
-                    : null;
-
-                return Container(
-                  decoration: BoxDecoration(
-                    color: isInReferenceRangeDrag
-                        ? Color.alphaBlend(
-                            Colors.orange.withValues(alpha: 0.15),
-                            baseColor,
+                    final referenceRangeEdges = isInReferenceRangeDrag
+                        ? _rangeEdges(
+                            startRow: dragRange.start!.row,
+                            endRow: dragRange.end!.row,
+                            startColumn: dragRange.start!.column,
+                            endColumn: dragRange.end!.column,
+                            row: widget.row,
+                            column: widget.column,
                           )
-                        : isSelected
+                        : null;
+
+                    return Container(
+                      decoration: BoxDecoration(
+                        color: isInReferenceRangeDrag
+                            ? Color.alphaBlend(
+                                Colors.orange.withValues(alpha: 0.15),
+                                baseColor,
+                              )
+                            : isSelected
                             ? Color.alphaBlend(
                                 Colors.blue.withValues(alpha: 0.08),
                                 baseColor,
                               )
                             : baseColor,
-                    border: isInReferenceRangeDrag
-                        ? _cellBorder(
-                            edges: referenceRangeEdges,
-                            gridColor: gridColor,
-                            rangeColor: Colors.orange,
-                            rangeWidth: 1,
-                          )
-                        : _cellBorder(
-                            edges: selectionEdges,
-                            gridColor: gridColor,
-                          ),
-                  ),
-                  alignment: AlignmentDirectional.centerStart,
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: Text(
-                    cell.value,
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                    style: cellTextStyle,
-                  ),
-                );
-              },
-            ),
+                        border: isInReferenceRangeDrag
+                            ? _cellBorder(
+                                edges: referenceRangeEdges,
+                                gridColor: gridColor,
+                                rangeColor: Colors.orange,
+                                rangeWidth: 1,
+                              )
+                            : _cellBorder(
+                                edges: selectionEdges,
+                                gridColor: gridColor,
+                              ),
+                      ),
+                      alignment: cellAlignment,
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Text(
+                        cell.value,
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                        textAlign: textAlignment,
+                        style: cellTextStyle,
+                      ),
+                    );
+                  },
+                ),
           ),
         );
       },
     );
+  }
+
+  TextAlign _textAlignment(String? alignment) {
+    switch (alignment) {
+      case 'left':
+        return TextAlign.left;
+      case 'center':
+        return TextAlign.center;
+      case 'right':
+        return TextAlign.right;
+      default:
+        return TextAlign.start;
+    }
+  }
+
+  TextAlignVertical _verticalTextAlignment(String? alignment) {
+    switch (alignment) {
+      case 'top':
+        return TextAlignVertical.top;
+      case 'bottom':
+        return TextAlignVertical.bottom;
+      default:
+        return TextAlignVertical.center;
+    }
+  }
+
+  AlignmentGeometry _cellAlignment(String? horizontal, String? vertical) {
+    final y = switch (vertical) {
+      'top' => -1.0,
+      'bottom' => 1.0,
+      _ => 0.0,
+    };
+
+    switch (horizontal) {
+      case 'left':
+        return Alignment(-1, y);
+      case 'center':
+        return Alignment(0, y);
+      case 'right':
+        return Alignment(1, y);
+      default:
+        return AlignmentDirectional(-1, y);
+    }
   }
 
   bool _isWithinCellRange(
@@ -622,10 +686,8 @@ class _GridCellState extends State<GridCell> {
     }
     final firstRow = start.row <= end.row ? start.row : end.row;
     final lastRow = start.row >= end.row ? start.row : end.row;
-    final firstColumn =
-        start.column <= end.column ? start.column : end.column;
-    final lastColumn =
-        start.column >= end.column ? start.column : end.column;
+    final firstColumn = start.column <= end.column ? start.column : end.column;
+    final lastColumn = start.column >= end.column ? start.column : end.column;
 
     return row >= firstRow &&
         row <= lastRow &&

@@ -37,6 +37,7 @@ def _grid_fields(controller: Controller) -> dict[str, Any]:
         "row_count": data.row_count,
         "column_count": data.column_count,
         "column_widths": data.column_widths,
+        "row_heights": data.row_heights,
         "rtl": data.rtl,
         "row_ids": data.row_ids,
         "column_ids": data.column_ids,
@@ -355,6 +356,25 @@ def set_column_width(
     success = controller.set_column_width(request.name, request.width)
 
     message = "Column width updated." if success else "Unable to update column width."
+    return SpreadsheetEditResponse(
+        success=success,
+        message=message,
+        **_grid_fields(controller)
+    )
+
+
+@router.post(
+    "/rows/height",
+    response_model=SpreadsheetEditResponse
+)
+def set_row_height(
+    request: RowHeightRequest,
+    controller: Controller = Depends(get_controller)
+):
+    """Set a row's display height in the active worksheet."""
+    success = controller.set_row_height(request.row_id, request.height)
+
+    message = "Row height updated." if success else "Unable to update row height."
     return SpreadsheetEditResponse(
         success=success,
         message=message,

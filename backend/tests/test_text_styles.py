@@ -106,6 +106,8 @@ def test_cell_style_rejects_invalid_values():
         {"color": "#12345"},
         {"color": "GGGGGG"},
         {"color": 123456},
+        {"horizontal_alignment": "middle"},
+        {"vertical_alignment": "left"},
         {"nope": True},
     ):
         assert empty.apply_patch(bad) is None, bad
@@ -177,7 +179,8 @@ def test_style_survives_edit_save_and_reload_as_real_fonts():
         assert c.set_cell_style(
             1, 0, 1, 0,
             {"bold": True, "italic": True, "underline": True, "strikethrough": True,
-             "font_family": "Cairo", "font_size": 16, "color": "FF0000"},
+             "font_family": "Cairo", "font_size": 16, "color": "FF0000",
+             "horizontal_alignment": "center", "vertical_alignment": "top"},
         ) is True
 
         # an unrelated edit rebuilds the whole worksheet - style must survive
@@ -189,6 +192,7 @@ def test_style_survives_edit_save_and_reload_as_real_fonts():
             (1, 0): {
                 "bold": True, "italic": True, "underline": True, "strikethrough": True,
                 "font_family": "Cairo", "font_size": 16.0, "color": "FF0000",
+                "horizontal_alignment": "center", "vertical_alignment": "top",
             }
         }
 
@@ -197,6 +201,8 @@ def test_style_survives_edit_save_and_reload_as_real_fonts():
         assert (font.name, font.sz, font.b, font.i, font.strike) == ("Cairo", 16.0, True, True, True)
         assert font.u == "single"
         assert font.color.rgb[-6:] == "FF0000"
+        alignment = load_workbook(os.path.join(folder, "t.xlsx"))["Sheet1"]["A3"].alignment
+        assert (alignment.horizontal, alignment.vertical) == ("center", "top")
 
 
 def test_removed_override_leaves_no_stale_font_in_file():

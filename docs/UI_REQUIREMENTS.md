@@ -68,12 +68,13 @@ Three work items, in this order: **A** toolbar fits any width, **B** File menu, 
 
 Order: C1 alignment, C2 number format, C3 borders. Each needs the same chain: backend `CellStyle` field and validation, xlsx read/write, sheet defaults if applicable, collab op (`set_cell_style` already validates through `apply_patch`), client model, grid rendering, toolbar button.
 
-### C1. Alignment
-- Horizontal: left, center, right (default = automatic: text follows sheet direction, numbers right). Vertical: top, middle, bottom. Wrap text on/off.
-- Toolbar: one button for horizontal (cycles or opens a small menu), one for wrap.
-- Rule: in an RTL sheet "left/right" mean the physical sides, as in Excel.
-- Edge: mixed selection shows no active state; empty cells still store alignment; wrap changes the row height? **Row height is fixed today, so wrap only clips unless we add auto row height (decision below).**
-- Acceptance: round trip through .xlsx (write, reopen, same alignment); invalid value rejected with a clear error; remote client sees it live; undo/redo works.
+### C1. Alignment and row height
+- Horizontal alignment: left, center, right. Vertical alignment: top, middle, bottom. Explicit left/right mean physical sides, including in an RTL sheet.
+- Toolbar: separate compact menus for horizontal and vertical alignment; each applies to the selected cells and can reset to the sheet default.
+- Row height: drag a row header's bottom edge or use its context menu to enter a value from 16 to 500 display pixels. Unset rows use the 28-pixel grid default; saved workbooks use native Excel row heights.
+- Text wrapping and automatic row-height fitting are not included yet; resizing is manual.
+- Acceptance: alignment and row heights round-trip through .xlsx; invalid values are rejected; sorted/filtered rows keep their own heights.
+- Live formatting operations and formatting undo/redo remain tracked in the collaboration follow-up below.
 
 ### C2. Number format
 - Presets: General, Number (2 decimals), Percent, Currency, Date, Text. Plus custom format string later.
@@ -97,7 +98,7 @@ Order: C1 alignment, C2 number format, C3 borders. Each needs the same chain: ba
 1. Toolbar below 600 px: **scroll sideways** (alternative: overflow "..." menu).
 2. Close with failed save: **ask Retry / Close anyway / Cancel**.
 3. Save as switches to the copy: **yes**.
-4. Row height with wrap text: **add auto row height in C1** (alternative: wrap clips for now).
+4. Row height with wrap text: **manual row-height editing only; defer wrapping and automatic fit**.
 5. Number format digits: **always Western digits (0-9)** (alternative: follow sheet direction).
 6. Currency symbol: **a setting with a default of none** (alternative: fixed EGP).
 

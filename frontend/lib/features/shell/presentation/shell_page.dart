@@ -2,14 +2,17 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../app/app_text.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/api/api_config.dart';
 import '../../../core/live/live_channel.dart';
 import '../../../core/live/live_coordinator.dart';
 import '../../../core/preferences/app_preferences.dart';
+import '../../../core/speech/speech_service_factory.dart';
 import '../../spreadsheet/controllers/spreadsheet_controller.dart';
 import '../../spreadsheet/controllers/viewport_controller.dart';
 import '../../spreadsheet/services/spreadsheet_service.dart';
+import '../dictation_controller.dart';
 import '../startup_status.dart';
 import '../widgets/app_menu_bar.dart';
 import '../widgets/workspace.dart';
@@ -31,7 +34,9 @@ const _defaultDocument = 'test.xlsx';
 /// ownership up here lets both widgets share the same controllers rather
 /// than each having their own disconnected copy.
 class ShellPage extends StatefulWidget {
-  const ShellPage({super.key});
+  const ShellPage({super.key, this.onLocaleChanged});
+
+  final ValueChanged<Locale>? onLocaleChanged;
 
   @override
   State<ShellPage> createState() => _ShellPageState();
@@ -40,6 +45,12 @@ class ShellPage extends StatefulWidget {
 class _ShellPageState extends State<ShellPage> with WidgetsBindingObserver {
   late final SpreadsheetController spreadsheetController;
   late final ViewportController viewportController;
+
+  /// Speech to text (PC only; see DictationController).
+  late final DictationController dictation;
+  bool _listeningShown = false;
+  bool _preparingSpeechShown = false;
+  int _shownDictationNotice = 0;
 
   /// Whether the first document has been tried, and why there is none.
   final StartupStatus startup = StartupStatus();
@@ -62,6 +73,7 @@ class _ShellPageState extends State<ShellPage> with WidgetsBindingObserver {
     // AppPreferences for why the browser can't be relied on). Must be set
     // before _loadInitialDocument reads them.
     AppPreferences.useBackend(api);
+    _loadInterfaceLanguage();
 
     spreadsheetController = SpreadsheetController(
       service,
@@ -87,6 +99,15 @@ class _ShellPageState extends State<ShellPage> with WidgetsBindingObserver {
     );
     viewportController = ViewportController();
 
+    dictation = DictationController(
+      speech: createSpeechService(),
+      spreadsheetController: spreadsheetController,
+      viewportController: viewportController,
+    );
+    dictation.speechLanguageReady = false;
+    _loadSpeechLanguage();
+    dictation.addListener(_onDictationChanged);
+
     // Keep the viewport's valid row/column range in sync with whatever
     // sheet is currently active - this covers every path that can change
     // the grid's dimensions (row/column insert/delete, search, sheet
@@ -103,6 +124,28 @@ class _ShellPageState extends State<ShellPage> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
 
     _loadInitialDocument();
+  }
+
+  Future<void> _loadSpeechLanguage() async {
+    final revision = dictation.localeRevision;
+    final language = await const AppPreferences().getSpeechLanguage();
+
+    if (!mounted) {
+      return;
+    }
+
+    if (dictation.localeRevision == revision) {
+      dictation.localeId = language == 'system' ? 'auto' : language;
+    }
+    dictation.speechLanguageReady = true;
+  }
+
+  Future<void> _loadInterfaceLanguage() async {
+    final language = await const AppPreferences().getInterfaceLanguage();
+
+    if (mounted) {
+      widget.onLocaleChanged?.call(Locale(language));
+    }
   }
 
   @override
@@ -151,8 +194,10 @@ class _ShellPageState extends State<ShellPage> with WidgetsBindingObserver {
       startup.finish(
         problem: spreadsheetController.hasDocument
             ? null
-            : 'Could not open a document. Check that the server is running '
-                'and that this device can reach it.',
+            : appText(
+                context,
+                'Could not open a document. Check that the server is running and that this device can reach it.',
+              ),
       );
     }
   }
@@ -177,25 +222,108 @@ class _ShellPageState extends State<ShellPage> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     spreadsheetController.removeListener(_syncViewportBounds);
     spreadsheetController.dispose();
+    dictation.removeListener(_onDictationChanged);
+    dictation.dispose();
     viewportController.dispose();
     startup.dispose();
     super.dispose();
   }
 
+  /// Tells the user what speech to text is doing: a notice while it is
+  /// listening, and one message for every outcome.
+  void _onDictationChanged() {
+    if (!mounted) {
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.of(context);
+
+    if (dictation.state == DictationState.starting) {
+      if (!_preparingSpeechShown) {
+        _preparingSpeechShown = true;
+        messenger.hideCurrentSnackBar();
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              appText(
+                context,
+                'Preparing offline speech recognition. First use downloads a roughly 460 MB model; audio stays on this device.',
+              ),
+            ),
+            duration: const Duration(days: 1),
+          ),
+        );
+      }
+
+      return;
+    }
+
+    if (dictation.isListening) {
+      if (!_listeningShown) {
+        _listeningShown = true;
+        _preparingSpeechShown = false;
+        messenger.hideCurrentSnackBar();
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              appText(
+                context,
+                dictation.isSearchCapture
+                    ? 'Listening... say what to search for. Press Ctrl+Shift+M to stop.'
+                    : 'Listening... say what the cell should contain. Press Ctrl+Shift+M to stop.',
+              ),
+            ),
+            duration: Duration(days: 1),
+          ),
+        );
+      }
+
+      return;
+    }
+
+    if (_listeningShown || _preparingSpeechShown) {
+      _listeningShown = false;
+      _preparingSpeechShown = false;
+      messenger.hideCurrentSnackBar();
+    }
+
+    final message = dictation.message;
+
+    if (message != null && dictation.messageSerial != _shownDictationNotice) {
+      _shownDictationNotice = dictation.messageSerial;
+      messenger.showSnackBar(
+        SnackBar(content: Text(appText(context, message))),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    return DictationShortcut(
+      dictation: dictation,
+      child: _buildPage(context),
+    );
+  }
+
+  Widget _buildPage(BuildContext context) {
     return Scaffold(
       body: SafeArea(
         child: Column(
           children: [
-            AppMenuBar(spreadsheetController: spreadsheetController),
+            AppMenuBar(
+              spreadsheetController: spreadsheetController,
+              dictation: dictation,
+            ),
             Toolbar(
               spreadsheetController: spreadsheetController,
               viewportController: viewportController,
+              dictation: dictation,
+              onLocaleChanged: widget.onLocaleChanged,
             ),
             SpreadsheetSearchBar(
               spreadsheetController: spreadsheetController,
               viewportController: viewportController,
+              dictation: dictation,
             ),
             Workspace(
               spreadsheetController: spreadsheetController,

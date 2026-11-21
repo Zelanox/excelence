@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../app/app_text.dart';
 import '../spreadsheet/controllers/spreadsheet_controller.dart';
 import '../spreadsheet/models/document_name.dart';
 import 'file_error.dart';
@@ -62,13 +63,17 @@ class FileActions {
 
     try {
       await controller.saveDocument();
-      messenger.showSnackBar(const SnackBar(content: Text('Saved.')));
+      messenger.showSnackBar(
+        SnackBar(content: Text(appText(context, 'Saved.'))),
+      );
     } catch (error) {
       messenger.showSnackBar(
         SnackBar(
-          content: Text(describeFileError(error, 'save the document')),
+          content: Text(
+            appText(context, describeFileError(error, 'save the document')),
+          ),
           action: SnackBarAction(
-            label: 'Retry',
+            label: appText(context, 'Retry'),
             onPressed: () {
               if (context.mounted) {
                 save(context, controller);
@@ -92,8 +97,8 @@ class FileActions {
 
     final result = await DocumentNameDialog.show(
       context,
-      title: 'Save as',
-      confirmLabel: 'Save',
+      title: appText(context, 'Save as'),
+      confirmLabel: appText(context, 'Save'),
       initial: '${documentNameWithoutExtension(current)} copy',
       current: current,
       onSubmit: controller.saveDocumentAs,
@@ -101,7 +106,11 @@ class FileActions {
 
     if (result != null) {
       messenger.showSnackBar(
-        SnackBar(content: Text('Saved a copy as ${result.name}.')),
+        SnackBar(
+          content: Text(
+            '${appText(context, 'Saved a copy as ')}${result.name}.',
+          ),
+        ),
       );
     }
   }
@@ -118,8 +127,8 @@ class FileActions {
 
     final result = await DocumentNameDialog.show(
       context,
-      title: 'Rename document',
-      confirmLabel: 'Rename',
+      title: appText(context, 'Rename document'),
+      confirmLabel: appText(context, 'Rename'),
       initial: documentNameWithoutExtension(current),
       current: current,
       onSubmit: controller.renameDocument,
@@ -127,7 +136,9 @@ class FileActions {
 
     if (result != null) {
       messenger.showSnackBar(
-        SnackBar(content: Text('Renamed to ${result.name}.')),
+        SnackBar(
+          content: Text('${appText(context, 'Renamed to ')}${result.name}.'),
+        ),
       );
     }
   }
@@ -157,26 +168,28 @@ class FileActions {
         context: context,
         barrierDismissible: false,
         builder: (dialogContext) => AlertDialog(
-          title: const Text('Could not save your changes'),
-          content: const Text(
-            'The document is still open. You can try saving again, or close '
-            'it anyway and lose the changes that were not saved.',
+          title: Text(appText(context, 'Could not save your changes')),
+          content: Text(
+            appText(
+              context,
+              'The document is still open. You can try saving again, or close it anyway and lose the changes that were not saved.',
+            ),
           ),
           actions: [
             TextButton(
               onPressed: () =>
                   Navigator.of(dialogContext).pop(_CloseChoice.cancel),
-              child: const Text('Cancel'),
+              child: Text(appText(context, 'Cancel')),
             ),
             TextButton(
               onPressed: () =>
                   Navigator.of(dialogContext).pop(_CloseChoice.closeAnyway),
-              child: const Text('Close anyway'),
+              child: Text(appText(context, 'Close anyway')),
             ),
             FilledButton(
               onPressed: () =>
                   Navigator.of(dialogContext).pop(_CloseChoice.retry),
-              child: const Text('Retry'),
+              child: Text(appText(context, 'Retry')),
             ),
           ],
         ),
@@ -206,15 +219,17 @@ class FileActions {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text('Delete $name?'),
-        content: const Text(
-          'This permanently deletes the file from the server. '
-          'It cannot be undone.',
+        title: Text('${appText(context, 'Delete')} $name?'),
+        content: Text(
+          appText(
+            context,
+            'This permanently deletes the file from the server. It cannot be undone.',
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancel'),
+            child: Text(appText(context, 'Cancel')),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
@@ -222,7 +237,7 @@ class FileActions {
               foregroundColor: Theme.of(dialogContext).colorScheme.onError,
             ),
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Delete'),
+            child: Text(appText(context, 'Delete')),
           ),
         ],
       ),
@@ -233,7 +248,9 @@ class FileActions {
     final result = await controller.deleteDocument();
 
     if (result.ok) {
-      messenger.showSnackBar(SnackBar(content: Text('Deleted $name.')));
+      messenger.showSnackBar(
+        SnackBar(content: Text('${appText(context, 'Deleted ')}$name.')),
+      );
       return;
     }
 
@@ -242,12 +259,12 @@ class FileActions {
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Could not delete the document'),
+        title: Text(appText(context, 'Could not delete the document')),
         content: Text(result.message),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('OK'),
+            child: Text(appText(context, 'OK')),
           ),
         ],
       ),
@@ -266,7 +283,9 @@ class FileActions {
       await work();
     } catch (error) {
       messenger.showSnackBar(
-        SnackBar(content: Text(describeFileError(error, action))),
+        SnackBar(
+          content: Text(appText(context, describeFileError(error, action))),
+        ),
       );
     }
   }

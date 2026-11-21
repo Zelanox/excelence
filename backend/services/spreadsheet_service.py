@@ -10,6 +10,7 @@ from backend.commands.spreadsheet.insert_column import InsertColumnCommand
 from backend.commands.spreadsheet.delete_column import DeleteColumnCommand
 from backend.commands.spreadsheet.rename_column import RenameColumnCommand
 from backend.commands.spreadsheet.set_column_width import SetColumnWidthCommand
+from backend.commands.spreadsheet.set_row_height import SetRowHeightCommand
 from backend.commands.spreadsheet.set_rtl import SetRtlCommand
 from backend.commands.spreadsheet.set_cell_style import SetCellStyleCommand
 from backend.commands.spreadsheet.edit_cells import EditCellsCommand
@@ -118,6 +119,9 @@ class SpreadsheetService:
         )
 
         return self._execute(command)
+
+    def set_row_height(self, row_id: str, height: float) -> bool:
+        return self._execute(SetRowHeightCommand(self.document, row_id, height))
 
     def set_rtl(self, rtl: bool) -> bool:
         command = SetRtlCommand(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/app_text.dart';
 import '../../spreadsheet/fonts/font_catalog.dart';
 import '../../spreadsheet/models/text_style_spec.dart';
 import 'color_picker_dialog.dart';
@@ -101,15 +102,15 @@ class _FontOptionsDialogState extends State<FontOptionsDialog> {
 
   /// What the preview (and a later Apply) is based on.
   TextStyleSpec get _working => TextStyleSpec(
-        bold: _bold,
-        italic: _italic,
-        underline: _underline,
-        strikethrough: _strikethrough,
-        fontFamily: _family,
-        fontSize: _size,
-        color: _color,
-        background: _background,
-      );
+    bold: _bold,
+    italic: _italic,
+    underline: _underline,
+    strikethrough: _strikethrough,
+    fontFamily: _family,
+    fontSize: _size,
+    color: _color,
+    background: _background,
+  );
 
   /// The change from [FontOptionsDialog.initial] to the current choices.
   FontOptionsResult _result() {
@@ -140,8 +141,11 @@ class _FontOptionsDialogState extends State<FontOptionsDialog> {
     final set = TextStyleSpec(
       bold: flag(initial.bold, _bold, TextStyleSpec.fieldBold),
       italic: flag(initial.italic, _italic, TextStyleSpec.fieldItalic),
-      underline:
-          flag(initial.underline, _underline, TextStyleSpec.fieldUnderline),
+      underline: flag(
+        initial.underline,
+        _underline,
+        TextStyleSpec.fieldUnderline,
+      ),
       strikethrough: flag(
         initial.strikethrough,
         _strikethrough,
@@ -170,7 +174,10 @@ class _FontOptionsDialogState extends State<FontOptionsDialog> {
 
   List<DropdownMenuItem<String?>> _familyItems() {
     final items = <DropdownMenuItem<String?>>[
-      const DropdownMenuItem<String?>(value: null, child: Text('Default')),
+      DropdownMenuItem<String?>(
+        value: null,
+        child: Text(appText(context, 'Default')),
+      ),
     ];
 
     final known = kFontChoices.map((choice) => choice.family).toSet();
@@ -179,10 +186,9 @@ class _FontOptionsDialogState extends State<FontOptionsDialog> {
     // "Verdana") still has to be a valid dropdown value, or the dropdown
     // would assert. It is listed first and drawn in the default font.
     if (_family != null && !known.contains(_family)) {
-      items.add(DropdownMenuItem<String?>(
-        value: _family,
-        child: Text(_family!),
-      ));
+      items.add(
+        DropdownMenuItem<String?>(value: _family, child: Text(_family!)),
+      );
     }
 
     String? currentGroup;
@@ -190,26 +196,30 @@ class _FontOptionsDialogState extends State<FontOptionsDialog> {
     for (final choice in kFontChoices) {
       if (choice.group != currentGroup) {
         currentGroup = choice.group;
-        items.add(DropdownMenuItem<String?>(
-          value: '$_groupPrefix${choice.group}',
-          enabled: false,
-          child: Text(
-            choice.group.toUpperCase(),
-            style: Theme.of(context).textTheme.labelSmall,
+        items.add(
+          DropdownMenuItem<String?>(
+            value: '$_groupPrefix${choice.group}',
+            enabled: false,
+            child: Text(
+              choice.group.toUpperCase(),
+              style: Theme.of(context).textTheme.labelSmall,
+            ),
           ),
-        ));
+        );
       }
 
-      items.add(DropdownMenuItem<String?>(
-        value: choice.family,
-        child: Text(
-          choice.family,
-          style: resolveCellTextStyle(
-            TextStyleSpec(fontFamily: choice.family),
-            base: const TextStyle(fontSize: 15),
+      items.add(
+        DropdownMenuItem<String?>(
+          value: choice.family,
+          child: Text(
+            choice.family,
+            style: resolveCellTextStyle(
+              TextStyleSpec(fontFamily: choice.family),
+              base: const TextStyle(fontSize: 15),
+            ),
           ),
         ),
-      ));
+      );
     }
 
     return items;
@@ -225,7 +235,10 @@ class _FontOptionsDialogState extends State<FontOptionsDialog> {
     }
 
     return [
-      const DropdownMenuItem<double?>(value: null, child: Text('Default')),
+      DropdownMenuItem<double?>(
+        value: null,
+        child: Text(appText(context, 'Default')),
+      ),
       for (final size in sizes)
         DropdownMenuItem<double?>(
           value: size,
@@ -267,10 +280,10 @@ class _FontOptionsDialogState extends State<FontOptionsDialog> {
   }) {
     final color = parseHexColor(value);
     final description = value == null
-        ? defaultLabel
+        ? appText(context, defaultLabel)
         : value == TextStyleSpec.noFill
-            ? 'No fill'
-            : '#$value';
+        ? appText(context, 'No fill')
+        : '#$value';
 
     return Row(
       children: [
@@ -306,7 +319,7 @@ class _FontOptionsDialogState extends State<FontOptionsDialog> {
               onPicked(result.value);
             }
           },
-          child: const Text('Change...'),
+          child: Text(appText(context, 'Change...')),
         ),
       ],
     );
@@ -329,7 +342,10 @@ class _FontOptionsDialogState extends State<FontOptionsDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Font', style: Theme.of(context).textTheme.labelLarge),
+              Text(
+                appText(context, 'Font'),
+                style: Theme.of(context).textTheme.labelLarge,
+              ),
               const SizedBox(height: 4),
               DropdownButton<String?>(
                 isExpanded: true,
@@ -347,8 +363,10 @@ class _FontOptionsDialogState extends State<FontOptionsDialog> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Size',
-                            style: Theme.of(context).textTheme.labelLarge),
+                        Text(
+                          appText(context, 'Size'),
+                          style: Theme.of(context).textTheme.labelLarge,
+                        ),
                         const SizedBox(height: 4),
                         DropdownButton<double?>(
                           isExpanded: true,
@@ -363,25 +381,25 @@ class _FontOptionsDialogState extends State<FontOptionsDialog> {
                   const Spacer(),
                   _flagButton(
                     icon: Icons.format_bold,
-                    tooltip: 'Bold',
+                    tooltip: appText(context, 'Bold'),
                     selected: _bold,
                     onChanged: (value) => _bold = value,
                   ),
                   _flagButton(
                     icon: Icons.format_italic,
-                    tooltip: 'Italic',
+                    tooltip: appText(context, 'Italic'),
                     selected: _italic,
                     onChanged: (value) => _italic = value,
                   ),
                   _flagButton(
                     icon: Icons.format_underlined,
-                    tooltip: 'Underline',
+                    tooltip: appText(context, 'Underline'),
                     selected: _underline,
                     onChanged: (value) => _underline = value,
                   ),
                   _flagButton(
                     icon: Icons.format_strikethrough,
-                    tooltip: 'Strikethrough',
+                    tooltip: appText(context, 'Strikethrough'),
                     selected: _strikethrough,
                     onChanged: (value) => _strikethrough = value,
                   ),
@@ -389,21 +407,27 @@ class _FontOptionsDialogState extends State<FontOptionsDialog> {
               ),
               const SizedBox(height: 12),
               _colorRow(
-                label: 'Text color',
+                label: appText(context, 'Text color'),
                 value: _color,
-                defaultLabel: 'Automatic',
+                defaultLabel: appText(context, 'Automatic'),
                 allowNoFill: false,
                 onPicked: (value) => setState(() => _color = value),
               ),
               _colorRow(
-                label: 'Fill',
+                label: appText(context, 'Fill'),
                 value: _background,
-                defaultLabel: widget.allowNoFill ? 'Sheet default' : 'None',
+                defaultLabel: appText(
+                  context,
+                  widget.allowNoFill ? 'Sheet default' : 'None',
+                ),
                 allowNoFill: widget.allowNoFill,
                 onPicked: (value) => setState(() => _background = value),
               ),
               const SizedBox(height: 16),
-              Text('Preview', style: Theme.of(context).textTheme.labelLarge),
+              Text(
+                appText(context, 'Preview'),
+                style: Theme.of(context).textTheme.labelLarge,
+              ),
               const SizedBox(height: 8),
               Container(
                 width: double.infinity,
@@ -443,17 +467,17 @@ class _FontOptionsDialogState extends State<FontOptionsDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(appText(context, 'Cancel')),
         ),
         TextButton(
-          onPressed: () => Navigator.of(context).pop(
-            FontOptionsResult(reset: TextStyleSpec.allFields),
-          ),
+          onPressed: () => Navigator.of(
+            context,
+          ).pop(FontOptionsResult(reset: TextStyleSpec.fontFields)),
           child: Text(widget.resetLabel),
         ),
         FilledButton(
           onPressed: () => Navigator.of(context).pop(_result()),
-          child: const Text('Apply'),
+          child: Text(appText(context, 'Apply')),
         ),
       ],
     );

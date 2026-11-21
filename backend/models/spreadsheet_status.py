@@ -31,6 +31,9 @@ class SpreadsheetData:
 
     column_widths: dict[str, float] = field(default_factory=dict)
 
+    # Explicit display-pixel heights keyed by stable row ID.
+    row_heights: dict[str, float] = field(default_factory=dict)
+
     rtl: bool = False
 
     # Stable IDs, parallel to ``rows`` and ``headers``: row_ids[n] names

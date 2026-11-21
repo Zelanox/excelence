@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../app/app_text.dart';
 import '../../spreadsheet/controllers/spreadsheet_controller.dart';
 
 /// A row of worksheet tabs shown below the grid, Excel-style - click a
@@ -11,10 +12,7 @@ import '../../spreadsheet/controllers/spreadsheet_controller.dart';
 /// fetches that sheet's data fresh rather than keeping every sheet's data
 /// resident at once).
 class SheetTabs extends StatefulWidget {
-  const SheetTabs({
-    super.key,
-    required this.spreadsheetController,
-  });
+  const SheetTabs({super.key, required this.spreadsheetController});
 
   final SpreadsheetController spreadsheetController;
 
@@ -43,15 +41,19 @@ class _SheetTabsState extends State<SheetTabs> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to switch sheet: $error')),
+          SnackBar(
+            content: Text(
+              '${appText(context, 'Failed to switch sheet: ')}$error',
+            ),
+          ),
         );
       }
     }
   }
 
   Future<void> _addSheet() async {
-    final existingNames = widget
-            .spreadsheetController.spreadsheet?.availableSheetNames ??
+    final existingNames =
+        widget.spreadsheetController.spreadsheet?.availableSheetNames ??
         const <String>[];
 
     var index = existingNames.length + 1;
@@ -66,7 +68,9 @@ class _SheetTabsState extends State<SheetTabs> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to add sheet: $error')),
+          SnackBar(
+            content: Text('${appText(context, 'Failed to add sheet: ')}$error'),
+          ),
         );
       }
     }
@@ -78,7 +82,11 @@ class _SheetTabsState extends State<SheetTabs> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to delete sheet: $error')),
+          SnackBar(
+            content: Text(
+              '${appText(context, 'Failed to delete sheet: ')}$error',
+            ),
+          ),
         );
       }
     }
@@ -145,7 +153,11 @@ class _SheetTabsState extends State<SheetTabs> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to rename sheet: $error')),
+          SnackBar(
+            content: Text(
+              '${appText(context, 'Failed to rename sheet: ')}$error',
+            ),
+          ),
         );
       }
     }
@@ -169,8 +181,7 @@ class _SheetTabsState extends State<SheetTabs> {
     String sheetName,
     Offset position,
   ) async {
-    final overlay =
-        Overlay.of(context).context.findRenderObject() as RenderBox;
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
 
     final selected = await showMenu<String>(
       context: context,
@@ -178,9 +189,15 @@ class _SheetTabsState extends State<SheetTabs> {
         position & const Size(1, 1),
         Offset.zero & overlay.size,
       ),
-      items: const [
-        PopupMenuItem(value: 'rename', child: Text('Rename sheet')),
-        PopupMenuItem(value: 'delete', child: Text('Delete sheet')),
+      items: [
+        PopupMenuItem(
+          value: 'rename',
+          child: Text(appText(context, 'Rename sheet')),
+        ),
+        PopupMenuItem(
+          value: 'delete',
+          child: Text(appText(context, 'Delete sheet')),
+        ),
       ],
     );
 
@@ -210,9 +227,7 @@ class _SheetTabsState extends State<SheetTabs> {
           width: double.infinity,
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surface,
-            border: Border(
-              top: BorderSide(color: Colors.grey.shade300),
-            ),
+            border: Border(top: BorderSide(color: Colors.grey.shade300)),
           ),
           child: Row(
             children: [
@@ -242,7 +257,7 @@ class _SheetTabsState extends State<SheetTabs> {
               ),
               IconButton(
                 icon: const Icon(Icons.add, size: 18),
-                tooltip: 'Add sheet',
+                tooltip: appText(context, 'Add sheet'),
                 onPressed: _addSheet,
               ),
             ],

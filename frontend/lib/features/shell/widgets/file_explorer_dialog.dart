@@ -1,6 +1,7 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
+import '../../../app/app_text.dart';
 import '../../spreadsheet/controllers/spreadsheet_controller.dart';
 import '../../spreadsheet/services/spreadsheet_service.dart';
 
@@ -56,8 +57,7 @@ class _FileExplorerDialogState extends State<FileExplorerDialog> {
 
   Future<FolderEntries>? _entriesFuture;
   String? _selectedDocument;
-  final TextEditingController _newFilenameController =
-      TextEditingController();
+  final TextEditingController _newFilenameController = TextEditingController();
 
   bool _uploading = false;
   String? _uploadError;
@@ -78,8 +78,9 @@ class _FileExplorerDialogState extends State<FileExplorerDialog> {
     setState(() {
       _selectedDocument = null;
       _uploadError = null;
-      _entriesFuture =
-          widget.spreadsheetController.browseFolder(_currentFolder);
+      _entriesFuture = widget.spreadsheetController.browseFolder(
+        _currentFolder,
+      );
     });
   }
 
@@ -102,7 +103,7 @@ class _FileExplorerDialogState extends State<FileExplorerDialog> {
 
     if (bytes == null) {
       setState(() {
-        _uploadError = 'Could not read the selected file.';
+        _uploadError = appText(context, 'Could not read the selected file.');
       });
       return;
     }
@@ -121,7 +122,7 @@ class _FileExplorerDialogState extends State<FileExplorerDialog> {
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _uploadError = 'Upload failed: $error';
+        _uploadError = '${appText(context, 'Upload failed: ')}$error';
       });
     } finally {
       if (mounted) {
@@ -157,9 +158,7 @@ class _FileExplorerDialogState extends State<FileExplorerDialog> {
   void _confirm() {
     if (widget.mode == FileExplorerMode.open) {
       if (_selectedDocument == null) return;
-      Navigator.of(context).pop(
-        _joinPath(_currentFolder, _selectedDocument!),
-      );
+      Navigator.of(context).pop(_joinPath(_currentFolder, _selectedDocument!));
       return;
     }
 
@@ -175,8 +174,9 @@ class _FileExplorerDialogState extends State<FileExplorerDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final breadcrumbSegments =
-        _currentFolder.isEmpty ? <String>[] : _currentFolder.split('/');
+    final breadcrumbSegments = _currentFolder.isEmpty
+        ? <String>[]
+        : _currentFolder.split('/');
 
     return Dialog(
       child: ConstrainedBox(
@@ -190,8 +190,8 @@ class _FileExplorerDialogState extends State<FileExplorerDialog> {
                 children: [
                   Text(
                     widget.mode == FileExplorerMode.open
-                        ? 'Open spreadsheet'
-                        : 'New spreadsheet',
+                        ? appText(context, 'Open spreadsheet')
+                        : appText(context, 'New spreadsheet'),
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -205,20 +205,21 @@ class _FileExplorerDialogState extends State<FileExplorerDialog> {
                             child: SizedBox(
                               width: 18,
                               height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                              ),
+                              child: CircularProgressIndicator(strokeWidth: 2),
                             ),
                           )
                         : IconButton(
                             icon: const Icon(Icons.upload_file),
                             onPressed: _pickAndUpload,
-                            tooltip: 'Upload from this device',
+                            tooltip: appText(
+                              context,
+                              'Upload from this device',
+                            ),
                           ),
                   IconButton(
                     icon: const Icon(Icons.close),
                     onPressed: () => Navigator.of(context).pop(),
-                    tooltip: 'Cancel',
+                    tooltip: appText(context, 'Cancel'),
                   ),
                 ],
               ),
@@ -252,7 +253,7 @@ class _FileExplorerDialogState extends State<FileExplorerDialog> {
             IconButton(
               icon: const Icon(Icons.arrow_upward, size: 18),
               onPressed: _goUp,
-              tooltip: 'Up one level',
+              tooltip: appText(context, 'Up one level'),
               visualDensity: VisualDensity.compact,
             ),
           Expanded(
@@ -260,16 +261,13 @@ class _FileExplorerDialogState extends State<FileExplorerDialog> {
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  _breadcrumbButton('Documents', () {
+                  _breadcrumbButton(appText(context, 'Documents'), () {
                     _currentFolder = '';
                     _load();
                   }),
                   for (int i = 0; i < segments.length; i++) ...[
                     const Text(' / '),
-                    _breadcrumbButton(
-                      segments[i],
-                      () => _goToBreadcrumb(i),
-                    ),
+                    _breadcrumbButton(segments[i], () => _goToBreadcrumb(i)),
                   ],
                 ],
               ),
@@ -285,10 +283,7 @@ class _FileExplorerDialogState extends State<FileExplorerDialog> {
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-        child: Text(
-          label,
-          style: const TextStyle(fontSize: 13),
-        ),
+        child: Text(label, style: const TextStyle(fontSize: 13)),
       ),
     );
   }
@@ -306,7 +301,7 @@ class _FileExplorerDialogState extends State<FileExplorerDialog> {
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Text(
-                'Failed to load this folder: ${snapshot.error}',
+                '${appText(context, 'Failed to load this folder: ')}${snapshot.error}',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.red.shade700),
               ),
@@ -317,9 +312,9 @@ class _FileExplorerDialogState extends State<FileExplorerDialog> {
         final entries = snapshot.data;
         if (entries == null ||
             (entries.folders.isEmpty && entries.documents.isEmpty)) {
-          return const Center(
+          return Center(
             child: Text(
-              'This folder is empty.',
+              appText(context, 'This folder is empty.'),
               style: TextStyle(color: Colors.grey),
             ),
           );
@@ -365,9 +360,9 @@ class _FileExplorerDialogState extends State<FileExplorerDialog> {
       child: TextField(
         controller: _newFilenameController,
         autofocus: true,
-        decoration: const InputDecoration(
-          labelText: 'Filename',
-          hintText: 'e.g. budget.xlsx',
+        decoration: InputDecoration(
+          labelText: appText(context, 'Filename'),
+          hintText: appText(context, 'e.g. budget.xlsx'),
           isDense: true,
           border: OutlineInputBorder(),
         ),
@@ -388,7 +383,7 @@ class _FileExplorerDialogState extends State<FileExplorerDialog> {
         children: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: Text(appText(context, 'Cancel')),
           ),
           const SizedBox(width: 8),
           // AnimatedBuilder-free rebuild: the filename field's onChanged
@@ -401,16 +396,15 @@ class _FileExplorerDialogState extends State<FileExplorerDialog> {
               valueListenable: _newFilenameController,
               builder: (context, value, _) {
                 return FilledButton(
-                  onPressed:
-                      value.text.trim().isNotEmpty ? _confirm : null,
-                  child: const Text('Create'),
+                  onPressed: value.text.trim().isNotEmpty ? _confirm : null,
+                  child: Text(appText(context, 'Create')),
                 );
               },
             )
           else
             FilledButton(
               onPressed: canConfirm ? _confirm : null,
-              child: const Text('Open'),
+              child: Text(appText(context, 'Open')),
             ),
         ],
       ),

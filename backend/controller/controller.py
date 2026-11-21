@@ -450,6 +450,9 @@ class Controller:
             width,
         )
 
+    def set_row_height(self, row_id: str, height: float) -> bool:
+        return self.spreadsheet_service.set_row_height(row_id, height)
+
     def column_widths(self) -> dict[str, float]:
         """
         Return the current column widths for the active worksheet.

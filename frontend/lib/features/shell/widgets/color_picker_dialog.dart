@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../app/app_text.dart';
 import '../../spreadsheet/fonts/font_catalog.dart';
 import '../../spreadsheet/models/text_style_spec.dart';
 
@@ -234,7 +235,7 @@ class _ColorPickerDialogState extends State<ColorPickerDialog> {
         _value = cleaned;
         _syncWheelFromHex(cleaned);
       } else {
-        _hexError = 'Use 6 hex digits, e.g. FFCC00';
+        _hexError = appText(context, 'Use 6 hex digits, e.g. FFCC00');
       }
     });
   }
@@ -307,7 +308,7 @@ class _ColorPickerDialogState extends State<ColorPickerDialog> {
                       ),
                     if (widget.allowNoFill)
                       _optionChip(
-                        label: 'No fill',
+                        label: appText(context, 'No fill'),
                         selected: _value == TextStyleSpec.noFill,
                         icon: Icons.block,
                         onTap: () => _select(TextStyleSpec.noFill),
@@ -368,7 +369,7 @@ class _ColorPickerDialogState extends State<ColorPickerDialog> {
                         LengthLimitingTextInputFormatter(7),
                       ],
                       decoration: InputDecoration(
-                        labelText: 'Hex color',
+                        labelText: appText(context, 'Hex color'),
                         prefixText: '#',
                         errorText: _hexError,
                         isDense: true,
@@ -404,7 +405,7 @@ class _ColorPickerDialogState extends State<ColorPickerDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(appText(context, 'Cancel')),
         ),
         FilledButton(
           // An invalid half-typed hex would otherwise silently apply the
@@ -412,7 +413,7 @@ class _ColorPickerDialogState extends State<ColorPickerDialog> {
           onPressed: _hexError != null
               ? null
               : () => Navigator.of(context).pop(ColorPickResult(_value)),
-          child: const Text('OK'),
+          child: Text(appText(context, 'OK')),
         ),
       ],
     );

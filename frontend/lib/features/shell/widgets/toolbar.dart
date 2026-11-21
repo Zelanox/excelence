@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/app_text.dart';
 import '../../spreadsheet/controllers/spreadsheet_controller.dart';
 import '../../spreadsheet/controllers/viewport_controller.dart';
+import '../dictation_controller.dart';
 import '../../spreadsheet/fonts/font_catalog.dart';
 import '../../spreadsheet/models/text_style_spec.dart';
 import '../../spreadsheet/presentation_v2/actions/text_format_actions.dart';
@@ -16,10 +18,10 @@ const double compactToolbarWidth = 600;
 // Horizontal padding on each side of the toolbar.
 const double _toolbarPadding = 10;
 
-/// The top toolbar: text formatting for the selected cells (bold, italic,
-/// underline, strikethrough, and a Font... dialog with preview) plus
-/// Settings. The formatting buttons scroll sideways when the window is
-/// too narrow to show them all; Settings stays pinned at the right.
+/// The top toolbar: text formatting for the selected cells (font, colors,
+/// alignment, and emphasis) plus Settings. The formatting buttons scroll
+/// sideways when the window is too narrow to show them all; Settings stays
+/// pinned at the right.
 ///
 /// File open/save/undo/redo icons used to sit here but were removed -
 /// they were bare Icon widgets with no onTap/IconButton wrapping them at
@@ -39,10 +41,17 @@ class Toolbar extends StatelessWidget {
     super.key,
     required this.spreadsheetController,
     required this.viewportController,
+    this.dictation,
+    this.onLocaleChanged,
   });
 
   final SpreadsheetController spreadsheetController;
   final ViewportController viewportController;
+
+  /// Speech to text. When set and supported on this platform (PCs only), a
+  /// microphone button is shown.
+  final DictationController? dictation;
+  final ValueChanged<Locale>? onLocaleChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -54,11 +63,7 @@ class Toolbar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: _toolbarPadding),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
-        border: Border(
-          bottom: BorderSide(
-            color: Colors.grey.shade300,
-          ),
-        ),
+        border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
       ),
       // Rebuilds on selection moves (viewportController) as well as on
       // sheet changes, so the buttons always reflect the active cell.
@@ -66,11 +71,14 @@ class Toolbar extends StatelessWidget {
         animation: Listenable.merge([
           spreadsheetController,
           viewportController,
+          ?dictation,
         ]),
         builder: (context, _) {
           final sheet = spreadsheetController.spreadsheet?.activeSheet;
           final hasCells =
-              sheet != null && sheet.rows.isNotEmpty && sheet.headers.isNotEmpty;
+              sheet != null &&
+              sheet.rows.isNotEmpty &&
+              sheet.headers.isNotEmpty;
           final selection = viewportController.selection;
           final active = hasCells
               ? spreadsheetController.effectiveTextStyleAt(
@@ -97,10 +105,10 @@ class Toolbar extends StatelessWidget {
               ),
               onPressed: hasCells
                   ? () => toggleTextFlag(
-                        spreadsheetController: spreadsheetController,
-                        viewportController: viewportController,
-                        field: field,
-                      )
+                      spreadsheetController: spreadsheetController,
+                      viewportController: viewportController,
+                      field: field,
+                    )
                   : null,
             );
           }
@@ -161,8 +169,8 @@ class Toolbar extends StatelessWidget {
             final set = value == null
                 ? TextStyleSpec.empty
                 : field == TextStyleSpec.fieldColor
-                    ? TextStyleSpec(color: value)
-                    : TextStyleSpec(background: value);
+                ? TextStyleSpec(color: value)
+                : TextStyleSpec(background: value);
 
             spreadsheetController.applyTextStyle(
               startRow: selection.startRow,
@@ -174,14 +182,66 @@ class Toolbar extends StatelessWidget {
             );
           }
 
-          final fontLabel = describeTextStyle(active, emptyLabel: 'Font...');
+          void applyAlignment(String field, String value) {
+            final set = value == 'reset'
+                ? TextStyleSpec.empty
+                : field == TextStyleSpec.fieldHorizontalAlignment
+                ? TextStyleSpec(horizontalAlignment: value)
+                : TextStyleSpec(verticalAlignment: value);
+
+            spreadsheetController.applyTextStyle(
+              startRow: selection.startRow,
+              startColumn: selection.startColumn,
+              endRow: selection.endRow,
+              endColumn: selection.endColumn,
+              set: set,
+              reset: value == 'reset' ? {field} : const {},
+            );
+          }
+
+          Widget alignmentButton({
+            required String field,
+            required String tooltip,
+            required IconData icon,
+            required List<({String value, String label, IconData icon})> items,
+          }) {
+            return PopupMenuButton<String>(
+              tooltip: tooltip,
+              enabled: hasCells,
+              onSelected: (value) => applyAlignment(field, value),
+              icon: Icon(icon),
+              itemBuilder: (context) => [
+                for (final item in items)
+                  PopupMenuItem(
+                    value: item.value,
+                    child: Row(
+                      children: [
+                        Icon(item.icon, size: 20),
+                        const SizedBox(width: 8),
+                        Text(appText(context, item.label)),
+                      ],
+                    ),
+                  ),
+                const PopupMenuDivider(),
+                PopupMenuItem(
+                  value: 'reset',
+                  child: Text(appText(context, 'Reset alignment')),
+                ),
+              ],
+            );
+          }
+
+          final fontLabel = describeTextStyle(
+            active,
+            emptyLabel: appText(context, 'Font...'),
+          );
 
           Future<void> openFontDialog() async {
             final result = await FontOptionsDialog.show(
               context,
-              title: 'Font for selected cells',
+              title: appText(context, 'Font for selected cells'),
               initial: active,
-              resetLabel: 'Reset to sheet default',
+              resetLabel: appText(context, 'Reset to sheet default'),
               allowNoFill: true,
             );
 
@@ -204,103 +264,180 @@ class Toolbar extends StatelessWidget {
           final actions = <Widget>[
             flagButton(
               icon: Icons.format_bold,
-              tooltip: 'Bold (Ctrl+B)',
+              tooltip: appText(context, 'Bold (Ctrl+B)'),
               field: TextStyleSpec.fieldBold,
             ),
             flagButton(
               icon: Icons.format_italic,
-              tooltip: 'Italic (Ctrl+I)',
+              tooltip: appText(context, 'Italic (Ctrl+I)'),
               field: TextStyleSpec.fieldItalic,
             ),
             flagButton(
               icon: Icons.format_underlined,
-              tooltip: 'Underline (Ctrl+U)',
+              tooltip: appText(context, 'Underline (Ctrl+U)'),
               field: TextStyleSpec.fieldUnderline,
             ),
             flagButton(
               icon: Icons.format_strikethrough,
-              tooltip: 'Strikethrough',
+              tooltip: appText(context, 'Strikethrough'),
               field: TextStyleSpec.fieldStrikethrough,
             ),
             colorButton(
               icon: Icons.format_color_text,
-              tooltip: 'Text color',
+              tooltip: appText(context, 'Text color'),
               current: active.color,
-              title: 'Text color',
-              defaultLabel: 'Automatic',
+              title: appText(context, 'Text color'),
+              defaultLabel: appText(context, 'Automatic'),
               allowNoFill: false,
               onPicked: (value) => applyColor(TextStyleSpec.fieldColor, value),
             ),
             colorButton(
               icon: Icons.format_color_fill,
-              tooltip: 'Fill color',
+              tooltip: appText(context, 'Fill color'),
               current: active.background,
-              title: 'Fill color',
-              defaultLabel: 'Sheet default',
+              title: appText(context, 'Fill color'),
+              defaultLabel: appText(context, 'Sheet default'),
               allowNoFill: true,
               onPicked: (value) =>
                   applyColor(TextStyleSpec.fieldBackground, value),
             ),
+            alignmentButton(
+              field: TextStyleSpec.fieldHorizontalAlignment,
+              tooltip: appText(context, 'Horizontal alignment'),
+              icon: switch (active.horizontalAlignment) {
+                'center' => Icons.format_align_center,
+                'right' => Icons.format_align_right,
+                _ => Icons.format_align_left,
+              },
+              items: const [
+                (
+                  value: 'left',
+                  label: 'Align left',
+                  icon: Icons.format_align_left,
+                ),
+                (
+                  value: 'center',
+                  label: 'Align center',
+                  icon: Icons.format_align_center,
+                ),
+                (
+                  value: 'right',
+                  label: 'Align right',
+                  icon: Icons.format_align_right,
+                ),
+              ],
+            ),
+            alignmentButton(
+              field: TextStyleSpec.fieldVerticalAlignment,
+              tooltip: appText(context, 'Vertical alignment'),
+              icon: switch (active.verticalAlignment) {
+                'top' => Icons.vertical_align_top,
+                'bottom' => Icons.vertical_align_bottom,
+                _ => Icons.vertical_align_center,
+              },
+              items: const [
+                (
+                  value: 'top',
+                  label: 'Align top',
+                  icon: Icons.vertical_align_top,
+                ),
+                (
+                  value: 'center',
+                  label: 'Align middle',
+                  icon: Icons.vertical_align_center,
+                ),
+                (
+                  value: 'bottom',
+                  label: 'Align bottom',
+                  icon: Icons.vertical_align_bottom,
+                ),
+              ],
+            ),
             const SizedBox(width: 4),
           ];
 
-          // The toolbar keeps its left-to-right order even in a right-to-left
-          // sheet or locale (only the grid flips), and decides between the
-          // full and the icon-only Font button from the width it is given.
-          return Directionality(
-            textDirection: TextDirection.ltr,
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                // Compared on the full toolbar width, padding included.
-                final compact =
-                    constraints.maxWidth + 2 * _toolbarPadding <
-                        compactToolbarWidth;
+          // A sheet's RTL setting affects only the grid; toolbar controls
+          // keep their physical left-to-right order in every interface.
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              // Compared on the full toolbar width, padding included.
+              final compact =
+                  constraints.maxWidth + 2 * _toolbarPadding <
+                  compactToolbarWidth;
 
-                return Row(
-                  children: [
-                    Expanded(
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            ...actions,
-                            if (compact)
-                              IconButton(
-                                icon: const Icon(Icons.text_fields),
-                                tooltip: fontLabel,
-                                onPressed: hasCells ? openFontDialog : null,
-                              )
-                            else
-                              TextButton.icon(
-                                icon: const Icon(Icons.text_fields),
-                                label: ConstrainedBox(
-                                  constraints:
-                                      const BoxConstraints(maxWidth: 240),
-                                  child: Text(
-                                    fontLabel,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
+              return Row(
+                textDirection: TextDirection.ltr,
+                children: [
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      reverse: Directionality.of(context) == TextDirection.rtl,
+                      child: Row(
+                        textDirection: TextDirection.ltr,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ...actions,
+                          if (compact)
+                            IconButton(
+                              icon: const Icon(Icons.text_fields),
+                              tooltip: fontLabel,
+                              onPressed: hasCells ? openFontDialog : null,
+                            )
+                          else
+                            TextButton.icon(
+                              icon: const Icon(Icons.text_fields),
+                              label: ConstrainedBox(
+                                constraints: const BoxConstraints(
+                                  maxWidth: 240,
                                 ),
-                                onPressed: hasCells ? openFontDialog : null,
+                                child: Text(
+                                  fontLabel,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
-                          ],
-                        ),
+                              onPressed: hasCells ? openFontDialog : null,
+                            ),
+                          if (dictation != null && dictation!.isSupported)
+                            IconButton(
+                              icon: Icon(
+                                Icons.mic,
+                                color: dictation!.isListening
+                                    ? Colors.red
+                                    : null,
+                              ),
+                              tooltip: dictation!.isListening
+                                  ? appText(
+                                      context,
+                                      'Stop speech to text (Ctrl+Shift+M)',
+                                    )
+                                  : appText(
+                                      context,
+                                      'Speech to text (Ctrl+Shift+M)',
+                                    ),
+                              onPressed:
+                                  hasCells && !dictation!.isBusy ||
+                                      dictation!.isListening
+                                  ? dictation!.toggle
+                                  : null,
+                            ),
+                        ],
                       ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.settings),
-                      tooltip: 'Settings',
-                      onPressed: () => SettingsDialog.show(
-                        context,
-                        spreadsheetController: spreadsheetController,
-                      ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.settings),
+                    tooltip: appText(context, 'Settings'),
+                    onPressed: () => SettingsDialog.show(
+                      context,
+                      spreadsheetController: spreadsheetController,
+                      dictation: dictation,
+                      onLocaleChanged: onLocaleChanged,
                     ),
-                  ],
-                );
-              },
-            ),
+                  ),
+                ],
+              );
+            },
           );
         },
       ),

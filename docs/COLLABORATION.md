@@ -297,9 +297,9 @@ Flutter client reads them yet, so this phase changes no behaviour.
   document is reopened from disk, every row and column gets a fresh ID, and clients reload the
   document. (Decided: this is simpler and enough for a small trusted team.)
 * **Where they live.** `Sheet.row_ids` (parallel to the dataframe rows) and `Sheet.column_ids`
-  (column name to ID). Cell styles, column widths and formulas are still stored by position and
-  by name, exactly as before: the IDs are a translation layer, so the server can turn an ID into a
-  position or a name at the moment it applies a change. `Sheet.row_position`, `row_id_at`,
+  (column name to ID). Cell styles and formulas remain stored by position, column widths by name,
+  and row heights by stable row ID. IDs let the server turn a row or column ID into a current
+  position or name when an operation is applied. `Sheet.row_position`, `row_id_at`,
   `column_name` and `column_id` do that translation.
 * **Repair rule.** `Sheet.ensure_ids()` runs before every structural edit and whenever IDs are
   read. If the number of IDs no longer matches the number of rows (a dataframe replaced from

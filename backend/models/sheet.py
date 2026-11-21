@@ -20,14 +20,15 @@ class SheetSnapshot:
     """An exact copy of the parts of a sheet that undo/redo rewinds.
 
     Deliberately limited to content: the cells (with their exact pandas
-    types), per-cell styles, and column widths. Direction (RTL) and the
-    sheet's default text style are settings, not edits, so undo leaves
-    them as they are.
+    types), per-cell styles, and row/column dimensions. Direction (RTL)
+    and the sheet's default text style are settings, not edits, so undo
+    leaves them as they are.
     """
 
     dataframe: pd.DataFrame
     cell_styles: dict[int, dict[str, CellStyle]]
     column_widths: dict[str, float]
+    row_heights: dict[str, float]
     # Row and column IDs travel with the content they name, so undoing a
     # delete brings the same row (and the same ID) back.
     row_ids: list[str] = field(default_factory=list)
@@ -64,6 +65,9 @@ class Sheet:
     # columns. Populated from the workbook's own column_dimensions on
     # load and written back the same way on save - see Document.
     column_widths: dict[str, float] = field(default_factory=dict)
+    # Keyed by stable row ID so resizing remains attached to the same data
+    # when the client sorts or filters the visible rows.
+    row_heights: dict[str, float] = field(default_factory=dict)
     # Mirrors the worksheet's native sheet_view.rightToLeft (a real
     # Excel/openpyxl property, not invented here) - round-trips through
     # save/load the same way column_widths does. Deliberately does NOT
@@ -98,7 +102,8 @@ class Sheet:
     #
     # row_ids is parallel to the dataframe: row_ids[n] names dataframe row
     # POSITION n. column_ids maps a column NAME to its ID. Storage stays
-    # keyed by position / name (cell_styles, column_widths, formulas); the
+    # keyed by position / name / ID (cell_styles, column_widths,
+    # row_heights, formulas); the
     # IDs are a translation layer on top, and every structural edit below
     # keeps them in step. This is one more parallel representation, so
     # any new structural operation must update it too (see ensure_ids).
@@ -169,6 +174,7 @@ class Sheet:
             row_count=len(view),
             column_count=self.column_count,
             column_widths=dict(self.column_widths),
+            row_heights=dict(self.row_heights),
             rtl=self.rtl,
             cell_styles=self._style_entries(view),
             text_defaults=self.text_defaults.to_dict(),
@@ -651,6 +657,7 @@ class Sheet:
                 for position, styles in self.cell_styles.items()
             },
             column_widths=dict(self.column_widths),
+            row_heights=dict(self.row_heights),
             row_ids=list(self.row_ids),
             column_ids=dict(self.column_ids),
         )
@@ -664,6 +671,7 @@ class Sheet:
             for position, styles in snapshot.cell_styles.items()
         }
         self.column_widths = dict(snapshot.column_widths)
+        self.row_heights = dict(snapshot.row_heights)
         self.row_ids = list(snapshot.row_ids)
         self.column_ids = dict(snapshot.column_ids)
         self.ensure_ids()
@@ -787,7 +795,9 @@ class Sheet:
         index = position
 
         self.ensure_ids()
+        deleted_row_id = self.row_ids[index]
         del self.row_ids[index]
+        self.row_heights.pop(deleted_row_id, None)
 
         self.dataframe = self.dataframe.drop(index)
         self.dataframe.reset_index(drop=True, inplace=True)
@@ -895,6 +905,23 @@ class Sheet:
             return False
 
         self.column_widths[name] = float(width)
+        return True
+
+    def set_row_height(self, row_id: str, height: float) -> bool:
+        self.ensure_ids()
+
+        if not isinstance(row_id, str) or row_id not in self.row_ids:
+            return False
+
+        if (
+            isinstance(height, bool)
+            or not isinstance(height, (int, float))
+            or not math.isfinite(height)
+            or not 16 <= height <= 500
+        ):
+            return False
+
+        self.row_heights[row_id] = float(height)
         return True
 
     def set_rtl(self, rtl: bool) -> bool:
