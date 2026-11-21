@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/app_text.dart';
+import '../../../core/connection/connection_scope.dart';
+import '../../../core/connection/server_connection.dart';
 import '../../../core/preferences/app_preferences.dart';
 import '../dictation_controller.dart';
 import '../../spreadsheet/controllers/spreadsheet_controller.dart';
@@ -8,6 +10,7 @@ import '../../spreadsheet/fonts/font_catalog.dart';
 import '../../spreadsheet/models/sheet_appearance.dart';
 import '../../spreadsheet/models/text_style_spec.dart';
 import 'color_picker_dialog.dart';
+import 'connection_form.dart';
 import 'font_options_dialog.dart';
 
 /// The app's settings dialog, opened via the gear icon in the toolbar
@@ -63,16 +66,24 @@ class SettingsDialog extends StatelessWidget {
           ),
         );
 
+        // The Connection tab only exists when the app provides a connection
+        // (it always does in the real app).
+        final connectionScope = ConnectionScope.maybeOf(context);
+        final navigator = Navigator.of(context);
+
         final contentHeight = (MediaQuery.sizeOf(context).height - 220)
             .clamp(100.0, 420.0)
             .toDouble();
 
         return DefaultTabController(
-          length: 3,
+          length: connectionScope == null ? 3 : 4,
           child: AlertDialog(
             title: Text(appText(context, 'Settings')),
             content: SizedBox(
-              width: 360,
+              // Wide enough for all four tabs where the screen allows it.
+              width: (MediaQuery.sizeOf(context).width - 80)
+                  .clamp(260.0, 420.0)
+                  .toDouble(),
               height: contentHeight,
               child: Column(
                 children: [
@@ -83,6 +94,8 @@ class SettingsDialog extends StatelessWidget {
                       Tab(text: appText(context, 'General')),
                       Tab(text: appText(context, 'Sheet')),
                       Tab(text: appText(context, 'Appearance')),
+                      if (connectionScope != null)
+                        Tab(text: appText(context, 'Connection')),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -331,6 +344,34 @@ class SettingsDialog extends StatelessWidget {
                             ],
                           ),
                         ),
+                        if (connectionScope != null)
+                          SingleChildScrollView(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _settingsSectionTitle(context, 'Server'),
+                                ConnectionForm(
+                                  initial: connectionScope.connection,
+                                  onSave: (connection) async {
+                                    // Send this device's pending edits to the
+                                    // old server first; if that fails, stop
+                                    // rather than lose them.
+                                    try {
+                                      await spreadsheetController
+                                          .flushPendingChanges();
+                                    } catch (_) {
+                                      throw const ConnectionChangeBlocked(
+                                        'Your open document could not be saved first, so the address was not changed. Try again.',
+                                      );
+                                    }
+
+                                    navigator.pop();
+                                    await connectionScope.change(connection);
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
                       ],
                     ),
                   ),

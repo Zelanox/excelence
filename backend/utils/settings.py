@@ -5,8 +5,10 @@ assume it is only ever spoken to by a page on the same machine. Everything
 that differs between "my laptop" and "a shared server" is configured here,
 through the environment, with defaults that keep today's local behavior:
 
-    EXCELENCE_HOST                 interface to listen on (default 127.0.0.1;
-                                   use 0.0.0.0 to accept other machines)
+    EXCELENCE_HOST                 interface to listen on (default 0.0.0.0: every
+                                   network interface, so phones and other PCs can
+                                   connect; a server that listens on the network
+                                   needs EXCELENCE_ACCESS_TOKEN)
     EXCELENCE_PORT                 port to listen on (default 8000)
     EXCELENCE_ALLOWED_ORIGINS      comma-separated origins of web clients
                                    allowed to call the API, e.g.
@@ -31,7 +33,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from urllib.parse import urlsplit
 
-DEFAULT_HOST = "127.0.0.1"
+DEFAULT_HOST = "0.0.0.0"
 DEFAULT_PORT = 8000
 
 # Short tokens are guessable over a network; this is only a floor.
@@ -151,6 +153,23 @@ def load_settings(env: Mapping[str, str] | None = None) -> ServerSettings:
         documents_dir=get("EXCELENCE_DOCUMENTS_DIR"),
         access_token=token,
     )
+
+
+def startup_problem(settings: ServerSettings) -> str | None:
+    """Why the server must not start with these settings, or None if it may.
+
+    A server that other machines can reach but that has no access token would
+    let anyone on the network read, change and delete every document, so it
+    refuses to start instead of only warning.
+    """
+    if settings.is_network_exposed and settings.access_token is None:
+        return (
+            "The server listens on the network but has no access token, so anyone "
+            "on the network could change your documents. Run: excelence-server setup "
+            "(or set EXCELENCE_ACCESS_TOKEN in excelence.env)."
+        )
+
+    return None
 
 
 def token_matches(authorization_header: str | None, expected_token: str | None) -> bool:

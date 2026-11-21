@@ -28,7 +28,7 @@ Only speech to text was added before packaging (done, above). Then:
 4. Ops record the values they replaced (needed before per-user undo).
 
 ## Open decisions
-- A **Server address** field in Settings, so one APK works on any network and the token is not compiled in (not decided).
+- ~~A Server address field in Settings~~ - decided and built (see docs/UI_REQUIREMENTS.md, section E): address and token are entered in the app, kept on the device, no localhost default; server defaults to 0.0.0.0 and refuses to start without a token.
 - Run the benchmark again with lxml installed (`benchmarks/benchmark_backend.py`) and report the 10k / 100k open times.
 - Edits made while a device was offline were seen to arrive once it came back online. Unplanned; needs a proper test (conflicts, order, large batches) before it is relied on.
 

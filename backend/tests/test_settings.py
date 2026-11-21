@@ -22,12 +22,12 @@ def raises(env, fragment):
 
 def test_defaults_keep_todays_local_behaviour():
     settings = load_settings({})
-    assert settings.host == DEFAULT_HOST == "127.0.0.1"
+    assert settings.host == DEFAULT_HOST == "0.0.0.0"
     assert settings.port == DEFAULT_PORT == 8000
     assert settings.allowed_origins == ()
     assert settings.allow_any_localhost is True
     assert settings.documents_dir is None and settings.access_token is None
-    assert settings.is_network_exposed is False
+    assert settings.is_network_exposed is True      # reachable by other devices; needs a token to start
 
 
 def test_values_are_read_and_trimmed():
@@ -139,3 +139,37 @@ def test_runner_stops_with_a_clear_error_on_bad_config():
             os.environ.pop("EXCELENCE_PORT", None)
         else:
             os.environ["EXCELENCE_PORT"] = saved
+
+
+# ---- a server on the network must have an access token ----
+
+def test_network_server_without_token_must_not_start():
+    from backend.utils.settings import startup_problem
+
+    problem = startup_problem(load_settings({}))
+    assert problem is not None and "access token" in problem and "excelence-server setup" in problem
+
+    assert startup_problem(load_settings({"EXCELENCE_HOST": "192.168.1.20"})) is not None
+
+
+def test_server_with_token_or_only_this_pc_may_start():
+    from backend.utils.settings import startup_problem
+
+    assert startup_problem(load_settings({"EXCELENCE_ACCESS_TOKEN": "a-long-enough-secret"})) is None
+    assert startup_problem(load_settings({"EXCELENCE_HOST": "127.0.0.1"})) is None
+
+
+def test_runner_refuses_to_listen_on_the_network_without_a_token():
+    from backend import run_server
+
+    saved = {name: os.environ.get(name) for name in ("EXCELENCE_HOST", "EXCELENCE_ACCESS_TOKEN")}
+    os.environ["EXCELENCE_HOST"] = "0.0.0.0"
+    os.environ.pop("EXCELENCE_ACCESS_TOKEN", None)
+    try:
+        assert run_server.main([]) == 2
+    finally:
+        for name, value in saved.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value

@@ -58,8 +58,17 @@ set EXCELENCE_ACCESS_TOKEN=choose-a-long-secret-here
 excelence-server.exe
 ```
 
-The first time, Windows Firewall asks whether to allow it: allow **Private networks**. The
-server prints a warning if it is reachable from the network without a token.
+The first time, Windows Firewall asks whether to allow it: allow **Private networks**.
+
+**Before the first start, run the setup** (it asks for an access token and port, saves them, and
+prints the address and token to type into each device):
+
+```
+excelence-server.exe setup
+```
+
+The server listens on the network by default and **refuses to start without an access token**.
+To see the address and token again later: `excelence-server.exe config show`.
 
 To keep it running after the window is closed, use the commands in
 [BACKGROUND_SERVER.md](BACKGROUND_SERVER.md): `excelence-server.exe start`, `stop`, `status`, and
@@ -76,27 +85,33 @@ On the build machine (needs Flutter and Visual Studio with the "Desktop developm
 C++" workload), from `frontend\`:
 
 ```
-flutter build windows --release ^
-  --dart-define=API_BASE_URL=http://192.168.1.20:8000 ^
-  --dart-define=API_TOKEN=choose-a-long-secret-here
+flutter build windows --release
 ```
 
-Use the **server's** address and the same token. Copy the **whole folder**
-`build\windows\x64\runner\Release\` to the other machine and run the `.exe` inside it. A
-desktop app isn't a browser, so the server's CORS settings don't apply to it.
+No address or token is built in. Copy the **whole folder** `build\windows\x64\runner\Release\`
+to the other machine and run the `.exe` inside it. On first start the app asks for the **server
+address** (`http://<server PC's network address>:8000`) and the **access token**; both are kept on
+that device and can be changed later in **Settings > Connection**. `localhost` is refused on
+purpose, also on the server PC: use its network address. A desktop app isn't a browser, so the
+server's CORS settings don't apply to it.
 
 If it won't start and complains about a missing `VCRUNTIME140.dll` or `MSVCP140.dll`, install
 Microsoft's "Visual C++ Redistributable (x64)" on that machine - most Windows 10/11 machines
 already have it.
 
-(For a *web* client instead, `flutter build web` with the same `--dart-define` flags, serve
-`build\web` from any static file server, and list that address in `EXCELENCE_ALLOWED_ORIGINS`
-on the server.)
+(For a *web* client instead, `flutter build web`, serve `build\web` from any static file
+server, and list that address in `EXCELENCE_ALLOWED_ORIGINS` on the server.)
+
+The Android APK is built the same way (`flutter build apk`) and is configured on the phone in the
+same screen, so one APK works on any network.
 
 ## 3. Everything on one machine
 
-Run `excelence-server.exe`, then the client built *without* `--dart-define` - it talks to
-`http://localhost:8000` by default.
+Run `excelence-server.exe setup`, start the server, then enter the PC's own network address
+(shown by `excelence-server.exe config show`) in the app. There is no localhost shortcut.
+
+For development only, `--dart-define=API_BASE_URL=http://192.168.1.20:8000` pre-fills the address
+on a device that has none saved. The token is never built in.
 
 ## If it fails
 
@@ -110,6 +125,8 @@ Run `excelence-server.exe`, then the client built *without* `--dart-define` - it
   exclusion for the folder.
 * **The client shows a spinner and nothing else**: it can't reach the server. Check the address
   and port, that the server is running, and that the firewall allows it.
-* **401 / "Missing or invalid access token"**: the client's `API_TOKEN` doesn't match the
-  server's `EXCELENCE_ACCESS_TOKEN`.
+* **401 / "Missing or invalid access token"**: the token entered in the app (Settings >
+  Connection) doesn't match the server's. See it with `excelence-server.exe config show`.
+* **"The server listens on the network but has no access token"**: run
+  `excelence-server.exe setup`.
 * **Size**: expect roughly 150-250 MB for the server (it bundles Python, pandas and numpy).

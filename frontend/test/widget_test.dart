@@ -5,14 +5,20 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:frontend/app/app.dart';
 
 void main() {
   testWidgets('ExcelenceApp builds without throwing', (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({});
+
     await tester.pumpWidget(const ExcelenceApp());
 
     // The app should render a MaterialApp as its root widget.
     expect(find.byType(MaterialApp), findsOneWidget);
+
+    // Let the saved-address lookup finish so no work is left pending.
+    await tester.pumpAndSettle();
   });
 }

@@ -1,0 +1,40 @@
+2026-11-21 12:32:06,428 - INFO - config - Using config file E:\ZELANOX\Excelence\backend\utils\config.json
+INFO:     Started server process [20920]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:60807 - "GET / HTTP/1.1" 401 Unauthorized
+INFO:     192.168.1.7:60853 - "GET /app-state HTTP/1.1" 200 OK
+INFO:     192.168.1.7:60854 - "GET /app-state HTTP/1.1" 200 OK
+INFO:     192.168.1.7:60855 - "GET /app-state HTTP/1.1" 200 OK
+INFO:     192.168.1.7:60856 - "POST /app-state/preferences HTTP/1.1" 200 OK
+2026-11-21 12:32:28,149 - INFO - document - Opened document test.xlsx
+2026-11-21 12:32:28,150 - INFO - sessions - Opened session 12f139bb8bf6c9d2 for test.xlsx
+INFO:     192.168.1.7:60857 - "POST /documents/open HTTP/1.1" 200 OK
+INFO:     192.168.1.7:60858 - "GET /spreadsheet/sheets HTTP/1.1" 200 OK
+INFO:     192.168.1.7:60859 - "GET /spreadsheet/data HTTP/1.1" 200 OK
+INFO:     192.168.1.7:60860 - "WebSocket /spreadsheet/live?document=12f139bb8bf6c9d2&client=0c5ce4df174cb8d5e587c426&since=0&token=VGpUuzEPl7__L9ql" [accepted]
+INFO:     connection open
+INFO:     192.168.1.7:60862 - "POST /spreadsheet/columns/width HTTP/1.1" 200 OK
+INFO:     192.168.1.7:60863 - "POST /spreadsheet/columns/width HTTP/1.1" 200 OK
+INFO:     192.168.1.7:60864 - "POST /documents/save?auto=true HTTP/1.1" 200 OK
+INFO:     192.168.1.7:60865 - "POST /spreadsheet/columns/width HTTP/1.1" 200 OK
+INFO:     192.168.1.7:60866 - "POST /documents/save?auto=true HTTP/1.1" 200 OK
+2026-11-21 12:32:46,399 - INFO - document - Saved document test.xlsx
+INFO:     192.168.1.7:60867 - "POST /spreadsheet/columns/width HTTP/1.1" 200 OK
+INFO:     192.168.1.7:60870 - "POST /spreadsheet/columns/width HTTP/1.1" 200 OK
+INFO:     192.168.1.7:60872 - "POST /spreadsheet/columns/width HTTP/1.1" 200 OK
+INFO:     192.168.1.7:60875 - "GET /app-state HTTP/1.1" 200 OK
+INFO:     192.168.1.7:60874 - "GET /app-state HTTP/1.1" 200 OK
+INFO:     192.168.1.7:60876 - "POST /documents/save?auto=true HTTP/1.1" 200 OK
+2026-11-21 12:32:55,502 - INFO - document - Saved document test.xlsx
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [20920]
+2026-11-21 12:36:46,446 - INFO - config - Using config file E:\ZELANOX\Excelence\backend\utils\config.json
+INFO:     Started server process [12484]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:61059 - "GET / HTTP/1.1" 401 Unauthorized

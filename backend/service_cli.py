@@ -8,7 +8,12 @@
     excelence-server status        exit code 0 when running, 1 when not
     excelence-server logs [--lines N]
     excelence-server autostart on | off | status
+    excelence-server setup         set the access token and port (start here)
     excelence-server config        create the settings file
+    excelence-server config show   show the settings and the address for the app
+    excelence-server config set <token|port|host|documents> <value>
+    excelence-server config unset <name>
+    excelence-server config token  make a new random access token
 
 During development the same commands work as
 ``python server_entry.py <command>``.
@@ -32,7 +37,13 @@ Usage: excelence-server [command]
   logs [--lines N]    show the end of the server log (default 40 lines)
   autostart on|off|status
                       start the server when you log in to Windows
+  setup               ask for the access token and port, save them, and show
+                      what to type into the app (run this first)
   config              create the settings file (excelence.env)
+  config show         show the settings and the address for the app
+  config set NAME VALUE   change one setting: token, port, host, documents
+  config unset NAME   remove one setting
+  config token        replace the access token with a new random one
   help                show this text
 """
 
@@ -120,8 +131,29 @@ def main(
         print("Usage: excelence-server autostart on|off|status", file=sys.stderr)
         return control.EXIT_USAGE
 
+    if command == "setup":
+        return _emit(control.run_setup(where))
+
     if command == "config":
-        return _emit(control.init_config(where))
+        action = rest[0].lower() if rest else ""
+
+        if not rest:
+            return _emit(control.init_config(where))
+
+        if action == "show" and len(rest) == 1:
+            return _emit(control.show_config(where))
+
+        if action == "token" and len(rest) == 1:
+            return _emit(control.new_token(where))
+
+        if action == "set" and len(rest) >= 3:
+            return _emit(control.set_config_value(where, rest[1], " ".join(rest[2:])))
+
+        if action == "unset" and len(rest) == 2:
+            return _emit(control.set_config_value(where, rest[1], None))
+
+        print("Usage: excelence-server config [show | token | set NAME VALUE | unset NAME]", file=sys.stderr)
+        return control.EXIT_USAGE
 
     print(f"Unknown command: {arguments[0]}\n", file=sys.stderr)
     print(USAGE, file=sys.stderr)

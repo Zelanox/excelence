@@ -242,4 +242,54 @@ const Map<String, String> _arabic = {
   'Search...': 'بحث...',
   'Could not open a document. Check that the server is running and that this device can reach it.':
       'تعذّر فتح مستند. تحقق من تشغيل الخادم وإمكانية الوصول إليه من هذا الجهاز.',
+  'Connect':
+      'اتصال',
+  'Connection':
+      'الاتصال',
+  'Server':
+      'الخادم',
+  'Server address':
+      'عنوان الخادم',
+  'Access token (if the server has one)':
+      'رمز الوصول (إن كان للخادم رمز)',
+  'Test connection':
+      'اختبار الاتصال',
+  'Save anyway':
+      'حفظ على أي حال',
+  'Show':
+      'إظهار',
+  'Hide':
+      'إخفاء',
+  'Change server address':
+      'تغيير عنوان الخادم',
+  'Connect to your Excelence server':
+      'الاتصال بخادم Excelence',
+  'Enter the network address of the PC that runs the server. It is kept on this device; you can change it later in Settings.':
+      'أدخل عنوان الشبكة للكمبيوتر الذي يشغّل الخادم. يُحفظ على هذا الجهاز ويمكنك تغييره لاحقًا من الإعدادات.',
+  'The server shows its address and token with: excelence-server config show':
+      'يعرض الخادم عنوانه والرمز عبر الأمر: excelence-server config show',
+  'Enter the server address.':
+      'أدخل عنوان الخادم.',
+  'That is not a valid address. Example: http://192.168.1.20:8000':
+      'هذا ليس عنوانًا صالحًا. مثال: http://192.168.1.20:8000',
+  'localhost cannot be used. Enter the network address of the PC that runs the server, for example http://192.168.1.20:8000':
+      'لا يمكن استخدام localhost. أدخل عنوان الشبكة للكمبيوتر الذي يشغّل الخادم، مثل http://192.168.1.20:8000',
+  'Add the port number. Example: http://192.168.1.20:8000':
+      'أضف رقم المنفذ. مثال: http://192.168.1.20:8000',
+  'Enter only the address and the port, with nothing after them.':
+      'أدخل العنوان والمنفذ فقط، دون أي شيء بعدهما.',
+  'Connected to the Excelence server.':
+      'تم الاتصال بخادم Excelence.',
+  'Cannot reach the server. Check that it is running, that this device is on the same network, and that the address is right.':
+      'تعذّر الوصول إلى الخادم. تحقق من أنه يعمل، وأن هذا الجهاز على الشبكة نفسها، وأن العنوان صحيح.',
+  'The server did not answer in time. Check the address and the network, then try again.':
+      'لم يستجب الخادم في الوقت المناسب. تحقق من العنوان والشبكة ثم حاول مرة أخرى.',
+  'The server refused the access token. Check the token and try again.':
+      'رفض الخادم رمز الوصول. تحقق من الرمز وحاول مرة أخرى.',
+  'Something answered, but it is not an Excelence server. Check the address and the port.':
+      'استجاب شيء ما لكنه ليس خادم Excelence. تحقق من العنوان والمنفذ.',
+  'Could not apply the new address. Please try again.':
+      'تعذّر تطبيق العنوان الجديد. حاول مرة أخرى.',
+  'Your open document could not be saved first, so the address was not changed. Try again.':
+      'تعذّر حفظ المستند المفتوح أولًا، لذلك لم يتغير العنوان. حاول مرة أخرى.',
 };

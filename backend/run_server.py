@@ -12,7 +12,7 @@ import os
 import sys
 
 from backend.utils.logger import get_logger
-from backend.utils.settings import load_settings
+from backend.utils.settings import load_settings, startup_problem
 
 logger = get_logger("run_server")
 
@@ -66,13 +66,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Configuration error: {error}", file=sys.stderr)
         return 2
 
-    if settings.is_network_exposed and settings.access_token is None:
-        logger.warning(
-            "Listening on %s with NO access token: anyone who can reach this "
-            "address can read, change and delete every document. Set "
-            "EXCELENCE_ACCESS_TOKEN (and see docs/COLLABORATION.md).",
-            settings.host,
-        )
+    problem = startup_problem(settings)
+
+    if problem is not None:
+        print(f"Configuration error: {problem}", file=sys.stderr)
+        return 2
 
     import uvicorn
 
@@ -97,10 +95,10 @@ def main(argv: list[str] | None = None) -> int:
 
     # Only one server per folder: a second one would fight for the port and
     # overwrite the first one's PID file.
-    problem = service_control.claim_pid_file(paths, settings.host, settings.port)
+    already_running = service_control.claim_pid_file(paths, settings.host, settings.port)
 
-    if problem is not None:
-        print(problem, file=sys.stderr)
+    if already_running is not None:
+        print(already_running, file=sys.stderr)
         return 3
 
     server = uvicorn.Server(uvicorn.Config(app, host=settings.host, port=settings.port))

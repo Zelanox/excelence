@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/app_text.dart';
+import '../../../core/connection/connection_scope.dart';
 import '../../spreadsheet/controllers/spreadsheet_controller.dart';
 import '../file_actions.dart';
+import 'connection_form.dart';
 
 /// Shown instead of the grid when no document is open (after Close or
 /// Delete, or when nothing could be opened at startup).
@@ -77,6 +79,11 @@ class NoDocumentView extends StatelessWidget {
                   TextButton(
                     onPressed: onRetry,
                     child: Text(appText(context, 'Try again')),
+                  ),
+                if (problem != null && ConnectionScope.maybeOf(context) != null)
+                  TextButton(
+                    onPressed: () => ServerAddressDialog.show(context),
+                    child: Text(appText(context, 'Change server address')),
                   ),
               ],
             ),

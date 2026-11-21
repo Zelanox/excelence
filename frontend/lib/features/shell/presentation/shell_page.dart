@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../app/app_text.dart';
+import '../../../app/branded_loading_screen.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/api/api_config.dart';
+import '../../../core/connection/server_connection.dart';
 import '../../../core/live/live_channel.dart';
 import '../../../core/live/live_coordinator.dart';
 import '../../../core/preferences/app_preferences.dart';
@@ -34,7 +36,10 @@ const _defaultDocument = 'test.xlsx';
 /// ownership up here lets both widgets share the same controllers rather
 /// than each having their own disconnected copy.
 class ShellPage extends StatefulWidget {
-  const ShellPage({super.key, this.onLocaleChanged});
+  const ShellPage({super.key, required this.connection, this.onLocaleChanged});
+
+  /// The server this page talks to (see ServerConnection).
+  final ServerConnection connection;
 
   final ValueChanged<Locale>? onLocaleChanged;
 
@@ -59,12 +64,14 @@ class _ShellPageState extends State<ShellPage> with WidgetsBindingObserver {
   void initState() {
     super.initState();
 
-    // The server's address (and optional access token) are build-time
-    // settings - see ApiConfig - so this same code can talk to a server on
-    // another machine.
+    // The server's address and access token are entered by the user and kept
+    // on the device (Settings > Connection); this page is rebuilt when they
+    // change, so it always talks to the current server.
     final api = ApiClient(
-      baseUrl: ApiConfig.baseUrl,
-      accessToken: ApiConfig.accessToken.isEmpty ? null : ApiConfig.accessToken,
+      baseUrl: widget.connection.address,
+      accessToken: widget.connection.token.isEmpty
+          ? null
+          : widget.connection.token,
       clientName: ApiConfig.clientName.isEmpty ? null : ApiConfig.clientName,
     );
     final service = SpreadsheetService(api);
@@ -80,22 +87,22 @@ class _ShellPageState extends State<ShellPage> with WidgetsBindingObserver {
       // Other people's changes to the open document arrive over a live
       // (WebSocket) connection; the controller starts it once a document
       // has been loaded.
-      liveFactory: ({
-        required reload,
-        required onChanged,
-        required onSessionLost,
-        required applyBatch,
-      }) =>
-          LiveCoordinator(
-        addressFor: (since) => api.liveUri(since: since),
-        connect: WebSocketLiveChannel.new,
-        reload: reload,
-        onChanged: onChanged,
-        onSessionLost: onSessionLost,
-        applyBatch: applyBatch,
-        onReloadFailed: (error) =>
-            debugPrint('[Live] reload failed: $error'),
-      ),
+      liveFactory:
+          ({
+            required reload,
+            required onChanged,
+            required onSessionLost,
+            required applyBatch,
+          }) => LiveCoordinator(
+            addressFor: (since) => api.liveUri(since: since),
+            connect: WebSocketLiveChannel.new,
+            reload: reload,
+            onChanged: onChanged,
+            onSessionLost: onSessionLost,
+            applyBatch: applyBatch,
+            onReloadFailed: (error) =>
+                debugPrint('[Live] reload failed: $error'),
+          ),
     );
     viewportController = ViewportController();
 
@@ -299,45 +306,56 @@ class _ShellPageState extends State<ShellPage> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    return DictationShortcut(
-      dictation: dictation,
-      child: _buildPage(context),
-    );
+    return DictationShortcut(dictation: dictation, child: _buildPage(context));
   }
 
   Widget _buildPage(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            AppMenuBar(
-              spreadsheetController: spreadsheetController,
-              dictation: dictation,
-            ),
-            Toolbar(
-              spreadsheetController: spreadsheetController,
-              viewportController: viewportController,
-              dictation: dictation,
-              onLocaleChanged: widget.onLocaleChanged,
-            ),
-            SpreadsheetSearchBar(
-              spreadsheetController: spreadsheetController,
-              viewportController: viewportController,
-              dictation: dictation,
-            ),
-            Workspace(
-              spreadsheetController: spreadsheetController,
-              viewportController: viewportController,
-              startup: startup,
-              onRetry: _loadInitialDocument,
-            ),
-            SheetTabs(spreadsheetController: spreadsheetController),
-            StatusBar(
-              spreadsheetController: spreadsheetController,
-              viewportController: viewportController,
-            ),
-          ],
-        ),
+      body: AnimatedBuilder(
+        animation: Listenable.merge([spreadsheetController, startup]),
+        builder: (context, _) {
+          final isLoading =
+              !startup.done || spreadsheetController.isLoadingDocument;
+
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              SafeArea(
+                child: Column(
+                  children: [
+                    AppMenuBar(
+                      spreadsheetController: spreadsheetController,
+                      dictation: dictation,
+                    ),
+                    Toolbar(
+                      spreadsheetController: spreadsheetController,
+                      viewportController: viewportController,
+                      dictation: dictation,
+                      onLocaleChanged: widget.onLocaleChanged,
+                    ),
+                    SpreadsheetSearchBar(
+                      spreadsheetController: spreadsheetController,
+                      viewportController: viewportController,
+                      dictation: dictation,
+                    ),
+                    Workspace(
+                      spreadsheetController: spreadsheetController,
+                      viewportController: viewportController,
+                      startup: startup,
+                      onRetry: _loadInitialDocument,
+                    ),
+                    SheetTabs(spreadsheetController: spreadsheetController),
+                    StatusBar(
+                      spreadsheetController: spreadsheetController,
+                      viewportController: viewportController,
+                    ),
+                  ],
+                ),
+              ),
+              if (isLoading) const BrandedLoadingScreen(),
+            ],
+          );
+        },
       ),
     );
   }

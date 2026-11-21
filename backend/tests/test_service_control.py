@@ -261,7 +261,7 @@ def test_status_text_says_what_the_user_needs_to_know():
     text = sc.format_status(running, paths, lan_ip=lambda: "192.168.1.20", now=1000.0 + 3 * 3600 + 5 * 60)
 
     assert "running (PID 321, up 3h 5m)" in text
-    assert "http://127.0.0.1:8000" in text
+    assert "127.0.0.1" not in text and "localhost" not in text      # never a localhost address for the app
     assert "http://192.168.1.20:8000" in text          # the address for other devices
     assert str(paths.log_file) in text
 
@@ -424,7 +424,7 @@ def test_start_reports_a_bad_setting_instead_of_starting():
 def test_start_reads_the_settings_file():
     with tempfile.TemporaryDirectory() as folder:
         paths = make_paths(folder)
-        paths.env_file.write_text("EXCELENCE_PORT=9123\n", encoding="utf-8")
+        paths.env_file.write_text("EXCELENCE_PORT=9123\nEXCELENCE_ACCESS_TOKEN=a-long-enough-secret\n", encoding="utf-8")
 
         outcome, launched = start_with(paths, process=FakeProcess(exit_code=1), env={})
 
@@ -839,6 +839,19 @@ def stand_in_server(port, watch_stop_file):
     )
 
 
+def release_log_file(paths, seconds=5.0):
+    """On Windows a killed process keeps the log file open for a moment, which
+    stops the temporary folder from being deleted. Wait until it lets go."""
+    deadline = time.monotonic() + seconds
+
+    while time.monotonic() < deadline:
+        try:
+            paths.out_file.unlink(missing_ok=True)
+            return
+        except PermissionError:
+            time.sleep(0.1)
+
+
 def real_start(paths, port, watch_stop_file=True):
     return sc.start(
         paths,
@@ -906,6 +919,8 @@ def test_real_process_that_ignores_the_stop_request_is_ended_by_force():
             leftover = sc.read_pid_file(paths)
             if leftover is not None:
                 sc.force_kill(leftover.pid)
+
+            release_log_file(paths)
 
 
 def test_real_process_a_server_that_cannot_start_reports_why():

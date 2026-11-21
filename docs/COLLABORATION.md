@@ -37,12 +37,12 @@ The first three are solved by Part 1. The last one is the heart of Part 2.
 
 | Variable | Meaning | Default |
 |---|---|---|
-| `EXCELENCE_HOST` | Interface to listen on. `0.0.0.0` accepts other machines | `127.0.0.1` |
+| `EXCELENCE_HOST` | Interface to listen on. `0.0.0.0` accepts other machines; `127.0.0.1` only this PC | `0.0.0.0` |
 | `EXCELENCE_PORT` | Port | `8000` |
 | `EXCELENCE_ALLOWED_ORIGINS` | Comma-separated origins of web clients allowed to call the API, e.g. `http://192.168.1.20:8080` | none |
 | `EXCELENCE_LOCALHOST_ORIGINS` | `0` stops also accepting any `http://localhost:<port>` page | on |
 | `EXCELENCE_DOCUMENTS_DIR` | Where workbooks are stored | `backend/utils/data/documents` |
-| `EXCELENCE_ACCESS_TOKEN` | If set (12+ characters), every request must send `Authorization: Bearer <token>` | none |
+| `EXCELENCE_ACCESS_TOKEN` | 12+ characters; every request must send `Authorization: Bearer <token>`. **Required** unless the host is `127.0.0.1` | none |
 
 A bad value stops startup with a message saying what to fix (a mistyped origin that is
 silently ignored is far harder to diagnose).
@@ -54,39 +54,42 @@ python -m backend.run_server            # reads the variables above
 python -m backend.run_server --reload   # development
 ```
 
-### Client settings (build-time `--dart-define`)
+### Client settings (entered in the app)
 
-```
-flutter run -d chrome --dart-define=API_BASE_URL=http://192.168.1.20:8000 --dart-define=API_TOKEN=<token>
-flutter build web     --dart-define=API_BASE_URL=https://sheets.example.com
-```
+The server address and access token are entered on each device, on first start or in
+**Settings > Connection**, and kept on that device. Use **Test connection** to check them.
+`localhost` / `127.x.x.x` are refused. For development only,
+`--dart-define=API_BASE_URL=http://192.168.1.20:8000` pre-fills the address on a device that has
+none saved.
 
 ### Example: two or more PCs on the same network (Windows)
 
 On the PC that will be the server (say its address is `192.168.1.20`):
 
 ```
-set EXCELENCE_HOST=0.0.0.0
-set EXCELENCE_ALLOWED_ORIGINS=http://192.168.1.20:8080
-set EXCELENCE_ACCESS_TOKEN=choose-a-long-secret-here
-python -m backend.run_server
+python server_entry.py setup        # asks for a token and port, prints what to type into the app
+python server_entry.py start
 ```
+
+(`set EXCELENCE_ACCESS_TOKEN=...` before `python -m backend.run_server` works too.)
 
 Allow inbound TCP on port 8000 in Windows Defender Firewall. Build the client once and
 serve the result from any static web server (the `flutter build web` output is just
 files; `python -m http.server 8080` run inside `build/web` is enough for a trial):
 
 ```
-flutter build web --dart-define=API_BASE_URL=http://192.168.1.20:8000 --dart-define=API_TOKEN=choose-a-long-secret-here
+flutter build web
 ```
 
-Everyone on the network opens `http://192.168.1.20:8080`.
+Everyone on the network opens `http://192.168.1.20:8080` and enters `http://192.168.1.20:8000`
+and the token in the connection screen (for a web client also list its address in
+`EXCELENCE_ALLOWED_ORIGINS`).
 
 ### Security - read this before exposing the server
 
 * With no token, **anyone who can reach the server can read, change and delete every
-  document.** The server logs a warning at startup if it is network-reachable without one.
-* The token is a *shared secret compiled into the client*. It keeps strangers out of a
+  document.** The server therefore refuses to start on the network without one.
+* The token is a *shared secret stored in plain text on each device*. It keeps strangers out of a
   trusted team's server. It is **not** per-user login: anyone who can load the app can
   extract it, and you cannot tell users apart or revoke one person. Real accounts are
   roadmap phase 6.

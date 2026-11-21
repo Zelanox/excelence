@@ -32,6 +32,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import secrets
 import signal
 import socket
 import subprocess
@@ -61,13 +62,15 @@ CONFIG_TEMPLATE = """\
 # Lines starting with # are ignored. Remove the # to use a line.
 # Restart the server after changing this file:  excelence-server restart
 
-# Accept connections from other devices on the network (phones, other PCs).
+# The server accepts connections from other devices on the network by default
+# (0.0.0.0). Change this only to restrict it to one network address.
 #EXCELENCE_HOST=0.0.0.0
 
 #EXCELENCE_PORT=8000
 
-# Required on a shared network. Use at least 12 characters, and give the same
-# value to the app when it is built (API_TOKEN).
+# Required: the server will not start without it. Use at least 12 characters
+# and type the same value into the app (Settings > Connection) on every
+# device. "excelence-server setup" creates one for you.
 #EXCELENCE_ACCESS_TOKEN=choose-a-long-secret-here
 
 # Where the workbooks are kept.
@@ -196,6 +199,249 @@ def init_config(paths: ServicePaths) -> Outcome:
         return Outcome(EXIT_FAILED, f"Could not create {paths.env_file}: {error}")
 
     return Outcome(EXIT_OK, f"Created {paths.env_file}\nEdit it, then run: excelence-server restart")
+
+
+# ----------------------------------------------------------------------
+# Changing the settings from the command line
+# ----------------------------------------------------------------------
+
+CONFIG_KEYS = {
+    "host": "EXCELENCE_HOST",
+    "port": "EXCELENCE_PORT",
+    "token": "EXCELENCE_ACCESS_TOKEN",
+    "documents": "EXCELENCE_DOCUMENTS_DIR",
+}
+
+RESTART_HINT = "Restart the server for this to take effect: excelence-server restart"
+
+
+def generate_token() -> str:
+    """A random access token (16 characters, letters/digits/-/_)."""
+    return secrets.token_urlsafe(12)
+
+
+def resolve_key(name: str) -> str | None:
+    """``token`` -> ``EXCELENCE_ACCESS_TOKEN``; a full EXCELENCE_ name is kept."""
+    short = name.strip().lower()
+
+    if short in CONFIG_KEYS:
+        return CONFIG_KEYS[short]
+
+    full = name.strip().upper()
+    return full if full.startswith("EXCELENCE_") and _KEY.match(full) else None
+
+
+def _read_file_values(paths: ServicePaths) -> dict[str, str]:
+    try:
+        text = paths.env_file.read_text(encoding="utf-8-sig")
+    except OSError:
+        return {}
+
+    return parse_env_text(text)[0]
+
+
+def _write_setting(paths: ServicePaths, key: str, value: str | None) -> None:
+    """Set (or, with None, remove) one KEY=value line, keeping everything else."""
+    try:
+        text = paths.env_file.read_text(encoding="utf-8-sig")
+    except OSError:
+        text = CONFIG_TEMPLATE
+
+    lines = text.splitlines()
+    active = re.compile(rf"^\s*(export\s+)?{re.escape(key)}\s*=")
+    commented = re.compile(rf"^\s*#\s*{re.escape(key)}\s*=")
+
+    if value is None:
+        lines = [line for line in lines if not active.match(line)]
+    else:
+        new_line = f"{key}={value}"
+        index = next((i for i, line in enumerate(lines) if active.match(line)), None)
+
+        if index is None:
+            index = next((i for i, line in enumerate(lines) if commented.match(line)), None)
+
+        if index is None:
+            lines.append(new_line)
+        else:
+            lines[index] = new_line
+
+            # Any later duplicate of the same setting would override this one.
+            lines = lines[: index + 1] + [l for l in lines[index + 1 :] if not active.match(l)]
+
+    paths.env_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def set_config_value(paths: ServicePaths, name: str, value: str | None) -> Outcome:
+    """``excelence-server config set token <value>`` (value None = unset)."""
+    from backend.utils.settings import load_settings
+
+    key = resolve_key(name)
+
+    if key is None:
+        known = ", ".join(CONFIG_KEYS)
+        return Outcome(EXIT_USAGE, f"Unknown setting {name!r}. Use one of: {known} (or a full EXCELENCE_ name).")
+
+    if value is not None:
+        value = value.strip()
+
+        if not value:
+            return Outcome(EXIT_USAGE, f"Give a value for {name}, or use: excelence-server config unset {name}")
+
+        candidate = {**_read_file_values(paths), key: value}
+
+        try:
+            load_settings(candidate)
+        except ValueError as error:
+            return Outcome(EXIT_USAGE, f"Not saved: {error}")
+
+    try:
+        _write_setting(paths, key, value)
+    except OSError as error:
+        return Outcome(EXIT_FAILED, f"Could not write {paths.env_file}: {error}")
+
+    action = "Removed" if value is None else "Saved"
+    return Outcome(EXIT_OK, f"{action} {key} in {paths.env_file}\n{RESTART_HINT}")
+
+
+def new_token(paths: ServicePaths, token: str | None = None) -> Outcome:
+    """Replace the access token with a random one and show it."""
+    token = token or generate_token()
+    outcome = set_config_value(paths, "token", token)
+
+    if outcome.code != EXIT_OK:
+        return outcome
+
+    return Outcome(
+        EXIT_OK,
+        f"New access token: {token}\n"
+        "Enter it in the app (Settings > Connection) on every device.\n"
+        f"{RESTART_HINT}",
+    )
+
+
+def show_config(
+    paths: ServicePaths,
+    environ: Mapping[str, str] | None = None,
+    lan_ip: Callable[[], str | None] | None = None,
+) -> Outcome:
+    """What the server will use, and what to type into the app."""
+    from backend.utils.settings import load_settings, startup_problem
+
+    lan_ip = lan_ip or guess_lan_ip
+
+    env: dict[str, str] = dict(os.environ if environ is None else environ)
+    load_env_file(paths.env_file, env)
+
+    try:
+        settings = load_settings(env)
+    except ValueError as error:
+        return Outcome(EXIT_USAGE, f"Configuration error: {error}")
+
+    lines = [
+        f"Settings file:  {paths.env_file}" + ("" if paths.env_file.exists() else "  (not created yet)"),
+        f"Host:           {settings.host}",
+        f"Port:           {settings.port}",
+        f"Access token:   {settings.access_token or 'NOT SET'}",
+        f"Documents:      {settings.documents_dir or 'default folder'}",
+        "",
+        _addresses(settings.host, settings.port, lan_ip),
+    ]
+
+    problem = startup_problem(settings)
+
+    if problem:
+        lines += ["", f"The server will not start: {problem}"]
+
+    return Outcome(EXIT_OK, "\n".join(lines))
+
+
+def run_setup(
+    paths: ServicePaths,
+    *,
+    input_fn: Callable[[str], str] = input,
+    print_fn: Callable[[str], None] = print,
+    lan_ip: Callable[[], str | None] | None = None,
+    make_token: Callable[[], str] = generate_token,
+) -> Outcome:
+    """Ask for the access token and port, save them, and say what to type
+    into the app. Safe to run again at any time."""
+    from backend.utils.settings import MIN_TOKEN_LENGTH, load_settings
+
+    lan_ip = lan_ip or guess_lan_ip
+
+    if not paths.env_file.exists():
+        created = init_config(paths)
+
+        if created.code != EXIT_OK:
+            return created
+
+    current = _read_file_values(paths)
+    suggested = current.get("EXCELENCE_ACCESS_TOKEN") or make_token()
+
+    try:
+        print_fn("Excelence server setup\n")
+
+        token = None
+
+        for _ in range(3):
+            answer = input_fn(
+                f"Access token [{suggested}]\n(press Enter to use it, or type your own, at least {MIN_TOKEN_LENGTH} characters): "
+            ).strip()
+            candidate = answer or suggested
+
+            if len(candidate) >= MIN_TOKEN_LENGTH:
+                token = candidate
+                break
+
+            print_fn(f"That token is too short ({len(candidate)} characters). Use at least {MIN_TOKEN_LENGTH}.")
+
+        if token is None:
+            return Outcome(EXIT_USAGE, "Setup stopped: no valid access token was given. Nothing was changed.")
+
+        port_text = None
+        current_port = current.get("EXCELENCE_PORT", "8000")
+
+        for _ in range(3):
+            answer = input_fn(f"Port [{current_port}] (press Enter to keep): ").strip()
+
+            if not answer:
+                break
+
+            try:
+                load_settings({"EXCELENCE_PORT": answer})
+            except ValueError as error:
+                print_fn(str(error))
+                continue
+
+            port_text = answer
+            break
+        else:
+            return Outcome(EXIT_USAGE, "Setup stopped: no valid port was given. Nothing was changed.")
+    except (EOFError, KeyboardInterrupt):
+        return Outcome(EXIT_FAILED, "Setup cancelled. Nothing was changed.")
+
+    for key, value in (("token", token), ("port", port_text)):
+        if value is None:
+            continue
+
+        saved = set_config_value(paths, key, value)
+
+        if saved.code != EXIT_OK:
+            return saved
+
+    saved_settings = load_settings(_read_file_values(paths))
+    address = _addresses(saved_settings.host, saved_settings.port, lan_ip).replace("Address for the app: ", "")
+
+    return Outcome(
+        EXIT_OK,
+        f"Saved to {paths.env_file}\n\n"
+        "To connect a phone or another PC, open the app and enter:\n"
+        f"  Server address:  {address}\n"
+        f"  Access token:    {token}\n\n"
+        "Then start the server (or restart it if it is running):\n"
+        "  excelence-server restart\n\n"
+        "To see these again later: excelence-server config show",
+    )
 
 
 # ----------------------------------------------------------------------
@@ -483,15 +729,20 @@ def _duration(seconds: float) -> str:
 
 
 def _addresses(host: str, port: int, lan_ip: Callable[[], str | None]) -> str:
-    text = f"http://{_connect_host(host)}:{port}"
-
-    if host in ("0.0.0.0", "::"):
+    """The address to type into the app. Never a localhost address when the
+    server listens on the network: that would only work on this PC."""
+    if host in ("", "0.0.0.0", "::"):
         address = lan_ip()
 
         if address:
-            text += f"\nOther devices on the network: http://{address}:{port}"
+            return f"Address for the app: http://{address}:{port}"
 
-    return text
+        return (
+            f"Address for the app: http://<this PC's network address>:{port} "
+            "(find the address with: ipconfig)"
+        )
+
+    return f"Address for the app: http://{_connect_host(host)}:{port}"
 
 
 def format_status(
@@ -599,6 +850,13 @@ def start(
         settings = _settings(env)
     except ValueError as error:
         return Outcome(EXIT_USAGE, f"Configuration error: {error}")
+
+    from backend.utils.settings import startup_problem
+
+    problem = startup_problem(settings)
+
+    if problem is not None:
+        return Outcome(EXIT_USAGE, f"Configuration error: {problem}")
 
     state = get_status(paths, env, is_alive=is_alive, probe_fn=probe_fn)
 

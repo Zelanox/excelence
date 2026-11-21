@@ -24,9 +24,14 @@ During development use `python server_entry.py <command>`; the packaged program 
 | `status` | running or not, PID, how long, addresses (exit code 0 / 1) |
 | `logs [--lines N]` | the end of the server log (default 40 lines) |
 | `autostart on` / `off` / `status` | start in the background when you log in to Windows |
+| `setup` | ask for the access token and port, save them, and print the address and token to type into the app. **Run this first.** |
 | `config` | create `excelence.env` with every option commented out |
+| `config show` | show the settings, the access token and the address for the app |
+| `config set <token\|port\|host\|documents> <value>` | change one setting (checked before it is saved) |
+| `config unset <name>` | remove one setting |
+| `config token` | replace the access token with a new random one and show it |
 
-When the server listens on the network (`EXCELENCE_HOST=0.0.0.0`), `start` and `status` also print the address other devices should use, for example `http://192.168.1.20:8000`.
+The server listens on the network by default (`EXCELENCE_HOST=0.0.0.0`) and refuses to start without an access token. `start`, `status` and `config show` print the address to type into the app, for example `http://192.168.1.20:8000`; never a localhost address. Restart the server after changing a setting.
 
 ## Settings: `excelence.env`
 

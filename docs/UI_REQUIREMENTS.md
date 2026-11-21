@@ -108,3 +108,23 @@ Requirements met, tests written with the code, backend and Flutter suites green 
 ## D. Top menus (placeholders)
 
 Every top menu (File, Edit, View, Insert, Data, Tools, Help) opens. Items whose features are not built yet are greyed out and do nothing; the list is `plannedMenuItems` in `app_menu_bar.dart`. When a feature is built its item is removed from that list and becomes a working item. The menu bar scrolls sideways instead of overflowing on a narrow screen.
+
+## E. Server connection (address and token set after the build)
+
+**Purpose.** One build works on any network; nothing can fall back to localhost.
+
+**Inputs.** Server address, access token (optional), typed on the device.
+
+**Behavior.**
+1. Kept on the device, not on the server. With nothing saved the app shows "Connect to your Excelence server" (no default address). `--dart-define=API_BASE_URL` only pre-fills; the token is never compiled in.
+2. Settings > Connection, the first-run screen and "Change server address" (shown when the server cannot be reached) share one form: **Test connection** and **Save/Connect**. Save checks the connection first; if the check fails it says why and the button becomes **Save anyway**.
+3. Address rules: `http://` is added if missing; plain http needs a port; nothing may follow the port; `localhost`, `127.x.x.x`, `::1`, `0.0.0.0` are refused ("Use the network address of the PC that runs the server"). A saved address that breaks these rules is ignored.
+4. Test results: connected / cannot reach / timed out (5 s) / token refused / not an Excelence server.
+5. Saving a new address first saves the open document to the old server; if that fails the address is not changed and the user is told. Then the whole app is rebuilt against the new server.
+6. Server: default host `0.0.0.0`; refuses to start on the network without a token (message says to run `setup`). `excelence-server setup | config show | config set | config unset | config token` change settings; `start`, `status` and `config show` print the address for the app (never localhost).
+
+**Error/edge cases.** Empty address; localhost; no port; path after port; port out of range; wrong token; wrong server; server off; token too short (server side); settings file with a bad value (reported, nothing saved); setup cancelled (nothing changed); device cannot store the address (works for the session, asked again next start).
+
+**Acceptance.** A fresh install contains no localhost address on the client or in the server's output; typing the address and token once connects; changing them in Settings reconnects without a restart; the server will not start on the network without a token.
+
+**Known limits.** The token is stored in plain text on the device and travels over plain HTTP (trusted LAN). Edits that cannot be saved to the old server block an address change.
