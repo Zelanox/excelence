@@ -9,6 +9,7 @@
     excelence-server logs [--lines N]
     excelence-server autostart on | off | status
     excelence-server setup         set the access token and port (start here)
+    excelence-server discover      look for servers on the network (tests "Find server")
     excelence-server config        create the settings file
     excelence-server config show   show the settings and the address for the app
     excelence-server config set <token|port|host|documents> <value>
@@ -37,6 +38,7 @@ Usage: excelence-server [command]
   logs [--lines N]    show the end of the server log (default 40 lines)
   autostart on|off|status
                       start the server when you log in to Windows
+  discover            look for servers on the network the way the app's Find server does
   setup               ask for the access token and port, save them, and show
                       what to type into the app (run this first)
   config              create the settings file (excelence.env)
@@ -130,6 +132,9 @@ def main(
 
         print("Usage: excelence-server autostart on|off|status", file=sys.stderr)
         return control.EXIT_USAGE
+
+    if command == "discover":
+        return _emit(control.run_discover(where))
 
     if command == "setup":
         return _emit(control.run_setup(where))

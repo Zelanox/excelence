@@ -68,6 +68,11 @@ CONFIG_TEMPLATE = """\
 
 #EXCELENCE_PORT=8000
 
+# Devices on the network can ask "where is the server?" (UDP) and find it
+# without typing its address. Set to off to stop answering.
+#EXCELENCE_DISCOVERY=on
+#EXCELENCE_DISCOVERY_PORT=8765
+
 # Required: the server will not start without it. Use at least 12 characters
 # and type the same value into the app (Settings > Connection) on every
 # device. "excelence-server setup" creates one for you.
@@ -210,9 +215,19 @@ CONFIG_KEYS = {
     "port": "EXCELENCE_PORT",
     "token": "EXCELENCE_ACCESS_TOKEN",
     "documents": "EXCELENCE_DOCUMENTS_DIR",
+    "discovery": "EXCELENCE_DISCOVERY",
+    "discovery-port": "EXCELENCE_DISCOVERY_PORT",
 }
 
 RESTART_HINT = "Restart the server for this to take effect: excelence-server restart"
+
+
+def firewall_rule_command(discovery_port: int) -> str:
+    """The Windows command that lets discovery questions reach the server."""
+    return (
+        'netsh advfirewall firewall add rule name="Excelence discovery" '
+        f"dir=in action=allow protocol=UDP localport={discovery_port} profile=private"
+    )
 
 
 def generate_token() -> str:
@@ -343,6 +358,8 @@ def show_config(
         f"Port:           {settings.port}",
         f"Access token:   {settings.access_token or 'NOT SET'}",
         f"Documents:      {settings.documents_dir or 'default folder'}",
+        "Discovery:      "
+        + (f"on (UDP {settings.discovery_port})" if settings.discovery_enabled else "off"),
         "",
         _addresses(settings.host, settings.port, lan_ip),
     ]
@@ -353,6 +370,46 @@ def show_config(
         lines += ["", f"The server will not start: {problem}"]
 
     return Outcome(EXIT_OK, "\n".join(lines))
+
+
+def run_discover(
+    paths: ServicePaths,
+    environ: Mapping[str, str] | None = None,
+    finder: Callable[..., list[dict[str, str]]] | None = None,
+) -> Outcome:
+    """``excelence-server discover``: look for servers the way the app's
+    "Find server" button does, from this PC. Tells apart "the network or the
+    firewall blocks discovery" from "the app has a problem"."""
+    from backend import discovery
+    from backend.utils.settings import load_settings
+
+    env: dict[str, str] = dict(os.environ if environ is None else environ)
+    load_env_file(paths.env_file, env)
+
+    try:
+        settings = load_settings(env)
+    except ValueError as error:
+        return Outcome(EXIT_USAGE, f"Configuration error: {error}")
+
+    if settings.access_token is None:
+        return Outcome(EXIT_USAGE, "There is no access token yet. Run: excelence-server setup")
+
+    found = (finder or discovery.find_servers)(settings.access_token, port=settings.discovery_port)
+
+    if found:
+        lines = ["Found:"] + [f"  {server['name']}  {server['address']}" for server in found]
+        lines.append("Discovery works from this PC. If the app still cannot find the server, the app's own PC or the network blocks it.")
+
+        return Outcome(EXIT_OK, "\n".join(lines))
+
+    return Outcome(
+        EXIT_FAILED,
+        "No server answered.\n"
+        "Check that the server is running (excelence-server status), that discovery is on "
+        "(excelence-server config show), and that the Windows firewall allows UDP "
+        f"{settings.discovery_port} (the netsh command printed by 'excelence-server setup'; "
+        "the network must be set to Private).",
+    )
 
 
 def run_setup(
@@ -440,6 +497,9 @@ def run_setup(
         f"  Access token:    {token}\n\n"
         "Then start the server (or restart it if it is running):\n"
         "  excelence-server restart\n\n"
+        "So that devices can also FIND the server by themselves (\"Find server\" in the app),\n"
+        "allow discovery through the Windows firewall once, in a terminal run as administrator:\n"
+        f"  {firewall_rule_command(saved_settings.discovery_port)}\n\n"
         "To see these again later: excelence-server config show",
     )
 

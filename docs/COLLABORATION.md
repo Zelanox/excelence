@@ -43,6 +43,8 @@ The first three are solved by Part 1. The last one is the heart of Part 2.
 | `EXCELENCE_LOCALHOST_ORIGINS` | `0` stops also accepting any `http://localhost:<port>` page | on |
 | `EXCELENCE_DOCUMENTS_DIR` | Where workbooks are stored | `backend/utils/data/documents` |
 | `EXCELENCE_ACCESS_TOKEN` | 12+ characters; every request must send `Authorization: Bearer <token>`. **Required** unless the host is `127.0.0.1` | none |
+| `EXCELENCE_DISCOVERY` | `off` stops the server answering "where is the server?" questions from devices on the network | `on` |
+| `EXCELENCE_DISCOVERY_PORT` | UDP port for those questions | `8765` |
 
 A bad value stops startup with a message saying what to fix (a mistyped origin that is
 silently ignored is far harder to diagnose).

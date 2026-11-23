@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../app/app_text.dart';
 import '../../../core/connection/connection_scope.dart';
 import '../../../core/connection/server_connection.dart';
+import '../../../core/connection/server_discovery.dart';
 
 /// How the form checks a connection (replaced in tests).
 typedef ConnectionTester = Future<ConnectionTestResult> Function({
@@ -16,7 +17,15 @@ Future<ConnectionTestResult> _defaultTester({
 }) =>
     testServerConnection(address: address, token: token);
 
-enum _Busy { none, testing, saving }
+/// How the form looks for servers on the network (replaced in tests).
+typedef ServerFinder = Future<List<DiscoveredServer>> Function({
+  required String token,
+});
+
+Future<List<DiscoveredServer>> _defaultFinder({required String token}) =>
+    findServers(token: token);
+
+enum _Busy { none, testing, saving, finding }
 
 /// The server address and access token fields with Test connection and Save.
 ///
@@ -31,6 +40,8 @@ class ConnectionForm extends StatefulWidget {
     required this.onSave,
     this.saveLabel = 'Save',
     this.tester = _defaultTester,
+    this.finder = _defaultFinder,
+    this.searchSupported = networkSearchAvailable,
   });
 
   final ServerConnection? initial;
@@ -41,6 +52,10 @@ class ConnectionForm extends StatefulWidget {
 
   final String saveLabel;
   final ConnectionTester tester;
+  final ServerFinder finder;
+
+  /// False in a browser: Find server then explains that it cannot search.
+  final bool searchSupported;
 
   @override
   State<ConnectionForm> createState() => _ConnectionFormState();
@@ -96,6 +111,82 @@ class _ConnectionFormState extends State<ConnectionForm> {
     }
 
     return check;
+  }
+
+  /// Looks for the server on the network and fills in its address. The
+  /// access token must be typed first: it is how the server proves it is
+  /// yours (the token itself is never sent).
+  Future<void> _find() async {
+    if (!widget.searchSupported) {
+      setState(() {
+        _message = 'Searching the network is not possible in a web browser. Type the server address.';
+        _isError = true;
+      });
+
+      return;
+    }
+
+    final token = _token.text.trim();
+
+    if (token.isEmpty) {
+      setState(() {
+        _message = 'Enter the access token first: it is how your server is recognised.';
+        _isError = true;
+      });
+
+      return;
+    }
+
+    setState(() {
+      _busy = _Busy.finding;
+      _message = null;
+    });
+
+    final found = await widget.finder(token: token);
+
+    if (!mounted) {
+      return;
+    }
+
+    if (found.isEmpty) {
+      setState(() {
+        _busy = _Busy.none;
+        _message =
+            'No server found with this token. Check that the server is running on this network and that discovery is allowed through its firewall (UDP 8765), or type the address.';
+        _isError = true;
+      });
+
+      return;
+    }
+
+    setState(() => _busy = _Busy.none);
+
+    final chosen = found.length == 1
+        ? found.single
+        : await showDialog<DiscoveredServer>(
+            context: context,
+            builder: (context) => SimpleDialog(
+              title: Text(appText(context, 'Choose a server')),
+              children: [
+                for (final server in found)
+                  SimpleDialogOption(
+                    onPressed: () => Navigator.of(context).pop(server),
+                    child: Text('${server.name}  ${server.address}'),
+                  ),
+              ],
+            ),
+          );
+
+    if (!mounted || chosen == null) {
+      return;
+    }
+
+    _address.text = chosen.address;
+
+    setState(() {
+      _message = 'Found ${chosen.name} at ${chosen.address}. Press Save to use it.';
+      _isError = false;
+    });
   }
 
   Future<void> _test() async {
@@ -257,6 +348,11 @@ class _ConnectionFormState extends State<ConnectionForm> {
           runSpacing: 8,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
+            OutlinedButton.icon(
+              icon: const Icon(Icons.search),
+              onPressed: busy ? null : _find,
+              label: Text(appText(context, 'Find server')),
+            ),
             OutlinedButton(
               onPressed: busy ? null : _test,
               child: Text(appText(context, 'Test connection')),
@@ -323,9 +419,14 @@ class ServerAddressDialog extends StatelessWidget {
 
 /// Shown instead of the app until the user has entered a server address.
 class ConnectScreen extends StatelessWidget {
-  const ConnectScreen({super.key, this.tester = _defaultTester});
+  const ConnectScreen({
+    super.key,
+    this.tester = _defaultTester,
+    this.finder = _defaultFinder,
+  });
 
   final ConnectionTester tester;
+  final ServerFinder finder;
 
   @override
   Widget build(BuildContext context) {
@@ -360,6 +461,7 @@ class ConnectScreen extends StatelessWidget {
                   ConnectionForm(
                     saveLabel: 'Connect',
                     tester: tester,
+                    finder: finder,
                     onSave: (connection) async {
                       await scope?.change(connection);
                     },
@@ -371,5 +473,159 @@ class ConnectScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+enum _Search { searching, found, same, none, hidden }
+
+/// Shown under "No document open" when the saved server could not be
+/// reached: looks for the server on the network by itself, once, and offers
+/// to switch when it answers somewhere else. Nothing is switched or saved
+/// until the user presses "Use it".
+class ServerFinderPanel extends StatefulWidget {
+  const ServerFinderPanel({
+    super.key,
+    this.finder = _defaultFinder,
+    this.searchSupported = networkSearchAvailable,
+  });
+
+  final ServerFinder finder;
+  final bool searchSupported;
+
+  @override
+  State<ServerFinderPanel> createState() => _ServerFinderPanelState();
+}
+
+class _ServerFinderPanelState extends State<ServerFinderPanel> {
+  _Search _state = _Search.searching;
+  List<DiscoveredServer> _found = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(_search);
+  }
+
+  ConnectionScope? get _scope =>
+      context.getInheritedWidgetOfExactType<ConnectionScope>();
+
+  Future<void> _search() async {
+    if (!widget.searchSupported) {
+      return;
+    }
+
+    final current = _scope?.connection;
+
+    if (current == null || current.token.isEmpty) {
+      setState(() => _state = _Search.none);
+
+      return;
+    }
+
+    setState(() => _state = _Search.searching);
+
+    final found = await widget.finder(token: current.token);
+
+    if (!mounted) {
+      return;
+    }
+
+    final others = found.where((s) => s.address != current.address).toList();
+
+    setState(() {
+      _found = others;
+      _state = others.isNotEmpty
+          ? _Search.found
+          : found.isNotEmpty
+              ? _Search.same
+              : _Search.none;
+    });
+  }
+
+  Future<void> _use(DiscoveredServer server) async {
+    final scope = _scope;
+    final current = scope?.connection;
+
+    if (scope == null || current == null) {
+      return;
+    }
+
+    await scope.change(ServerConnection(address: server.address, token: current.token));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    if (!widget.searchSupported) {
+      return const SizedBox.shrink();
+    }
+
+    switch (_state) {
+      case _Search.hidden:
+        return const SizedBox.shrink();
+      case _Search.searching:
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            const SizedBox(width: 8),
+            Text(appText(context, 'Looking for the server on this network...')),
+          ],
+        );
+      case _Search.same:
+        return Text(
+          appText(context, 'The server answers at the saved address. Press Try again.'),
+          textAlign: TextAlign.center,
+        );
+      case _Search.none:
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              appText(context, 'The server was not found on this network.'),
+              textAlign: TextAlign.center,
+            ),
+            TextButton(
+              onPressed: _search,
+              child: Text(appText(context, 'Find server')),
+            ),
+          ],
+        );
+      case _Search.found:
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final server in _found)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      '${appText(context, 'Server found')}: ${server.name}  ${server.address}',
+                      style: TextStyle(color: theme.colorScheme.primary),
+                    ),
+                    FilledButton(
+                      onPressed: () => _use(server),
+                      child: Text(appText(context, 'Use it')),
+                    ),
+                  ],
+                ),
+              ),
+            TextButton(
+              onPressed: () => setState(() => _state = _Search.hidden),
+              child: Text(appText(context, 'Ignore')),
+            ),
+          ],
+        );
+    }
   }
 }

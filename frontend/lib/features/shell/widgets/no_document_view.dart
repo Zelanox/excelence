@@ -55,6 +55,10 @@ class NoDocumentView extends StatelessWidget {
                 ),
               ),
             ],
+            if (problem != null && ConnectionScope.maybeOf(context) != null) ...[
+              const SizedBox(height: 12),
+              const ServerFinderPanel(),
+            ],
             const SizedBox(height: 16),
             Wrap(
               spacing: 12,

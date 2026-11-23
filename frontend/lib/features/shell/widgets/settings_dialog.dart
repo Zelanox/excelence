@@ -350,6 +350,15 @@ class SettingsDialog extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 _settingsSectionTitle(context, 'Server'),
+                                if (!connectionScope.savedOnDevice) ...[
+                                  Text(
+                                    appText(
+                                      context,
+                                      'This address comes from the build and is not saved on this device. Press Save to keep it.',
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                ],
                                 ConnectionForm(
                                   initial: connectionScope.connection,
                                   onSave: (connection) async {

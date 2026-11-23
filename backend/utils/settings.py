@@ -18,6 +18,10 @@ through the environment, with defaults that keep today's local behavior:
     EXCELENCE_DOCUMENTS_DIR        where workbooks are stored
     EXCELENCE_ACCESS_TOKEN         if set, every request must carry
                                    "Authorization: Bearer <token>"
+    EXCELENCE_DISCOVERY            "off" to stop answering "who is the server?"
+                                   questions from devices on the network
+                                   (default on; see backend/discovery.py)
+    EXCELENCE_DISCOVERY_PORT       UDP port for those questions (default 8765)
 
 Bad values raise ValueError at startup with a message saying what to fix:
 a server that quietly falls back to a default (say, a mistyped origin that
@@ -35,6 +39,7 @@ from urllib.parse import urlsplit
 
 DEFAULT_HOST = "0.0.0.0"
 DEFAULT_PORT = 8000
+DEFAULT_DISCOVERY_PORT = 8765
 
 # Short tokens are guessable over a network; this is only a floor.
 MIN_TOKEN_LENGTH = 12
@@ -53,6 +58,8 @@ class ServerSettings:
     allow_any_localhost: bool = True
     documents_dir: str | None = None
     access_token: str | None = None
+    discovery_enabled: bool = True
+    discovery_port: int = DEFAULT_DISCOVERY_PORT
 
     @property
     def is_network_exposed(self) -> bool:
@@ -60,14 +67,14 @@ class ServerSettings:
         return self.host not in _LOOPBACK_HOSTS
 
 
-def _parse_port(raw: str) -> int:
+def _parse_port(raw: str, name: str = "EXCELENCE_PORT") -> int:
     try:
         port = int(raw.strip())
     except ValueError:
-        raise ValueError(f"EXCELENCE_PORT must be a whole number, got {raw!r}.") from None
+        raise ValueError(f"{name} must be a whole number, got {raw!r}.") from None
 
     if not 1 <= port <= 65535:
-        raise ValueError(f"EXCELENCE_PORT must be between 1 and 65535, got {port}.")
+        raise ValueError(f"{name} must be between 1 and 65535, got {port}.")
 
     return port
 
@@ -145,6 +152,18 @@ def load_settings(env: Mapping[str, str] | None = None) -> ServerSettings:
             f"use at least {MIN_TOKEN_LENGTH}."
         )
 
+    discovery_flag = (get("EXCELENCE_DISCOVERY") or "on").lower()
+
+    if discovery_flag not in ("on", "off", "1", "0", "true", "false", "yes", "no"):
+        raise ValueError("EXCELENCE_DISCOVERY must be on or off.")
+
+    raw_discovery_port = get("EXCELENCE_DISCOVERY_PORT")
+    discovery_port = (
+        _parse_port(raw_discovery_port, "EXCELENCE_DISCOVERY_PORT")
+        if raw_discovery_port is not None
+        else DEFAULT_DISCOVERY_PORT
+    )
+
     return ServerSettings(
         host=host,
         port=port,
@@ -152,6 +171,8 @@ def load_settings(env: Mapping[str, str] | None = None) -> ServerSettings:
         allow_any_localhost=localhost_flag in ("1", "true", "yes"),
         documents_dir=get("EXCELENCE_DOCUMENTS_DIR"),
         access_token=token,
+        discovery_enabled=discovery_flag in ("on", "1", "true", "yes"),
+        discovery_port=discovery_port,
     )
 
 

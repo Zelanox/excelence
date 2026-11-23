@@ -149,6 +149,7 @@ def test_show_gives_the_address_for_the_app_and_never_localhost():
         assert "http://192.168.1.20:8000" in outcome.message
         assert "127.0.0.1" not in outcome.message and "localhost" not in outcome.message
         assert "will not start" not in outcome.message
+        assert "Discovery:      on (UDP 8765)" in outcome.message
 
 
 def test_show_warns_when_there_is_no_token():
@@ -191,6 +192,8 @@ def test_setup_with_enter_keeps_the_suggested_token_and_prints_what_to_type():
         assert "Server address:  http://192.168.1.20:8000" in outcome.message
         assert "Access token:    suggested-token-1" in outcome.message
         assert "127.0.0.1" not in outcome.message
+        assert "netsh advfirewall firewall add rule" in outcome.message
+        assert "protocol=UDP localport=8765" in outcome.message
 
 
 def test_setup_accepts_a_typed_token_and_port_and_asks_again_when_invalid():
@@ -294,3 +297,51 @@ def test_cli_config_usage_errors_exit_with_the_usage_code():
 def test_help_lists_the_setup_commands():
     code, out, _ = run_cli(["help"], make_paths("/tmp/x"))
     assert code == 0 and "setup" in out and "config show" in out and "config token" in out
+
+
+def test_discovery_can_be_changed_with_config_set():
+    with tempfile.TemporaryDirectory() as folder:
+        paths = make_paths(folder)
+
+        assert sc.set_config_value(paths, "discovery", "off").code == 0
+        assert sc.set_config_value(paths, "discovery-port", "9000").code == 0
+        assert sc.set_config_value(paths, "discovery", "maybe").code == sc.EXIT_USAGE
+
+        assert file_values(paths) == {"EXCELENCE_DISCOVERY": "off", "EXCELENCE_DISCOVERY_PORT": "9000"}
+        assert "Discovery:      off" in sc.show_config(paths, environ={}, lan_ip=lambda: "10.0.0.5").message
+
+
+# ---- excelence-server discover ----
+
+def test_discover_reports_what_it_found():
+    with tempfile.TemporaryDirectory() as folder:
+        paths = make_paths(folder)
+        sc.set_config_value(paths, "token", TOKEN)
+        calls = []
+
+        def finder(token, port):
+            calls.append((token, port))
+            return [{"name": "SERVER-PC", "address": "http://192.168.1.30:8000"}]
+
+        outcome = sc.run_discover(paths, environ={}, finder=finder)
+
+        assert outcome.code == 0 and "SERVER-PC  http://192.168.1.30:8000" in outcome.message
+        assert calls == [(TOKEN, 8765)]
+
+
+def test_discover_says_what_to_check_when_nothing_answers():
+    with tempfile.TemporaryDirectory() as folder:
+        paths = make_paths(folder)
+        sc.set_config_value(paths, "token", TOKEN)
+
+        outcome = sc.run_discover(paths, environ={}, finder=lambda token, port: [])
+
+        assert outcome.code == sc.EXIT_FAILED
+        assert "firewall" in outcome.message and "UDP 8765" in outcome.message and "Private" in outcome.message
+
+
+def test_discover_needs_a_token():
+    with tempfile.TemporaryDirectory() as folder:
+        outcome = sc.run_discover(make_paths(folder), environ={}, finder=lambda token, port: [])
+
+        assert outcome.code == sc.EXIT_USAGE and "setup" in outcome.message

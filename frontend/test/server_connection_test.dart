@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
+import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 import 'package:frontend/core/connection/server_connection.dart';
 
@@ -109,6 +111,53 @@ void main() {
       });
 
       expect(await const ServerConnectionStore().load(), isNull);
+    });
+
+    test('save reports success only after reading the value back', () async {
+      SharedPreferencesAsyncPlatform.instance = InMemorySharedPreferencesAsync.empty();
+      addTearDown(() => SharedPreferencesAsyncPlatform.instance = null);
+
+      const store = ServerConnectionStore();
+      const connection = ServerConnection(address: 'http://10.0.0.9:8001', token: 'new-token-1234');
+
+      expect(await store.save(connection), isTrue);
+      expect(await store.loadSaved(), connection);
+    });
+
+    test('the newest saved copy wins when the two stores disagree', () async {
+      SharedPreferences.setMockInitialValues({
+        'server_address': 'http://10.0.0.5:8000',
+        'server_saved_at': 1000,
+      });
+      SharedPreferencesAsyncPlatform.instance = InMemorySharedPreferencesAsync.withData({
+        'server_address': 'http://10.0.0.9:8001',
+        'server_saved_at': 2000,
+      });
+      addTearDown(() => SharedPreferencesAsyncPlatform.instance = null);
+
+      expect((await const ServerConnectionStore().loadSaved())?.address, 'http://10.0.0.9:8001');
+    });
+
+    test('saving again replaces an older copy in both stores', () async {
+      SharedPreferences.setMockInitialValues({
+        'server_address': 'http://10.0.0.5:8000',
+        'server_saved_at': 1000,
+      });
+      SharedPreferencesAsyncPlatform.instance = InMemorySharedPreferencesAsync.withData({
+        'server_address': 'http://10.0.0.6:8000',
+        'server_saved_at': 1500,
+      });
+      addTearDown(() => SharedPreferencesAsyncPlatform.instance = null);
+
+      const store = ServerConnectionStore();
+
+      expect(await store.save(const ServerConnection(address: 'http://10.0.0.9:8001')), isTrue);
+      expect((await store.loadSaved())?.address, 'http://10.0.0.9:8001');
+    });
+
+    test('the build-time pre-fill is not a saved address', () async {
+      expect(await const ServerConnectionStore().loadSaved(), isNull);
+      expect(ServerConnectionStore.preset(), isNull); // no --dart-define in tests
     });
 
     test('a changed address replaces the old one', () async {

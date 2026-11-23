@@ -82,3 +82,15 @@ When packaged these are next to `excelence-server.exe`; in development `excelenc
 5. `status` again: not running (exit code 1).
 6. `start`, then `start` again: the second says it is already running.
 7. `autostart on`, log out and in: the server is running; `autostart off` afterwards.
+
+## Letting devices find the server
+
+The server answers "where is the server?" questions from the app's **Find server** button (UDP port 8765; `excelence-server config set discovery off` turns it off, `discovery-port` moves it). The answer proves the server knows the access token without sending it, so only devices with the same token see it. Windows must allow the port once; `excelence-server setup` prints the command to run in a terminal started as administrator:
+
+```
+netsh advfirewall firewall add rule name="Excelence discovery" dir=in action=allow protocol=UDP localport=8765 profile=private
+```
+
+Manual check: on another device press **Find server** (token typed first) - the address is filled in. It cannot work across different subnets, on guest Wi-Fi that isolates devices, or through some VPNs; then type the address.
+
+**If "Find server" finds nothing**, test from the server PC first: `excelence-server discover`. If that finds the server, discovery works and the problem is on the app's PC (its firewall must allow the app to receive the answer: allow the app when Windows asks, on a Private network) or on the network. If it finds nothing, check `excelence-server logs` for "Answered a discovery question", the firewall rule above and that the network is set to Private. The app cannot search at all when run in a web browser (`flutter run -d chrome`): there the address is typed.

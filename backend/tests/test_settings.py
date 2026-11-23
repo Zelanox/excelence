@@ -173,3 +173,34 @@ def test_runner_refuses_to_listen_on_the_network_without_a_token():
                 os.environ.pop(name, None)
             else:
                 os.environ[name] = value
+
+
+# ---- discovery settings ----
+
+def test_discovery_is_on_by_default_on_port_8765():
+    settings = load_settings({})
+    assert settings.discovery_enabled is True and settings.discovery_port == 8765
+
+
+def test_discovery_can_be_switched_off_and_moved():
+    for value in ("off", "0", "false", "no", "OFF"):
+        assert load_settings({"EXCELENCE_DISCOVERY": value}).discovery_enabled is False, value
+    for value in ("on", "1", "true", "yes"):
+        assert load_settings({"EXCELENCE_DISCOVERY": value}).discovery_enabled is True, value
+
+    assert load_settings({"EXCELENCE_DISCOVERY_PORT": "9000"}).discovery_port == 9000
+
+
+def test_bad_discovery_settings_are_refused_with_their_own_name():
+    for env, name in (
+        ({"EXCELENCE_DISCOVERY": "maybe"}, "EXCELENCE_DISCOVERY"),
+        ({"EXCELENCE_DISCOVERY_PORT": "abc"}, "EXCELENCE_DISCOVERY_PORT"),
+        ({"EXCELENCE_DISCOVERY_PORT": "0"}, "EXCELENCE_DISCOVERY_PORT"),
+        ({"EXCELENCE_DISCOVERY_PORT": "70000"}, "EXCELENCE_DISCOVERY_PORT"),
+    ):
+        try:
+            load_settings(env)
+        except ValueError as error:
+            assert name in str(error), env
+        else:
+            raise AssertionError(f"{env} should be refused")

@@ -292,4 +292,28 @@ const Map<String, String> _arabic = {
       'تعذّر تطبيق العنوان الجديد. حاول مرة أخرى.',
   'Your open document could not be saved first, so the address was not changed. Try again.':
       'تعذّر حفظ المستند المفتوح أولًا، لذلك لم يتغير العنوان. حاول مرة أخرى.',
+  'This address comes from the build and is not saved on this device. Press Save to keep it.':
+      'هذا العنوان مأخوذ من نسخة التطبيق وغير محفوظ على هذا الجهاز. اضغط حفظ للاحتفاظ به.',
+  'Find server':
+      'البحث عن الخادم',
+  'Choose a server':
+      'اختر خادمًا',
+  'Use it':
+      'استخدمه',
+  'Ignore':
+      'تجاهل',
+  'Server found':
+      'تم العثور على خادم',
+  'Looking for the server on this network...':
+      'جارٍ البحث عن الخادم على هذه الشبكة...',
+  'The server answers at the saved address. Press Try again.':
+      'الخادم يستجيب على العنوان المحفوظ. اضغط إعادة المحاولة.',
+  'The server was not found on this network.':
+      'لم يتم العثور على الخادم على هذه الشبكة.',
+  'Enter the access token first: it is how your server is recognised.':
+      'أدخل رمز الوصول أولًا: به يتم التعرف على خادمك.',
+  'No server found with this token. Check that the server is running on this network and that discovery is allowed through its firewall (UDP 8765), or type the address.':
+      'لم يتم العثور على خادم بهذا الرمز. تحقق من أن الخادم يعمل على هذه الشبكة وأن الاكتشاف مسموح في جدار الحماية (UDP 8765)، أو اكتب العنوان.',
+  'Searching the network is not possible in a web browser. Type the server address.':
+      'البحث في الشبكة غير ممكن داخل متصفح الويب. اكتب عنوان الخادم.',
 };

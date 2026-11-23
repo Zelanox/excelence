@@ -128,3 +128,38 @@ Every top menu (File, Edit, View, Insert, Data, Tools, Help) opens. Items whose 
 **Acceptance.** A fresh install contains no localhost address on the client or in the server's output; typing the address and token once connects; changing them in Settings reconnects without a restart; the server will not start on the network without a token.
 
 **Known limits.** The token is stored in plain text on the device and travels over plain HTTP (trusted LAN). Edits that cannot be saved to the old server block an address change.
+
+## F. Find the server on the network (BUILT - needs a test on a real network)
+
+**Purpose.** A moved server (new PC, new IP) needs no change on any client.
+
+**How.** The server answers a UDP "who is an Excelence server?" broadcast (default port 8765, `EXCELENCE_DISCOVERY_PORT`, can be turned off). The question carries a random number; the answer carries the server's name, its HTTP port and a proof that it knows the access token (an HMAC of that number), never the token itself. A client only accepts answers whose proof matches its own token, so a stranger on the Wi-Fi cannot collect tokens by pretending to be the server.
+
+**Behavior.**
+1. "Find server" button in the connection form and on the first-run screen: searches for 3 seconds, fills in the address of the single match, or lists several to pick from.
+2. At start, if the saved address does not answer, the app searches by itself. One match: it keeps working and shows "Server found at <address>" with Keep / Ignore; the new address is saved only after Keep. No match: the usual "cannot reach" screen with Retry, Find server and Change server address.
+3. Setup prints the one-time Windows firewall rule for UDP 8765 (needs administrator); without it the button reports "No server found" and the address can still be typed.
+
+**Error/edge cases.** No reply; several servers; wrong token (silently ignored, reported as "no server found with this token"); broadcast blocked (guest Wi-Fi, other subnet, VPN); firewall closed; port in use; two servers with the same name.
+
+**As built.** Server: `backend/discovery.py` (UDP responder thread, at most 20 answers a second, only started when the server listens on the network, has a token and discovery is on); settings `EXCELENCE_DISCOVERY` (on/off) and `EXCELENCE_DISCOVERY_PORT` (8765), also `config set discovery|discovery-port`. App: `core/connection/server_discovery.dart` (+ `discovery_io.dart`; the browser build cannot search); "Find server" in the connection form (token must be typed first) and `ServerFinderPanel` on the "No document open" screen, which searches once by itself and only switches after "Use it". Needs `flutter pub get` (new package `crypto`).
+
+**Acceptance.** Move the server to another PC, open a client, press Find server: connected without typing an address. Tests: discovery message encode/decode, proof check, wrong token ignored, several answers, timeout.
+
+## G. Offline editing, syncing later (PROPOSED - not built, confirm first)
+
+**Purpose.** The app opens and works with the server switched off or out of reach; changes made meanwhile reach the server when it is back.
+
+**Phases (each releasable):**
+1. **Offline start.** Every opened document is kept on the device (last 5, setting). When the server cannot be reached, the app opens the last document from that copy, with a banner "Offline - changes will be sent when the server is back" and automatic retry every few seconds.
+2. **Offline cell edits.** Values, formulas and formatting can be edited offline. Every change goes into a queue stored on the device (survives closing the app). When the server returns the queue is sent in order, in batches of up to 500; the banner shows progress; the queue is only cleared after the server accepts a batch.
+3. **Conflicts.** If someone changed the same cell on the server meanwhile, the device's change wins (last writer wins) and the app lists the overwritten cells afterwards ("12 cells you changed replaced newer values; review"), so nothing is lost silently.
+4. **Structure.** Inserting/deleting rows, columns and sheets, Save as, Rename and Delete stay disabled offline (greyed, with the reason) until they exist as live operations (roadmap 5b-5).
+
+**Needs first (prerequisites on the server).** A document revision number that survives restarts; operations that record the value they replaced (also on the roadmap); a persistent operation log (today it is in memory and a restart loses it). Without them the client cannot tell what changed on the server while it was away.
+
+**Error/edge cases.** Server never returns; app closed with a non-empty queue; two offline devices edit the same cell; document deleted or renamed on the server while offline; queue sent partly (batch fails half-way); disk full on the device; very large document (the 10,000 / 100,000 row targets apply to the cached copy); token changed while offline.
+
+**Acceptance.** Switch the server off, start the app: the last document opens with the banner. Edit 100 cells, close and reopen the app (edits still there), switch the server on: all 100 arrive, the banner clears, a second device sees them. Same cell edited on the server and offline: the offline value wins and is listed.
+
+**Size.** Phase 1 is moderate, phase 2 large, phases 3 and the server prerequisites large. Recommended as its own release after the first packaged version.

@@ -116,9 +116,16 @@ def main(argv: list[str] | None = None) -> int:
     )
     watcher.start()
 
+    from backend.discovery import start_discovery
+
+    responder = start_discovery(settings)
+
     try:
         server.run()
     finally:
+        if responder is not None:
+            responder.close()
+
         watcher.close()
         service_control.remove_pid_file(paths, only_pid=os.getpid())
 

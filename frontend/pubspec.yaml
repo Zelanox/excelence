@@ -35,6 +35,9 @@ dependencies:
 
   http: ^1.5.0
 
+  # Finding the server on the network: HMAC proof (core/connection/server_discovery.dart).
+  crypto: ^3.0.6
+
   # Live collaboration: the WebSocket connection to the server.
   web_socket_channel: ^3.0.1
 

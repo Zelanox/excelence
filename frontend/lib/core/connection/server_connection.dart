@@ -145,49 +145,97 @@ String addressProblemMessage(AddressProblem problem) {
 }
 
 /// Keeps the address and token on this device.
+///
+/// The connection is written to BOTH of the plugin's storage APIs, each with
+/// a time stamp, and the newest valid copy wins when reading. Saving is only
+/// reported as successful after reading the value back, so a device that
+/// cannot remember the address says so instead of silently going back to an
+/// old one.
 class ServerConnectionStore {
   const ServerConnectionStore();
 
   static const _addressKey = 'server_address';
   static const _tokenKey = 'server_token';
+  static const _stampKey = 'server_saved_at';
 
-  /// The saved connection, or - only when nothing valid is saved - an
-  /// address given at build time (`--dart-define=API_BASE_URL=...`), or null
-  /// when the user still has to enter one. There is no default address.
-  Future<ServerConnection?> load() async {
+  /// The address given at build time (`--dart-define=API_BASE_URL=...`), if
+  /// it is a usable one. Only a pre-fill: it is never used once an address
+  /// has been saved on the device.
+  static ServerConnection? preset() {
+    final check = checkServerAddress(ApiConfig.baseUrl);
+
+    return check.isValid ? ServerConnection(address: check.address!) : null;
+  }
+
+  /// What this device has saved, or null. Never the build-time pre-fill.
+  Future<ServerConnection?> loadSaved() async {
+    ServerConnection? newest;
+    var newestStamp = -1;
+
+    void consider(String? address, String? token, int? stamp) {
+      if (address == null || !checkServerAddress(address).isValid) {
+        return;
+      }
+
+      if ((stamp ?? 0) > newestStamp) {
+        newestStamp = stamp ?? 0;
+        newest = ServerConnection(address: address, token: token ?? '');
+      }
+    }
+
     try {
       final prefs = await SharedPreferences.getInstance();
-      final address = prefs.getString(_addressKey);
-
-      if (address != null && checkServerAddress(address).isValid) {
-        return ServerConnection(
-          address: address,
-          token: prefs.getString(_tokenKey) ?? '',
-        );
-      }
+      consider(
+        prefs.getString(_addressKey),
+        prefs.getString(_tokenKey),
+        prefs.getInt(_stampKey),
+      );
     } catch (error) {
       debugPrint('[Connection] could not read the saved address: $error');
     }
 
-    final preset = checkServerAddress(ApiConfig.baseUrl);
+    try {
+      final prefs = SharedPreferencesAsync();
+      consider(
+        await prefs.getString(_addressKey),
+        await prefs.getString(_tokenKey),
+        await prefs.getInt(_stampKey),
+      );
+    } catch (error) {
+      debugPrint('[Connection] could not read the saved address (async): $error');
+    }
 
-    return preset.isValid ? ServerConnection(address: preset.address!) : null;
+    return newest;
   }
 
-  /// Returns false if the device could not store it.
+  /// The saved connection, or - only when nothing valid is saved - the
+  /// build-time pre-fill, or null when the user still has to enter one.
+  /// There is no default address.
+  Future<ServerConnection?> load() async => await loadSaved() ?? preset();
+
+  /// True only if the device really holds [connection] afterwards.
   Future<bool> save(ServerConnection connection) async {
+    final stamp = DateTime.now().millisecondsSinceEpoch;
+
     try {
       final prefs = await SharedPreferences.getInstance();
-      final savedAddress =
-          await prefs.setString(_addressKey, connection.address);
-      final savedToken = await prefs.setString(_tokenKey, connection.token);
-
-      return savedAddress && savedToken;
+      await prefs.setString(_addressKey, connection.address);
+      await prefs.setString(_tokenKey, connection.token);
+      await prefs.setInt(_stampKey, stamp);
     } catch (error) {
       debugPrint('[Connection] could not save the address: $error');
-
-      return false;
     }
+
+    try {
+      final prefs = SharedPreferencesAsync();
+      await prefs.setString(_addressKey, connection.address);
+      await prefs.setString(_tokenKey, connection.token);
+      await prefs.setInt(_stampKey, stamp);
+    } catch (error) {
+      debugPrint('[Connection] could not save the address (async): $error');
+    }
+
+    return await loadSaved() == connection;
   }
 }
 

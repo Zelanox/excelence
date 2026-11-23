@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:frontend/app/app.dart';
 import 'package:frontend/core/connection/connection_scope.dart';
 import 'package:frontend/core/connection/server_connection.dart';
+import 'package:frontend/core/connection/server_discovery.dart';
 import 'package:frontend/features/shell/widgets/connection_form.dart';
 import 'package:frontend/features/shell/widgets/settings_dialog.dart';
 import 'package:frontend/features/spreadsheet/controllers/spreadsheet_controller.dart';
@@ -29,11 +30,28 @@ class FakeCheck {
   }
 }
 
+class FakeFinder {
+  FakeFinder([this.result = const []]);
+
+  List<DiscoveredServer> result;
+  final List<String> tokens = [];
+
+  Future<List<DiscoveredServer>> call({required String token}) async {
+    tokens.add(token);
+    return result;
+  }
+}
+
+const serverA = DiscoveredServer(name: 'SERVER-PC', address: 'http://192.168.1.30:8000');
+const serverB = DiscoveredServer(name: 'OTHER-PC', address: 'http://192.168.1.31:8000');
+
 Future<void> pumpForm(
   WidgetTester tester, {
   required FakeCheck check,
   required Future<void> Function(ServerConnection) onSave,
   ServerConnection? initial,
+  FakeFinder? finder,
+  bool searchSupported = true,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
@@ -43,6 +61,8 @@ Future<void> pumpForm(
             initial: initial,
             onSave: onSave,
             tester: check.call,
+            finder: (finder ?? FakeFinder()).call,
+            searchSupported: searchSupported,
           ),
         ),
       ),
@@ -195,6 +215,178 @@ void main() {
       await tester.pump();
 
       expect(tester.widget<TextField>(tokenField).obscureText, isFalse);
+    });
+  });
+
+  group('Find server', () {
+    testWidgets('needs the token first and does not search without it', (tester) async {
+      final finder = FakeFinder([serverA]);
+
+      await pumpForm(tester, check: FakeCheck(), onSave: (_) async {}, finder: finder);
+      await tester.tap(find.text('Find server'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Enter the access token first'), findsOneWidget);
+      expect(finder.tokens, isEmpty);
+    });
+
+    testWidgets('in a browser it says searching is not possible', (tester) async {
+      final finder = FakeFinder([serverA]);
+
+      await pumpForm(tester, check: FakeCheck(), onSave: (_) async {}, finder: finder, searchSupported: false);
+      await tester.enterText(tokenField, 'secret-token-123');
+      await tester.tap(find.text('Find server'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('not possible in a web browser'), findsOneWidget);
+      expect(finder.tokens, isEmpty);
+    });
+
+    testWidgets('one server found fills in its address', (tester) async {
+      final finder = FakeFinder([serverA]);
+
+      await pumpForm(tester, check: FakeCheck(), onSave: (_) async {}, finder: finder);
+      await tester.enterText(tokenField, 'secret-token-123');
+      await tester.tap(find.text('Find server'));
+      await tester.pumpAndSettle();
+
+      expect(finder.tokens, ['secret-token-123']);
+      expect(tester.widget<TextField>(addressField).controller!.text, 'http://192.168.1.30:8000');
+      expect(find.textContaining('Found SERVER-PC'), findsOneWidget);
+    });
+
+    testWidgets('nothing found says what to check', (tester) async {
+      await pumpForm(tester, check: FakeCheck(), onSave: (_) async {}, finder: FakeFinder());
+      await tester.enterText(tokenField, 'secret-token-123');
+      await tester.tap(find.text('Find server'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('No server found with this token'), findsOneWidget);
+      expect(tester.widget<TextField>(addressField).controller!.text, isEmpty);
+    });
+
+    testWidgets('several servers: the user chooses one', (tester) async {
+      await pumpForm(tester, check: FakeCheck(), onSave: (_) async {}, finder: FakeFinder([serverA, serverB]));
+      await tester.enterText(tokenField, 'secret-token-123');
+      await tester.tap(find.text('Find server'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Choose a server'), findsOneWidget);
+
+      await tester.tap(find.textContaining('OTHER-PC'));
+      await tester.pumpAndSettle();
+
+      expect(tester.widget<TextField>(addressField).controller!.text, 'http://192.168.1.31:8000');
+    });
+
+    testWidgets('closing the list without choosing changes nothing', (tester) async {
+      await pumpForm(tester, check: FakeCheck(), onSave: (_) async {}, finder: FakeFinder([serverA, serverB]));
+      await tester.enterText(tokenField, 'secret-token-123');
+      await tester.tap(find.text('Find server'));
+      await tester.pumpAndSettle();
+
+      await tester.tapAt(const Offset(5, 5)); // outside the dialog
+      await tester.pumpAndSettle();
+
+      expect(tester.widget<TextField>(addressField).controller!.text, isEmpty);
+    });
+  });
+
+  group('ServerFinderPanel', () {
+    Future<List<ServerConnection>> pumpPanel(
+      WidgetTester tester,
+      FakeFinder finder, {
+      String token = 'secret-token-123',
+    }) async {
+      final changes = <ServerConnection>[];
+
+      await tester.pumpWidget(
+        ConnectionScope(
+          connection: ServerConnection(address: 'http://192.168.1.20:8000', token: token),
+          change: (c) async => changes.add(c),
+          child: MaterialApp(
+            home: Scaffold(body: Center(child: ServerFinderPanel(finder: finder.call))),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      return changes;
+    }
+
+    testWidgets('searches by itself and offers a server found elsewhere', (tester) async {
+      final finder = FakeFinder([serverA]);
+      final changes = await pumpPanel(tester, finder);
+
+      expect(finder.tokens, ['secret-token-123']);
+      expect(find.textContaining('SERVER-PC'), findsOneWidget);
+      expect(changes, isEmpty); // nothing is switched until the user agrees
+
+      await tester.tap(find.text('Use it'));
+      await tester.pumpAndSettle();
+
+      expect(changes.single.address, 'http://192.168.1.30:8000');
+      expect(changes.single.token, 'secret-token-123');
+    });
+
+    testWidgets('Ignore hides the offer without changing anything', (tester) async {
+      final changes = await pumpPanel(tester, FakeFinder([serverA]));
+
+      await tester.tap(find.text('Ignore'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Use it'), findsNothing);
+      expect(changes, isEmpty);
+    });
+
+    testWidgets('a server at the saved address is not offered as a change', (tester) async {
+      await pumpPanel(
+        tester,
+        FakeFinder([const DiscoveredServer(name: 'SERVER-PC', address: 'http://192.168.1.20:8000')]),
+      );
+
+      expect(find.text('Use it'), findsNothing);
+      expect(find.textContaining('answers at the saved address'), findsOneWidget);
+    });
+
+    testWidgets('nothing found says so and can search again', (tester) async {
+      final finder = FakeFinder();
+      await pumpPanel(tester, finder);
+
+      expect(find.textContaining('not found on this network'), findsOneWidget);
+
+      await tester.tap(find.text('Find server'));
+      await tester.pumpAndSettle();
+
+      expect(finder.tokens, hasLength(2));
+    });
+
+    testWidgets('in a browser the panel shows nothing and does not search', (tester) async {
+      final finder = FakeFinder([serverA]);
+      final changes = <ServerConnection>[];
+
+      await tester.pumpWidget(
+        ConnectionScope(
+          connection: const ServerConnection(address: 'http://192.168.1.20:8000', token: 'secret-token-123'),
+          change: (c) async => changes.add(c),
+          child: MaterialApp(
+            home: Scaffold(body: ServerFinderPanel(finder: finder.call, searchSupported: false)),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(finder.tokens, isEmpty);
+      expect(find.text('Use it'), findsNothing);
+      expect(find.textContaining('not found'), findsNothing);
+    });
+
+    testWidgets('without a token it does not search', (tester) async {
+      final finder = FakeFinder([serverA]);
+      await pumpPanel(tester, finder, token: '');
+
+      expect(finder.tokens, isEmpty);
+      expect(find.textContaining('not found on this network'), findsOneWidget);
     });
   });
 

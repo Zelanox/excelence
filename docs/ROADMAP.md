@@ -48,7 +48,8 @@ Requirements are written before any of these are built.
 
 ## Later
 - Per-user undo through inverse operations (phase 6).
-- Accounts, permissions, HTTPS; offline mode (phase 7).
+- Accounts, permissions, HTTPS (phase 7).
+- **Find server on the network** (requirements F): built, waiting for a real-network test. **Offline editing** (requirements G, phases 1-4): confirmed, after the first packaged release; needs the server prerequisites listed there first.
 - PyInstaller build never run.
 
 ## Known issues deferred (not started)
