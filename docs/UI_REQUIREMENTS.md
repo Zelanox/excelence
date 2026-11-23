@@ -163,3 +163,26 @@ Every top menu (File, Edit, View, Insert, Data, Tools, Help) opens. Items whose 
 **Acceptance.** Switch the server off, start the app: the last document opens with the banner. Edit 100 cells, close and reopen the app (edits still there), switch the server on: all 100 arrive, the banner clears, a second device sees them. Same cell edited on the server and offline: the offline value wins and is listed.
 
 **Size.** Phase 1 is moderate, phase 2 large, phases 3 and the server prerequisites large. Recommended as its own release after the first packaged version.
+
+## H. Updates served by the server (PROPOSED - not built, confirm first)
+
+**Purpose.** Publish a new client once, on the server; every Windows PC and Android phone fetches and installs it by itself. No copying files by hand.
+
+**Must be part of the first packaged release**: a client without the updater cannot update itself later.
+
+**Flow.**
+1. On the server PC: `excelence-server publish-update --version 1.2.0 --build 7 --notes "..." --windows <zip of the Release folder> --android <apk>` copies the packages into the server's `updates` folder and writes a manifest (version, build number, notes, file name, size, SHA-256 per platform, minimum client build).
+2. Server routes (behind the usual access token): `GET /updates/manifest`, `GET /updates/files/<name>`.
+3. The app checks the manifest at start and on "Check for updates" (Settings > About); if the published build is newer: "Version 1.2.0 is available - Install now / Later" (with the notes). A manifest `minimum client build` above the app's own makes the update required (the app explains why and offers only Install).
+4. Download shows progress; the file's SHA-256 is checked against the manifest; a bad or partial file is deleted and reported ("Download failed, nothing was changed. Try again.").
+5. **Windows:** the zip is unpacked beside the app, a small helper waits for the app to close, copies the files over the install folder, and starts the new version. If the folder is not writable the user is told where and why.
+6. **Android:** the APK is handed to the system installer (the user taps Install; Android asks once to allow installs from this app). It only installs over the existing app if signed with the **same release key**, so the APK must always be built with the same keystore (keep a backup of it).
+7. The server itself is updated by hand on its PC (`excelence-server stop`, replace, `start`); a later step can automate it.
+
+**Error/edge cases.** Server unreachable (skip silently, retry later); no update published; downloaded file truncated or altered; disk full; app opened from a read-only place; two updates published in a row; update published for one platform only; the user chooses Later (asked again at the next start, not more often); downgrade (never offered); phone on mobile data away from the LAN (no check).
+
+**Trust.** Integrity is the SHA-256 in the manifest, delivered by your own server over the LAN with the access token. A stronger step, for later: sign every package with a key kept on the developer's PC and build the public key into the app, so even a tampered server cannot push code.
+
+**Acceptance.** Publish build 2 on the server; a client running build 1 shows the offer, installs and restarts as build 2 with its saved address and token intact; a corrupted download is refused; a phone does the same with the APK. Tests: manifest read/write and the publish command, hash check, newer-build comparison, required-update rule, download failure handling.
+
+**Phases (each releasable).** (1) Server: publish command, manifest and file routes - testable here. (2) App: check, offer, download, verify, Windows install. (3) Android install.
